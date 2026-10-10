@@ -1,9 +1,10 @@
 import { config } from 'dotenv';
 import express, { type RequestHandler } from 'express';
-import { timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkCredentials, createSessionToken, parseUsers, readSession, setSessionCookie } from './auth.ts';
 
 const app = express();
 config({ path: ['.env.local', '.env'], quiet: true });
@@ -19,38 +20,11 @@ app.disable('x-powered-by');
 // Health check usado pelo Render; fica fora da autenticação.
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
-// Autenticação básica opcional: ativa somente quando APP_USERNAME e APP_PASSWORD estão definidos.
-const authUser = process.env.APP_USERNAME;
-const authPassword = process.env.APP_PASSWORD;
-
-function safeEqual(a: string, b: string): boolean {
-  const left = Buffer.from(a);
-  const right = Buffer.from(b);
-  return left.length === right.length && timingSafeEqual(left, right);
-}
-
-if (authUser && authPassword) {
-  app.use((req, res, next) => {
-    const header = req.headers.authorization || '';
-    if (header.startsWith('Basic ')) {
-      const decoded = Buffer.from(header.slice(6), 'base64').toString('utf8');
-      const separator = decoded.indexOf(':');
-      const user = decoded.slice(0, separator);
-      const password = decoded.slice(separator + 1);
-      if (separator >= 0 && safeEqual(user, authUser) && safeEqual(password, authPassword)) return next();
-    }
-    res.setHeader('WWW-Authenticate', 'Basic realm="GuardList", charset="UTF-8"');
-    return res.status(401).send('Autenticação necessária.');
-  });
-} else if (production) {
-  console.warn('Aviso: APP_USERNAME/APP_PASSWORD não definidos; o GuardList está público.');
-}
-
-// Limite simples por IP em janela fixa de 1 minuto, para proteger a cota das APIs de CTI.
-function rateLimit(name: string, maxPerMinute: number): RequestHandler {
+// Limite simples por IP em janela fixa, para proteger a cota das APIs de CTI e o login.
+function rateLimit(name: string, maxPerWindow: number, windowMs = 60_000): RequestHandler {
   const hits = new Map<string, { windowStart: number; count: number }>();
   setInterval(() => {
-    const cutoff = Date.now() - 60_000;
+    const cutoff = Date.now() - windowMs;
     for (const [key, entry] of hits) if (entry.windowStart < cutoff) hits.delete(key);
   }, 60_000).unref();
 
@@ -58,20 +32,63 @@ function rateLimit(name: string, maxPerMinute: number): RequestHandler {
     const key = req.ip || 'unknown';
     const now = Date.now();
     const entry = hits.get(key);
-    if (!entry || now - entry.windowStart >= 60_000) {
+    if (!entry || now - entry.windowStart >= windowMs) {
       hits.set(key, { windowStart: now, count: 1 });
       return next();
     }
     entry.count += 1;
-    if (entry.count <= maxPerMinute) return next();
-    const retryAfter = Math.ceil((entry.windowStart + 60_000 - now) / 1000);
+    if (entry.count <= maxPerWindow) return next();
+    const retryAfter = Math.ceil((entry.windowStart + windowMs - now) / 1000);
     res.setHeader('Retry-After', String(retryAfter));
-    return res.status(429).json({ error: `Muitas consultas (${name}). Tente novamente em ${retryAfter}s.` });
+    return res.status(429).json({ error: `Muitas tentativas (${name}). Tente novamente em ${retryAfter}s.` });
   };
 }
 
 const ctiLimit = rateLimit('CTI', Number(process.env.CTI_RATE_LIMIT_PER_MIN || 30));
 const abuseSummaryLimit = rateLimit('AbuseIPDB', Number(process.env.ABUSE_SUMMARY_RATE_LIMIT_PER_MIN || 120));
+const loginLimit = rateLimit('login', 20, 15 * 60_000);
+
+// Login: ativo quando APP_USERS tem ao menos um usuário.
+const users = parseUsers(process.env.APP_USERS);
+const authEnabled = users.size > 0;
+const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString('hex');
+
+if (!authEnabled && production) {
+  console.warn('Aviso: APP_USERS não definido; o GuardList está público.');
+}
+if (authEnabled && !process.env.SESSION_SECRET) {
+  console.warn('Aviso: SESSION_SECRET não definido; as sessões expiram a cada reinício do servidor.');
+}
+
+app.get('/api/auth/me', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  if (!authEnabled) return res.json({ authEnabled: false, user: null });
+  return res.json({ authEnabled: true, user: readSession(sessionSecret, users, req) });
+});
+
+app.post('/api/auth/login', loginLimit, express.json({ limit: '4kb' }), (req, res) => {
+  if (!authEnabled) return res.status(400).json({ error: 'O login não está ativado neste servidor.' });
+  const username = typeof req.body?.username === 'string' ? req.body.username : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!username || !password || username.length > 64 || password.length > 256) {
+    return res.status(400).json({ error: 'Informe usuário e senha.' });
+  }
+  const user = checkCredentials(users, username, password);
+  if (!user) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+  setSessionCookie(req, res, createSessionToken(sessionSecret, user));
+  return res.json({ user });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  setSessionCookie(req, res, null);
+  return res.json({ ok: true });
+});
+
+// Demais rotas de API exigem sessão válida quando o login está ativo.
+app.use('/api', (req, res, next) => {
+  if (!authEnabled || readSession(sessionSecret, users, req)) return next();
+  return res.status(401).json({ error: 'Sessão expirada. Entre novamente.' });
+});
 
 type SourceResult = {
   status: 'ok' | 'not_configured' | 'not_found' | 'rate_limited' | 'error';

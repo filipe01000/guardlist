@@ -6,6 +6,7 @@ import {
   HardDriveDownload,
   History,
   LayoutDashboard,
+  LogOut,
   ListFilter,
   Radio,
   Search,
@@ -24,6 +25,8 @@ interface NavbarProps {
   onToggleTheme: () => void;
   isBackupOutdated: boolean;
   daysSinceBackup: number | null;
+  currentUser?: string | null;
+  onLogout?: () => void;
 }
 
 const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = [
@@ -43,7 +46,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   theme,
   onToggleTheme,
   isBackupOutdated,
-  daysSinceBackup
+  daysSinceBackup,
+  currentUser,
+  onLogout
 }) => {
   return (
     <header className="studio-header text-white">
@@ -112,6 +117,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               <strong>{daysSinceBackup === null ? 'Pendente' : `há ${daysSinceBackup} dias`}</strong>
             </span>
           </button>
+          {onLogout && (
+            <button type="button" onClick={onLogout} className="studio-download" title={currentUser ? `Conectado como ${currentUser}` : undefined}>
+              <LogOut aria-hidden="true" />
+              <span>Sair{currentUser ? ` (${currentUser})` : ''}</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

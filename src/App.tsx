@@ -25,7 +25,12 @@ import { generateFirewallTxt, generateNanoFormattedTxt, triggerDownload } from '
 import { getDaysSince } from './utils/validator';
 import { CheckCircle2 } from 'lucide-react';
 
-export default function App() {
+interface AppProps {
+  currentUser?: string | null;
+  onLogout?: () => void;
+}
+
+export default function App({ currentUser = null, onLogout }: AppProps) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = window.localStorage.getItem('guardlist-theme');
     if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
@@ -207,6 +212,8 @@ export default function App() {
         onToggleTheme={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
         isBackupOutdated={isBackupOutdated}
         daysSinceBackup={daysSinceBackup}
+        currentUser={currentUser}
+        onLogout={onLogout}
       />
 
       {/* Conteúdo Principal */}

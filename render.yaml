@@ -10,10 +10,11 @@ services:
       - key: NODE_VERSION
         value: "22"
       # Defina os valores no painel do Render (sync: false = não ficam no repositório).
-      - key: APP_USERNAME
+      # Usuários do login, gerados com `npm run user:add -- <usuario>`.
+      - key: APP_USERS
         sync: false
-      - key: APP_PASSWORD
-        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
       - key: ABUSEIPDB_API_KEY
         sync: false
       - key: GREYNOISE_API_KEY

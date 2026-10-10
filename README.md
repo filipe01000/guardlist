@@ -38,9 +38,20 @@ O repositório já inclui `render.yaml`. No Render, use **New → Blueprint** ap
 
 Variáveis de ambiente (definidas no painel, nunca no repositório):
 
-- `APP_USERNAME` e `APP_PASSWORD`: ativam o login HTTP Basic. Sem elas, qualquer pessoa com a URL acessa o app e consome a cota das APIs.
+- `APP_USERS`: usuários que podem entrar. Sem ela, qualquer pessoa com a URL acessa o app e consome a cota das APIs.
+- `SESSION_SECRET`: assina as sessões de login. O `render.yaml` já gera um valor aleatório.
 - `ABUSEIPDB_API_KEY`, `GREYNOISE_API_KEY`, `OTX_API_KEY`: integrações CTI (opcionais).
 - `CTI_RATE_LIMIT_PER_MIN` (padrão 30) e `ABUSE_SUMMARY_RATE_LIMIT_PER_MIN` (padrão 120): limites por IP.
+
+### Usuários
+
+Para criar um usuário, rode localmente:
+
+```bash
+npm run user:add -- maria
+```
+
+O comando pede a senha (mínimo de 10 caracteres) sem mostrá-la e imprime uma linha como `maria:scrypt:...`. Cole essa linha em `APP_USERS` no Render; para vários usuários, separe as linhas por vírgula. Para tirar o acesso de alguém, remova a entrada dessa pessoa: as sessões dela deixam de valer quando o serviço reinicia com a nova variável.
 
 Não defina `HOST` no Render; em produção o servidor já escuta em `0.0.0.0` e usa a `PORT` fornecida pela plataforma.
 
