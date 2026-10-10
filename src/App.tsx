@@ -36,6 +36,13 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
     if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('guardlist-sidebar-collapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
   const [currentTab, setCurrentTab] = useState<
     'dashboard' | 'import' | 'client-list' | 'intelligence' | 'history' | 'clients' | 'backup'
   >('dashboard');
@@ -123,6 +130,14 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
     window.localStorage.setItem('guardlist-theme', theme);
   }, [theme]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('guardlist-sidebar-collapsed', sidebarCollapsed ? '1' : '0');
+    } catch {
+      // Preferência opcional; ignora navegadores sem armazenamento local.
+    }
+  }, [sidebarCollapsed]);
+
   // Navegações cruzadas
   const handleNavigateToImport = (clientId: string) => {
     setImportTargetClientId(clientId);
@@ -194,7 +209,7 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
   const isBackupOutdated = daysSinceBackup === null || daysSinceBackup > 7;
 
   return (
-    <div className="app-shell min-h-screen text-slate-100 flex flex-col font-sans">
+    <div className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''} min-h-screen text-slate-100 flex flex-col font-sans`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-slate-900 border border-emerald-500/80 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs animate-in slide-in-from-bottom-3 duration-200">
@@ -203,7 +218,7 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
         </div>
       )}
 
-      {/* Barra de Navegação Superior */}
+      {/* Menu lateral */}
       <Navbar
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
@@ -212,6 +227,8 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
         onToggleTheme={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
         isBackupOutdated={isBackupOutdated}
         daysSinceBackup={daysSinceBackup}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed(value => !value)}
         currentUser={currentUser}
         onLogout={onLogout}
       />

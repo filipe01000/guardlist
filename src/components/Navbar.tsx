@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   Building2,
@@ -6,14 +6,17 @@ import {
   HardDriveDownload,
   History,
   LayoutDashboard,
-  LogOut,
   ListFilter,
+  LogOut,
+  Menu,
+  Moon,
+  PanelLeft,
   Radio,
   Search,
-  Moon,
-  Sun,
-  UploadCloud
+  UploadCloud,
+  X
 } from 'lucide-react';
+import './Sidebar.css';
 
 type AppTab = 'dashboard' | 'import' | 'client-list' | 'intelligence' | 'history' | 'clients' | 'backup';
 
@@ -25,6 +28,8 @@ interface NavbarProps {
   onToggleTheme: () => void;
   isBackupOutdated: boolean;
   daysSinceBackup: number | null;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
   currentUser?: string | null;
   onLogout?: () => void;
 }
@@ -39,6 +44,11 @@ const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = 
   { id: 'backup', label: 'Backup e ajustes', icon: HardDrive }
 ];
 
+function initials(name: string): string {
+  const parts = name.split(/[\s._-]+/).filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase();
+}
+
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   setCurrentTab,
@@ -47,84 +57,172 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleTheme,
   isBackupOutdated,
   daysSinceBackup,
+  collapsed,
+  onToggleCollapsed,
   currentUser,
   onLogout
 }) => {
-  return (
-    <header className="studio-header text-white">
-      <div className="studio-header__inner">
-        <button
-          type="button"
-          onClick={() => setCurrentTab('dashboard')}
-          className="studio-brand"
-          aria-label="Ir para o painel geral"
-        >
-          <span className="studio-brand__mark">
-            <img src="/brand/guardlist-mark.png" alt="" aria-hidden="true" />
-          </span>
-          <span className="studio-brand__copy">
-            <strong>GuardList</strong>
-          </span>
-        </button>
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
+  const activeRow = Math.max(0, navItems.findIndex((item) => item.id === currentTab));
+  const displayName = currentUser || 'Uso local';
+  const backupLabel = isBackupOutdated
+    ? 'Backup pendente'
+    : `Backup há ${daysSinceBackup} ${daysSinceBackup === 1 ? 'dia' : 'dias'}`;
 
-        <div className="studio-header__tools">
-          <button type="button" onClick={onOpenQuickSearch} className="studio-search" aria-label="Consultar IP">
-            <Search aria-hidden="true" />
-            <span>Consultar IP</span>
-            <kbd>Ctrl/⌘ K</kbd>
-          </button>
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => event.key === 'Escape' && setMobileOpen(false);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [mobileOpen]);
+
+  useEffect(() => {
+    if (!collapsed) setTip(null);
+  }, [collapsed]);
+
+  const go = (tab: AppTab) => {
+    setCurrentTab(tab);
+    setMobileOpen(false);
+  };
+
+  // Dicas flutuantes no modo recolhido; ficam fora da sidebar para não serem cortadas.
+  const showTip = (event: React.SyntheticEvent<HTMLElement>) => {
+    if (!collapsed) return;
+    const target = (event.target as HTMLElement).closest<HTMLElement>('[data-tip]');
+    if (!target) return;
+    const rect = target.getBoundingClientRect();
+    setTip({ text: target.dataset.tip || '', top: rect.top + rect.height / 2, left: rect.right + 14 });
+  };
+  const hideTip = () => setTip(null);
+
+  return (
+    <>
+      <div className="gl-mobilebar">
+        <button type="button" className="gl-icon-btn" onClick={() => setMobileOpen(true)} aria-label="Abrir menu">
+          <Menu aria-hidden="true" />
+        </button>
+        <span className="gl-mobilebar__brand">
+          <img src="/brand/guardlist-mark.png" alt="" />
+          GuardList
+        </span>
+        <button type="button" className="gl-icon-btn" onClick={onOpenQuickSearch} aria-label="Consultar IP">
+          <Search aria-hidden="true" />
+        </button>
+      </div>
+
+      <div
+        className={`gl-sidebar-backdrop ${mobileOpen ? 'is-open' : ''}`}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden="true"
+      />
+
+      <aside
+        className={`gl-sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'is-open' : ''}`}
+        aria-label="Menu principal"
+        onMouseOver={showTip}
+        onFocus={showTip}
+        onMouseOut={hideTip}
+        onBlur={hideTip}
+      >
+        <div className="gl-sidebar-inner">
+          <div className="gl-brand">
+            <span className="gl-brand-mark">
+              <img src="/brand/guardlist-mark.png" alt="" />
+            </span>
+            <span className="gl-brand-name label">GuardList</span>
+          </div>
+
           <button
             type="button"
-            onClick={onToggleTheme}
-            className="studio-theme-toggle"
-            aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
-            title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+            className="gl-collapse-btn"
+            onClick={onToggleCollapsed}
+            aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+            aria-expanded={!collapsed}
           >
-            {theme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+            <PanelLeft aria-hidden="true" />
           </button>
-        </div>
+          <button type="button" className="gl-close-btn" onClick={() => setMobileOpen(false)} aria-label="Fechar menu">
+            <X aria-hidden="true" />
+          </button>
 
-        {isBackupOutdated && (
-          <button type="button" onClick={() => setCurrentTab('backup')} className="studio-backup-alert">
-            <AlertTriangle aria-hidden="true" />
-            <span>
-              <strong>Backup pendente</strong>
-              <small>{daysSinceBackup === null ? 'Nenhuma cópia exportada' : `Última cópia há ${daysSinceBackup} dias`}</small>
+          <hr className="gl-divider" />
+
+          <div className="gl-profile" data-tip={displayName}>
+            <span className="gl-avatar" aria-hidden="true">{initials(displayName)}</span>
+            <span className="gl-profile-text label">
+              <span className="gl-profile-name">{displayName}</span>
+              <span className="gl-profile-role">{currentUser ? 'Acesso autorizado' : 'Sem login ativo'}</span>
+            </span>
+          </div>
+
+          <button type="button" className="gl-row gl-search" onClick={onOpenQuickSearch} data-tip="Consultar IP (Ctrl/⌘ K)" aria-label="Consultar IP">
+            <Search aria-hidden="true" />
+            <span className="label">Consultar IP</span>
+            <kbd className="label">Ctrl K</kbd>
+          </button>
+
+          <ul className="gl-nav" style={{ '--active-row': activeRow } as React.CSSProperties}>
+            <li className="gl-indicator" aria-hidden="true" />
+            {navItems.map(({ id, label, icon: Icon }) => (
+              <li key={id}>
+                <button
+                  type="button"
+                  className={`gl-row ${currentTab === id ? 'active' : ''}`}
+                  onClick={() => go(id)}
+                  aria-current={currentTab === id ? 'page' : undefined}
+                  data-tip={label}
+                  aria-label={label}
+                >
+                  <Icon aria-hidden="true" />
+                  <span className="label">{label}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          <hr className="gl-divider" />
+
+          <button
+            type="button"
+            className={`gl-row gl-backup ${isBackupOutdated ? 'is-warning' : ''}`}
+            onClick={() => go('backup')}
+            data-tip={backupLabel}
+            aria-label={backupLabel}
+          >
+            {isBackupOutdated ? <AlertTriangle aria-hidden="true" /> : <HardDriveDownload aria-hidden="true" />}
+            <span className="label">{backupLabel}</span>
+          </button>
+
+          <button
+            type="button"
+            className="gl-row gl-theme-toggle"
+            onClick={onToggleTheme}
+            aria-pressed={theme === 'dark'}
+            data-tip="Modo escuro"
+            aria-label="Modo escuro"
+          >
+            <Moon aria-hidden="true" />
+            <span className="label">Modo escuro</span>
+            <span className={`gl-switch label ${theme === 'dark' ? 'on' : ''}`}>
+              <span />
             </span>
           </button>
-        )}
 
-        <nav className="studio-nav" aria-label="Navegação principal">
-          {navItems.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setCurrentTab(id)}
-              className={`studio-nav__item ${currentTab === id ? 'is-active' : ''}`}
-              aria-current={currentTab === id ? 'page' : undefined}
-            >
-              <Icon aria-hidden="true" />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
-
-        <div className="studio-sidebar-meta">
-          <button type="button" onClick={() => setCurrentTab('backup')} className="studio-backup-state">
-            <HardDriveDownload aria-hidden="true" />
-            <span>
-              <small>Último backup</small>
-              <strong>{daysSinceBackup === null ? 'Pendente' : `há ${daysSinceBackup} dias`}</strong>
-            </span>
-          </button>
           {onLogout && (
-            <button type="button" onClick={onLogout} className="studio-download" title={currentUser ? `Conectado como ${currentUser}` : undefined}>
+            <button type="button" className="gl-row gl-logout" onClick={onLogout} data-tip="Sair" aria-label="Sair">
               <LogOut aria-hidden="true" />
-              <span>Sair{currentUser ? ` (${currentUser})` : ''}</span>
+              <span className="label">Sair</span>
             </button>
           )}
         </div>
-      </div>
-    </header>
+      </aside>
+
+      {tip && (
+        <div className="gl-tooltip" role="tooltip" style={{ top: tip.top, left: tip.left }}>
+          {tip.text}
+        </div>
+      )}
+    </>
   );
 };

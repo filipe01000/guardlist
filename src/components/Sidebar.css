@@ -1,0 +1,463 @@
+/* Sidebar flutuante recolhível. As cores seguem os tokens de tema do app (index.css). */
+
+:root {
+  --sb-card: var(--sidebar);
+  --sb-band: var(--accent-soft);
+  --sb-band-text: var(--accent);
+  --sb-divider: var(--line);
+  --sb-surface: var(--surface-raised);
+  --sb-surface-hover: var(--surface-subtle);
+  --sb-tooltip-bg: #22222b;
+  --sb-tooltip-text: #ffffff;
+  --sb-gap: 24px;
+  --sb-width: 280px;
+  --sb-collapsed: 70px;
+  --sb-pad: 24px;
+  --sb-icon: 22px;
+  --sb-row: 46px;
+  --sb-avatar: 46px;
+  --sb-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+:root[data-theme="light"] {
+  --sb-card: #ffffff;
+  --sb-band: #f0f5ff;
+  --sb-band-text: #2563eb;
+  --sb-divider: #edeef2;
+  --sb-surface: #f2f4f7;
+  --sb-surface-hover: #eaeaec;
+  --sb-shadow: 0 12px 40px rgba(31, 26, 74, 0.08);
+}
+
+:root[data-theme="dark"] {
+  --sb-tooltip-bg: #f2f5f8;
+  --sb-tooltip-text: #17202b;
+}
+
+/* Espaço reservado para a sidebar no conteúdo. */
+.app-shell {
+  --sb-offset: calc(var(--sb-width) + var(--sb-gap) * 2);
+}
+
+.app-shell.is-sidebar-collapsed {
+  --sb-offset: calc(var(--sb-collapsed) + var(--sb-gap) * 2);
+}
+
+.app-shell .studio-main,
+.app-shell .studio-footer {
+  width: calc(100% - var(--sb-offset));
+  max-width: none;
+  margin-left: var(--sb-offset);
+  transition: margin-left 0.35s ease, width 0.35s ease;
+}
+
+.app-shell .studio-main {
+  padding: var(--sb-gap) clamp(16px, 3vw, 42px) 44px clamp(0px, 1vw, 12px);
+}
+
+.gl-sidebar {
+  position: fixed;
+  z-index: 40;
+  top: var(--sb-gap);
+  left: var(--sb-gap);
+  bottom: var(--sb-gap);
+  height: fit-content;
+  max-height: calc(100dvh - var(--sb-gap) * 2);
+  width: var(--sb-width);
+  display: flex;
+  overflow: hidden;
+  border-radius: 24px;
+  background: var(--sb-card);
+  box-shadow: 0 0 0 1px var(--sb-divider), var(--sb-shadow);
+  transition: width 0.35s ease, background 0.3s, box-shadow 0.3s, translate 0.3s ease;
+}
+
+.gl-sidebar.collapsed {
+  width: var(--sb-collapsed);
+}
+
+.gl-sidebar-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  padding: 22px 0;
+}
+
+.gl-sidebar .label {
+  white-space: nowrap;
+}
+
+@media (min-width: 1024px) {
+  .gl-sidebar.collapsed .label {
+    display: none;
+  }
+
+  .gl-sidebar.collapsed .gl-brand {
+    visibility: hidden;
+  }
+}
+
+.gl-sidebar svg {
+  flex: 0 0 auto;
+  width: var(--sb-icon);
+  height: var(--sb-icon);
+  stroke-width: 2;
+}
+
+/* Marca e botão de recolher */
+.gl-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 var(--sb-pad);
+  margin-bottom: 14px;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 750;
+}
+
+.gl-brand-mark img {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.gl-collapse-btn,
+.gl-close-btn,
+.gl-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 13px;
+  background: var(--sb-surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: 0.25s;
+}
+
+.gl-collapse-btn,
+.gl-close-btn {
+  position: absolute;
+  top: 22px;
+  right: 16px;
+}
+
+.gl-close-btn {
+  display: none;
+}
+
+.gl-sidebar.collapsed .gl-collapse-btn {
+  right: 50%;
+  translate: 50% 0;
+}
+
+.gl-collapse-btn:hover,
+.gl-close-btn:hover,
+.gl-icon-btn:hover {
+  background: var(--sb-surface-hover);
+  color: var(--text);
+}
+
+.gl-divider {
+  flex: 0 0 auto;
+  height: 1px;
+  margin: 0 16px 18px;
+  border: 0;
+  background: var(--sb-divider);
+}
+
+/* Perfil */
+.gl-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  margin-bottom: 14px;
+}
+
+.gl-avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--sb-avatar);
+  height: var(--sb-avatar);
+  border-radius: 50%;
+  border: 3px solid var(--sb-card);
+  background: linear-gradient(140deg, #3d7af5, #1d3f8f);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  box-shadow: 0 6px 16px rgba(31, 26, 74, 0.16);
+  transition: border-color 0.3s, background 0.3s;
+}
+
+.gl-profile-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.gl-profile-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.gl-profile-role {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* Linhas clicáveis (navegação e ações) */
+.gl-row {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: var(--sb-row);
+  padding: 0 var(--sb-pad);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s;
+}
+
+.gl-row .label {
+  flex: 1 1 auto;
+}
+
+.gl-row:hover {
+  color: var(--text);
+}
+
+.gl-row:focus-visible,
+.gl-collapse-btn:focus-visible,
+.gl-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.gl-search kbd {
+  flex: 0 0 auto !important;
+  padding: 2px 6px;
+  border: 1px solid var(--sb-divider);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.65rem;
+  color: var(--muted);
+}
+
+.gl-nav {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  --active-row: 0;
+}
+
+.gl-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.gl-nav .gl-row.active {
+  color: var(--sb-band-text);
+}
+
+.gl-indicator {
+  position: absolute;
+  inset: 0;
+  height: var(--sb-row);
+  translate: 0 calc(var(--active-row) * var(--sb-row));
+  background: var(--sb-band);
+  transition: translate 0.38s cubic-bezier(0.34, 1.16, 0.42, 1), background 0.3s;
+  pointer-events: none;
+}
+
+.gl-indicator::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 0;
+  translate: 0 -50%;
+  width: 8px;
+  height: 16px;
+  border-radius: 12px 0 0 12px;
+  background: var(--accent);
+}
+
+.gl-backup.is-warning {
+  color: var(--warning);
+}
+
+/* Interruptor de tema */
+.gl-switch {
+  display: block;
+  flex: 0 0 auto !important;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 20px;
+  background: var(--sb-surface-hover);
+  box-shadow: inset 0 0 0 1px var(--sb-divider);
+  transition: background 0.3s;
+}
+
+.gl-switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: translate 0.3s ease;
+}
+
+.gl-switch.on {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+.gl-switch.on span {
+  translate: 16px 0;
+}
+
+.gl-logout:hover {
+  color: var(--danger);
+}
+
+/* Dica flutuante (modo recolhido) */
+.gl-tooltip {
+  position: fixed;
+  z-index: 60;
+  translate: 0 -50%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--sb-tooltip-bg);
+  color: var(--sb-tooltip-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+}
+
+/* Barra superior e gaveta: só no celular/tablet */
+.gl-mobilebar,
+.gl-sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .app-shell,
+  .app-shell.is-sidebar-collapsed {
+    --sb-offset: 0px;
+  }
+
+  .app-shell .studio-main {
+    padding: 22px 14px 34px;
+  }
+
+  .gl-mobilebar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--sb-divider);
+    background: var(--sb-card);
+  }
+
+  .gl-mobilebar .gl-icon-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+
+  .gl-mobilebar svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .gl-mobilebar__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text);
+    font-weight: 750;
+  }
+
+  .gl-mobilebar__brand img {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .gl-sidebar,
+  .gl-sidebar.collapsed {
+    top: 12px;
+    left: 12px;
+    bottom: 12px;
+    width: min(var(--sb-width), calc(100vw - 24px));
+    max-height: calc(100dvh - 24px);
+    translate: calc(-100% - 24px) 0;
+  }
+
+  .gl-sidebar.is-open {
+    translate: 0 0;
+  }
+
+  .gl-collapse-btn {
+    display: none;
+  }
+
+  .gl-close-btn {
+    display: grid;
+  }
+
+  .gl-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    display: block;
+    background: rgba(5, 8, 14, 0.5);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .gl-sidebar-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-sidebar,
+  .gl-indicator,
+  .gl-switch span,
+  .app-shell .studio-main,
+  .app-shell .studio-footer {
+    transition: none;
+  }
+}
