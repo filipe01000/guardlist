@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T16:30:00-03:00",
+  "title": "Design System: GuardList",
+  "extensions": {
+    "colorMeta": {
+      "action-blue": {
+        "role": "primary",
+        "displayName": "Action Blue",
+        "canonical": "#5791ff",
+        "tonalRamp": ["#07152f", "#0c2552", "#173a75", "#27569f", "#3d73cc", "#5791ff", "#93b8ff", "#dce8ff"]
+      },
+      "canvas-charcoal": {
+        "role": "neutral",
+        "displayName": "Canvas Charcoal",
+        "canonical": "#0a0c10",
+        "tonalRamp": ["#08090c", "#101319", "#181e27", "#29313d", "#3a4554", "#667385", "#aab3bf", "#eef1f5"]
+      },
+      "danger": {
+        "role": "semantic",
+        "displayName": "Operational Danger",
+        "canonical": "#f56a77",
+        "tonalRamp": ["#2c0a0e", "#56131b", "#7f202c", "#ac3442", "#d94d5b", "#f56a77", "#ff9da6", "#ffe1e4"]
+      },
+      "warning": {
+        "role": "semantic",
+        "displayName": "Operational Warning",
+        "canonical": "#e7ab4e",
+        "tonalRamp": ["#271904", "#493006", "#6f4a0d", "#986817", "#c0862c", "#e7ab4e", "#f3ca86", "#fbe9c5"]
+      },
+      "success": {
+        "role": "semantic",
+        "displayName": "Operational Success",
+        "canonical": "#4ec995",
+        "tonalRamp": ["#05231a", "#0a4432", "#12654b", "#218766", "#34a97f", "#4ec995", "#88dfba", "#d2f3e5"]
+      }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Page Headline", "purpose": "Um título compacto por página." },
+      "body": { "displayName": "Operational Body", "purpose": "Instruções e contexto de trabalho." },
+      "data": { "displayName": "Tabular Data", "purpose": "IPs, CIDRs, datas e contagens comparáveis." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "state-standard", "value": "160ms ease-out", "purpose": "Hover e seleção sem deslocamento físico." },
+      { "name": "reduced-motion", "value": "0.01ms", "purpose": "Fallback para preferência de movimento reduzido." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "420px" },
+      { "name": "compact", "value": "760px" },
+      { "name": "navigation", "value": "1023px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ação operacional principal, uma por agrupamento.",
+      "html": "<button class=\"ds-btn-primary\">Confirmar importação</button>",
+      "css": ".ds-btn-primary{border:1px solid rgba(87,145,255,.42);border-radius:8px;background:#244a85;color:#eef4ff;padding:8px 12px;font:650 .75rem ui-sans-serif,system-ui;transition:background-color 160ms ease-out,border-color 160ms ease-out}.ds-btn-primary:hover{background:#2d5b9f}.ds-btn-primary:focus-visible{outline:2px solid #78a8ff;outline-offset:2px}.ds-btn-primary:active{background:#1d3c6d}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "description": "Ação auxiliar em superfícies densas.",
+      "html": "<button class=\"ds-btn-secondary\">Ver lista</button>",
+      "css": ".ds-btn-secondary{border:1px solid #3a4554;border-radius:8px;background:#181e27;color:#c3cbd5;padding:8px 12px;font:620 .75rem ui-sans-serif,system-ui;transition:background-color 160ms ease-out,border-color 160ms ease-out}.ds-btn-secondary:hover{border-color:#4b596b;background:#202630;color:#f2f5f8}.ds-btn-secondary:focus-visible{outline:2px solid #78a8ff;outline-offset:2px}.ds-btn-secondary:active{background:#131820}"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Busca e filtros de indicadores.",
+      "html": "<input class=\"ds-input\" placeholder=\"Pesquisar IP ou CIDR\" />",
+      "css": ".ds-input{width:100%;border:1px solid #29313d;border-radius:8px;background:#0f1319;color:#f2f5f8;padding:10px 12px;font:400 .78rem ui-sans-serif,system-ui}.ds-input:hover{border-color:#3a4554}.ds-input:focus-visible{border-color:#5791ff;outline:2px solid #78a8ff;outline-offset:2px}.ds-input::placeholder{color:#8e9aaa}"
+    },
+    {
+      "name": "Navigation Item",
+      "kind": "nav",
+      "description": "Item persistente do rail operacional.",
+      "html": "<button class=\"ds-nav-item ds-nav-item-active\"><svg aria-hidden=\"true\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\"><path d=\"M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z\"/></svg>Painel geral</button>",
+      "css": ".ds-nav-item{position:relative;display:flex;align-items:center;gap:10px;min-height:40px;width:100%;border:0;border-radius:8px;background:transparent;color:#98a4b3;padding:0 12px;font:560 .76rem ui-sans-serif,system-ui;text-align:left}.ds-nav-item:hover{background:rgba(255,255,255,.04);color:#c3cbd5}.ds-nav-item:focus-visible{outline:2px solid #78a8ff;outline-offset:2px}.ds-nav-item-active{background:rgba(87,145,255,.12);color:#a9c5ff}.ds-nav-item-active:before{content:'';position:absolute;left:0;width:2px;height:20px;background:#5791ff}"
+    },
+    {
+      "name": "Operational Summary",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Célula de leitura rápida com contexto curto.",
+      "html": "<section class=\"ds-summary\"><span>Entradas ativas</span><strong>65</strong><small>51 IPs · 14 CIDRs</small></section>",
+      "css": ".ds-summary{display:flex;min-height:104px;flex-direction:column;justify-content:center;border:1px solid #29313d;border-radius:11px;background:#131820;color:#f2f5f8;padding:18px 20px}.ds-summary span,.ds-summary small{color:#8e9aaa;font:620 .68rem ui-sans-serif,system-ui}.ds-summary strong{margin-top:5px;font:650 1.45rem ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}.ds-summary:focus-within{border-color:#5791ff}"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "description": "Estado operacional com texto e cor semântica.",
+      "html": "<span class=\"ds-chip-warning\">Atenção</span>",
+      "css": ".ds-chip-warning{display:inline-flex;align-items:center;border:1px solid rgba(231,171,78,.45);border-radius:999px;background:rgba(231,171,78,.1);color:#efbf67;padding:3px 8px;font:650 .68rem ui-sans-serif,system-ui}.ds-chip-warning:focus-visible{outline:2px solid #78a8ff;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Laboratory Chain-of-Custody Worksheet",
+    "overview": "O GuardList é uma bancada operacional digital: sóbria, precisa e orientada a evidências. A interface deve parecer uma ferramenta usada continuamente por analistas de segurança, com alta densidade informacional, hierarquia curta e ações inequívocas.\n\nSuperfícies carvão, divisórias finas e numerais tabulares dão ritmo de registro técnico sem simular papel ou terminal. O sistema rejeita composição de campanha, slogans, métricas gigantes, brilhos e qualquer decoração que concorra com estado, urgência ou procedência dos dados.",
+    "keyCharacteristics": [
+      "Navegação persistente e compacta.",
+      "Um único azul para ações; cores semânticas apenas para estado.",
+      "Superfícies planas separadas por tom e linha, não por sombra ornamental.",
+      "Dados numéricos alinhados e legíveis em varredura rápida.",
+      "Mesma linguagem visual em painel, importação, listas, histórico, clientes e ajustes."
+    ],
+    "rules": [
+      { "name": "The One Action Voice Rule", "body": "Azul representa interação; roxo e ciano não formam famílias paralelas de ação.", "section": "colors" },
+      { "name": "The Semantic Reserve Rule", "body": "Verde, amarelo e vermelho só comunicam sucesso, atenção e risco.", "section": "colors" },
+      { "name": "The Evidence Type Rule", "body": "Valores técnicos e identificadores usam monoespaçado; explicações e comandos usam sans-serif.", "section": "typography" },
+      { "name": "The Flat-by-Default Rule", "body": "Uma superfície precisa justificar seu nível por função e agrupamento, não por brilho ou elevação decorativa.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do priorize o próximo trabalho operacional e o estado do dado.",
+      "Do use azul para ações e foco em todas as páginas.",
+      "Do mantenha numerais, IPs, CIDRs e datas alinhados com fonte monoespaçada.",
+      "Do rebaixe diagnóstico e manutenção para seções recolhíveis."
+    ],
+    "donts": [
+      "Don't use slogans, heróis, métricas gigantes ou composição de landing page.",
+      "Don't crie famílias roxa, ciano ou verde para ações comuns.",
+      "Don't use glow, gradientes decorativos ou sombras para simular importância.",
+      "Don't esconda diferenças de risco usando apenas cor; mantenha texto e ícone de estado."
+    ]
+  }
+}

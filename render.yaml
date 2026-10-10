@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: guardlist
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Defina os valores no painel do Render (sync: false = não ficam no repositório).
+      - key: APP_USERNAME
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: ABUSEIPDB_API_KEY
+        sync: false
+      - key: GREYNOISE_API_KEY
+        sync: false
+      - key: OTX_API_KEY
+        sync: false
