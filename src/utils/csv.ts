@@ -3,7 +3,7 @@
 export type CsvCell = string | number | null | undefined;
 
 // Evita que um valor vindo da lista seja interpretado como fórmula pelo Excel (=, +, -, @).
-function neutralize(value: string): string {
+export function neutralize(value: string): string {
   return /^[=+\-@\t\r]/.test(value) && !/^-?\d+([.,]\d+)?$/.test(value) ? `'${value}` : value;
 }
 

@@ -192,6 +192,10 @@ export function createUsers(db: Database) {
       return null;
     },
 
+    async revokeSessions(id: number) {
+      await db.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [id]);
+    },
+
     async changeOwnPassword(id: number, current: unknown, next: unknown): Promise<UserRow> {
       const row = await byId(id);
       if (!row || !row.active) throw new StoreError('Sessão inválida.', 401);

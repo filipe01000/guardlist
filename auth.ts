@@ -65,7 +65,13 @@ export function readSession(secret: string, req: Request): { userId: number; ver
 function readCookie(req: Request, name: string): string | null {
   for (const part of (req.headers.cookie || '').split(';')) {
     const [key, ...rest] = part.trim().split('=');
-    if (key === name) return decodeURIComponent(rest.join('='));
+    if (key !== name) continue;
+    // Cookie com codificação inválida conta como ausente (decodeURIComponent lança URIError).
+    try {
+      return decodeURIComponent(rest.join('='));
+    } catch {
+      return null;
+    }
   }
   return null;
 }

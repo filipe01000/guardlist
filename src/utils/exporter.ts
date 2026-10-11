@@ -5,6 +5,7 @@
 
 import { BlocklistEntry } from '../types';
 import { ipv4ToNumber, isValidIPv4 } from './validator';
+import { neutralize } from './csv';
 
 export function sortEntriesNumerically(entries: BlocklistEntry[]): BlocklistEntry[] {
   return [...entries].sort((a, b) => {
@@ -95,7 +96,7 @@ export function generateFullCSV(entries: BlocklistEntry[], sortNumeric: boolean 
 
   const escapeCSV = (val: string | undefined | null) => {
     if (!val) return '""';
-    return `"${String(val).replace(/"/g, '""')}"`;
+    return `"${neutralize(String(val)).replace(/"/g, '""')}"`;
   };
 
   const rows = list.map(e => [

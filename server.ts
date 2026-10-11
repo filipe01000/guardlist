@@ -92,7 +92,7 @@ const jsonSmall = express.json({ limit: '8kb' });
 
 app.get('/api/auth/me', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  const row = await currentUser(req);
+  const row = await currentUser(req).catch(() => null);
   return res.json({ authEnabled: true, user: row ? toPublic(row) : null });
 });
 
@@ -112,13 +112,16 @@ app.post('/api/auth/login', loginLimit, jsonSmall, async (req, res) => {
   }
 });
 
-app.post('/api/auth/logout', (req, res) => {
+// Sair invalida a sessão no servidor: um cookie copiado antes deixa de valer.
+app.post('/api/auth/logout', async (req, res) => {
+  const row = await currentUser(req).catch(() => null);
+  if (row) await users.revokeSessions(row.id).catch((error) => console.error(error));
   setSessionCookie(req, res, null);
   return res.json({ ok: true });
 });
 
 app.post('/api/auth/change-password', passwordLimit, jsonSmall, async (req, res) => {
-  const row = await currentUser(req);
+  const row = await currentUser(req).catch(() => null);
   if (!row) return res.status(401).json({ error: 'Sessão expirada. Entre novamente.' });
   try {
     const updated = await users.changeOwnPassword(row.id, req.body?.currentPassword, req.body?.newPassword);
