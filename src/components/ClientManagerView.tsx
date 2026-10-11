@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Archive, ArchiveRestore, Check, X } from 'lucide-react';
 import { Client } from '../types';
-import { saveClient, renameClient, archiveClient } from '../db/store';
+import { saveClient, updateClient, archiveClient } from '../db/store';
 import { PageHeader } from './PageHeader';
 
 interface ClientManagerViewProps {
@@ -19,6 +19,9 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
   const [newClientNotes, setNewClientNotes] = useState('');
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [editNameText, setEditNameText] = useState('');
+  const [editNotesText, setEditNotesText] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,17 +50,36 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
     onRefreshClients();
   };
 
-  const handleStartRename = (client: Client) => {
+  const handleStartEdit = (client: Client) => {
     setEditingClientId(client.id);
     setEditNameText(client.name);
+    setEditNotesText(client.notes || '');
+    setEditError(null);
   };
 
-  const handleSaveRename = async (clientId: string) => {
-    const clean = editNameText.trim().toUpperCase();
-    if (!clean) return;
-    await renameClient(clientId, clean);
+  const handleCancelEdit = () => {
     setEditingClientId(null);
-    onRefreshClients();
+    setEditError(null);
+  };
+
+  const handleSaveEdit = async (client: Client) => {
+    const name = editNameText.trim().toUpperCase();
+    if (!name) return setEditError('Informe o nome do cliente.');
+    const changes: { name?: string; notes?: string } = {};
+    if (name !== client.name) changes.name = name;
+    if (editNotesText.trim() !== (client.notes || '')) changes.notes = editNotesText;
+    if (Object.keys(changes).length === 0) return handleCancelEdit();
+
+    setSavingEdit(true);
+    try {
+      await updateClient(client.id, changes);
+      setEditingClientId(null);
+      onRefreshClients();
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : 'Não foi possível salvar.');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleToggleArchive = async (client: Client) => {
@@ -126,41 +148,76 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
             const isEditing = editingClientId === client.id;
 
             return (
-              <li key={client.id} className={`client-row ${client.isArchived ? 'is-archived' : ''}`}>
-                <div className="min-w-0">
+              <li key={client.id} className={`client-row ${client.isArchived ? 'is-archived' : ''} ${isEditing ? 'is-editing' : ''}`}>
+                <div className="min-w-0 flex-1">
                   {isEditing ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={editNameText}
-                        autoFocus
-                        onChange={(e) => setEditNameText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleSaveRename(client.id);
-                          if (e.key === 'Escape') setEditingClientId(null);
-                        }}
-                        className="field uppercase font-mono font-bold"
-                        aria-label={`Novo nome para ${client.name}`}
-                      />
-                      <button type="button" onClick={() => handleSaveRename(client.id)} className="btn btn--sm btn--primary btn--icon" title="Salvar" aria-label="Salvar nome">
-                        <Check aria-hidden="true" />
-                      </button>
-                      <button type="button" onClick={() => setEditingClientId(null)} className="btn btn--sm btn--icon" title="Cancelar" aria-label="Cancelar">
-                        <X aria-hidden="true" />
-                      </button>
-                    </div>
+                    <form
+                      className="client-edit view-enter"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleSaveEdit(client);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') handleCancelEdit();
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSaveEdit(client);
+                      }}
+                    >
+                      <div>
+                        <label className="field-label" htmlFor={`edit-name-${client.id}`}>Nome</label>
+                        <input
+                          id={`edit-name-${client.id}`}
+                          type="text"
+                          value={editNameText}
+                          autoFocus
+                          onChange={(e) => setEditNameText(e.target.value)}
+                          className="field w-full uppercase font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="field-label" htmlFor={`edit-notes-${client.id}`}>Observações</label>
+                        <textarea
+                          id={`edit-notes-${client.id}`}
+                          rows={3}
+                          maxLength={1000}
+                          value={editNotesText}
+                          onChange={(e) => setEditNotesText(e.target.value)}
+                          placeholder="Firewall, contato do cliente, janela de manutenção, particularidades da lista…"
+                          className="field w-full py-2 leading-relaxed resize-y"
+                        />
+                      </div>
+                      {editError && <p className="text-xs font-semibold text-rose-400" role="alert">{editError}</p>}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-slate-500">Ctrl+Enter salva · Esc cancela</span>
+                        <span className="flex gap-1.5">
+                          <button type="button" onClick={handleCancelEdit} className="btn btn--sm">
+                            <X aria-hidden="true" />
+                            Cancelar
+                          </button>
+                          <button type="submit" className="btn btn--sm btn--primary" disabled={savingEdit}>
+                            <Check aria-hidden="true" />
+                            {savingEdit ? 'Salvando…' : 'Salvar'}
+                          </button>
+                        </span>
+                      </div>
+                    </form>
                   ) : (
                     <>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white font-mono text-sm">{client.name}</span>
                         {client.isArchived && <span className="chip">Arquivado</span>}
                       </div>
-                      <span className="block text-[12px] text-slate-400 mt-0.5 truncate">{client.notes || 'Sem observações'}</span>
+                      {client.notes ? (
+                        <p className="client-row__notes" title={client.notes}>{client.notes}</p>
+                      ) : (
+                        <button type="button" className="client-row__add-notes" onClick={() => handleStartEdit(client)}>
+                          Adicionar observação
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className={`flex items-center gap-4 ${isEditing ? 'self-start' : ''}`}>
                   <div className="text-right">
                     <strong className="block text-white font-mono tabular-nums">{count}</strong>
                     <span className="text-slate-500 text-[11px]">ativos</span>
@@ -168,10 +225,11 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => handleStartRename(client)}
+                      onClick={() => (isEditing ? handleCancelEdit() : handleStartEdit(client))}
                       className="btn btn--sm btn--icon btn--quiet"
-                      title="Renomear"
-                      aria-label={`Renomear ${client.name}`}
+                      title="Editar nome e observações"
+                      aria-label={`Editar ${client.name}`}
+                      aria-pressed={isEditing}
                     >
                       <Edit2 aria-hidden="true" />
                     </button>

@@ -1214,3 +1214,43 @@ select.field {
   color: var(--muted);
   vertical-align: -1px;
 }
+
+/* Edição de cliente na própria linha. */
+.client-row.is-editing {
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+}
+
+.client-edit {
+  display: grid;
+  gap: 12px;
+  max-width: 640px;
+}
+
+.client-row__notes {
+  display: -webkit-box;
+  margin: 3px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.client-row__add-notes {
+  margin-top: 3px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.client-row__add-notes:hover {
+  color: var(--accent);
+  text-decoration-color: currentColor;
+}

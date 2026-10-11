@@ -25,6 +25,8 @@ export const initializeDatabaseIfEmpty = () => call<null>('initializeDatabaseIfE
 export const getAllClients = () => call<Client[]>('getAllClients');
 export const saveClient = (client: Client) => call<null>('saveClient', client);
 export const renameClient = (clientId: string, newName: string) => call<null>('renameClient', clientId, newName);
+export const updateClient = (clientId: string, changes: { name?: string; notes?: string }) =>
+  call<Client>('updateClient', clientId, changes);
 export const archiveClient = (clientId: string, isArchived: boolean) => call<null>('archiveClient', clientId, isArchived);
 
 export const getClientEntries = (clientId: string, status?: 'active' | 'removed') =>

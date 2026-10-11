@@ -144,6 +144,34 @@ export function createStore(db: Database) {
       return null;
     },
 
+    // Edição parcial: altera só nome e/ou observações, sem regravar dados que outra pessoa possa ter mudado.
+    async updateClient(actor: Actor, clientId: string, changes: { name?: unknown; notes?: unknown }) {
+      return db.tx(async (q) => {
+        const client = await getClient(q, asString(clientId, 'clientId'));
+        if (!client) throw new StoreError('Cliente não encontrado.', 404);
+        const next: Client = { ...client, updatedAt: new Date().toISOString() };
+        const detail: Record<string, unknown> = { clientId, name: client.name };
+
+        if (changes?.name !== undefined) {
+          const name = String(changes.name).trim().toUpperCase().slice(0, 80);
+          if (!name) throw new StoreError('Informe o nome do cliente.');
+          const clash = await q<{ id: string }>("SELECT id FROM clients WHERE upper(data->>'name') = $1 AND id <> $2", [name, clientId]);
+          if (clash.length) throw new StoreError('Já existe outro cliente com esse nome.', 409);
+          if (name !== client.name) detail.renamedTo = name;
+          next.name = name;
+        }
+        if (changes?.notes !== undefined) {
+          const notes = String(changes.notes ?? '').trim().slice(0, 1000);
+          next.notes = notes || undefined;
+          detail.notesChanged = (client.notes || '') !== notes;
+        }
+
+        await putClient(q, next, actor);
+        await audit(q, actor, 'client.update', detail);
+        return next;
+      });
+    },
+
     async archiveClient(actor: Actor, clientId: string, isArchived: boolean) {
       await db.tx(async (q) => {
         const client = await getClient(q, clientId);
@@ -471,6 +499,7 @@ export const PUBLIC_OPS = [
   'getAllClients',
   'saveClient',
   'renameClient',
+  'updateClient',
   'archiveClient',
   'getClientEntries',
   'getClientActiveIndicatorsSet',
