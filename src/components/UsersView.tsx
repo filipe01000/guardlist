@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, KeyRound, Plus, RefreshCw, UserCheck, UserX, Users } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff, KeyRound, Plus, RefreshCw, Trash2, UserCheck, UserX, Users } from 'lucide-react';
 import { SessionUser } from '../types';
 import { PageHeader } from './PageHeader';
 
@@ -8,8 +8,9 @@ interface UsersViewProps {
 }
 
 const ROLE_LABEL: Record<SessionUser['role'], string> = { admin: 'Administrador', analyst: 'Analista' };
+const MIN_PASSWORD = 10;
 
-// Senha provisória legível: 4 blocos de 4 caracteres sem caracteres ambíguos.
+// Senha aleatória legível: 4 blocos de 4 caracteres sem caracteres ambíguos.
 function generatePassword(): string {
   const alphabet = 'abcdefghjkmnpqrstuvwxyzACDEFGHJKMNPQRSTUVWXYZ23456789';
   const bytes = crypto.getRandomValues(new Uint8Array(16));
@@ -33,6 +34,82 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+// ---------- Escolha de senha: aleatória ou definida manualmente ----------
+
+interface PasswordChoiceState {
+  mode: 'random' | 'manual';
+  random: string;
+  manual: string;
+  mustChange: boolean;
+}
+
+const newPasswordChoice = (): PasswordChoiceState => ({ mode: 'random', random: generatePassword(), manual: '', mustChange: true });
+const chosenPassword = (s: PasswordChoiceState) => (s.mode === 'random' ? s.random : s.manual);
+
+const PasswordChoice: React.FC<{
+  idPrefix: string;
+  value: PasswordChoiceState;
+  onChange: (next: PasswordChoiceState) => void;
+}> = ({ idPrefix, value, onChange }) => {
+  const [visible, setVisible] = useState(false);
+  const tooShort = value.mode === 'manual' && value.manual.length > 0 && value.manual.length < MIN_PASSWORD;
+
+  return (
+    <div className="password-choice">
+      <div className="segmented" role="radiogroup" aria-label="Tipo de senha">
+        <button type="button" role="radio" aria-checked={value.mode === 'random'} aria-pressed={value.mode === 'random'} onClick={() => onChange({ ...value, mode: 'random' })}>
+          Aleatória
+        </button>
+        <button type="button" role="radio" aria-checked={value.mode === 'manual'} aria-pressed={value.mode === 'manual'} onClick={() => onChange({ ...value, mode: 'manual' })}>
+          Definir manualmente
+        </button>
+      </div>
+
+      {value.mode === 'random' ? (
+        <span className="flex gap-1.5">
+          <input
+            id={`${idPrefix}-pass`}
+            className="field w-full font-mono"
+            value={value.random}
+            readOnly
+            aria-label="Senha aleatória gerada"
+          />
+          <button type="button" className="btn btn--icon" title="Gerar outra" aria-label="Gerar outra senha" onClick={() => onChange({ ...value, random: generatePassword() })}>
+            <RefreshCw aria-hidden="true" />
+          </button>
+        </span>
+      ) : (
+        <span className="field-password">
+          <input
+            id={`${idPrefix}-pass`}
+            className="field w-full font-mono"
+            type={visible ? 'text' : 'password'}
+            value={value.manual}
+            onChange={(e) => onChange({ ...value, manual: e.target.value })}
+            placeholder={`Mínimo de ${MIN_PASSWORD} caracteres`}
+            autoComplete="new-password"
+            minLength={MIN_PASSWORD}
+            required
+            aria-invalid={tooShort}
+            aria-label="Senha definida manualmente"
+          />
+          <button type="button" className="btn btn--sm btn--icon btn--quiet" onClick={() => setVisible((v) => !v)} aria-label={visible ? 'Ocultar senha' : 'Mostrar senha'}>
+            {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+          </button>
+        </span>
+      )}
+      {tooShort && <span className="text-[11px] text-rose-400">Faltam {MIN_PASSWORD - value.manual.length} caracteres.</span>}
+
+      <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+        <input type="checkbox" checked={value.mustChange} onChange={(e) => onChange({ ...value, mustChange: e.target.checked })} className="accent-[var(--accent)]" />
+        Pedir para trocar no primeiro acesso
+      </label>
+    </div>
+  );
+};
+
+// ---------- Tela ----------
+
 export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
   const [users, setUsers] = useState<SessionUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,8 +120,12 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [role, setRole] = useState<SessionUser['role']>('analyst');
-  const [password, setPassword] = useState(generatePassword);
+  const [createPass, setCreatePass] = useState<PasswordChoiceState>(newPasswordChoice);
   const [saving, setSaving] = useState(false);
+
+  const [resetTarget, setResetTarget] = useState<SessionUser | null>(null);
+  const [resetPass, setResetPass] = useState<PasswordChoiceState>(newPasswordChoice);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -62,25 +143,31 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
     load();
   }, [load]);
 
-  const showPassword = (text: string, temp: string) => {
+  // A senha só é exibida de volta quando foi gerada aqui; senha manual o admin já conhece.
+  const announce = (text: string, choice: PasswordChoiceState) => {
     setCopied(false);
-    setNotice({ text, password: temp });
+    setNotice({ text, password: choice.mode === 'random' ? choice.random : undefined });
   };
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
-    setSaving(true);
     setError(null);
+    const password = chosenPassword(createPass);
+    if (password.length < MIN_PASSWORD) return setError(`A senha precisa ter pelo menos ${MIN_PASSWORD} caracteres.`);
+    setSaving(true);
     try {
       const body = await api<{ user: SessionUser }>('/api/users', {
         method: 'POST',
-        body: JSON.stringify({ username, displayName, role, password })
+        body: JSON.stringify({ username, displayName, role, password, mustChangePassword: createPass.mustChange })
       });
-      showPassword(`Usuário ${body.user.username} criado. Envie a senha provisória por um canal seguro; ela será trocada no primeiro acesso.`, password);
+      announce(
+        `Usuário ${body.user.username} criado.${createPass.mustChange ? ' A senha será trocada no primeiro acesso.' : ''} Envie a senha por um canal seguro.`,
+        createPass
+      );
       setUsername('');
       setDisplayName('');
       setRole('analyst');
-      setPassword(generatePassword());
+      setCreatePass(newPasswordChoice());
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível criar o usuário.');
@@ -107,16 +194,39 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
     }
   };
 
-  const handleReset = async (user: SessionUser) => {
-    if (!window.confirm(`Gerar uma nova senha provisória para ${user.displayName}? As sessões abertas dessa pessoa serão encerradas.`)) return;
-    const temp = generatePassword();
-    setError(null);
+  const openReset = (user: SessionUser) => {
+    setResetTarget(user);
+    setResetPass(newPasswordChoice());
+    setResetError(null);
+  };
+
+  const handleReset = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!resetTarget) return;
+    const password = chosenPassword(resetPass);
+    if (password.length < MIN_PASSWORD) return setResetError(`A senha precisa ter pelo menos ${MIN_PASSWORD} caracteres.`);
     try {
-      await api(`/api/users/${user.id}/reset-password`, { method: 'POST', body: JSON.stringify({ password: temp }) });
-      showPassword(`Nova senha provisória de ${user.displayName}. Ela será trocada no próximo acesso.`, temp);
+      await api(`/api/users/${resetTarget.id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ password, mustChangePassword: resetPass.mustChange })
+      });
+      announce(`Senha de ${resetTarget.displayName} redefinida; as sessões abertas dessa pessoa foram encerradas.`, resetPass);
+      setResetTarget(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível redefinir a senha.');
+      setResetError(err instanceof Error ? err.message : 'Não foi possível redefinir a senha.');
+    }
+  };
+
+  const handleDelete = async (user: SessionUser) => {
+    if (!window.confirm(`Apagar ${user.displayName} (${user.username}) definitivamente? A pessoa perde o acesso na hora. As importações feitas por ela continuam no histórico com o nome dela.`)) return;
+    setError(null);
+    try {
+      await api(`/api/users/${user.id}`, { method: 'DELETE' });
+      setNotice({ text: `${user.displayName} foi apagado.` });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível apagar o usuário.');
     }
   };
 
@@ -130,7 +240,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
     <div className="space-y-6">
       <PageHeader
         title="Usuários"
-        description="Quem acessa o GuardList. Todos trabalham na mesma base; administradores também gerenciam contas, backups e restauração."
+        description="Quem acessa o GuardList. Todos trabalham na mesma base; administradores também gerenciam contas, backups, restauração e exclusão de clientes."
       />
 
       {notice && (
@@ -156,7 +266,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
 
       <section className="data-panel p-5" aria-labelledby="new-user-title">
         <h2 id="new-user-title" className="text-sm font-bold text-white mb-4">Novo usuário</h2>
-        <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-[1fr_1.2fr_150px_1.3fr_auto] gap-3 items-end">
+        <form onSubmit={handleCreate} className="new-user-form">
           <div>
             <label className="field-label" htmlFor="nu-username">Usuário</label>
             <input
@@ -180,19 +290,16 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
               <option value="admin">Administrador</option>
             </select>
           </div>
-          <div>
-            <label className="field-label" htmlFor="nu-pass">Senha provisória</label>
-            <span className="flex gap-1.5">
-              <input id="nu-pass" className="field w-full font-mono" value={password} onChange={(e) => setPassword(e.target.value)} minLength={10} required />
-              <button type="button" className="btn btn--icon" title="Gerar outra senha" aria-label="Gerar outra senha" onClick={() => setPassword(generatePassword())}>
-                <RefreshCw aria-hidden="true" />
-              </button>
-            </span>
+          <div className="new-user-form__password">
+            <span className="field-label">Senha</span>
+            <PasswordChoice idPrefix="nu" value={createPass} onChange={setCreatePass} />
           </div>
-          <button type="submit" className="btn btn--primary h-9" disabled={saving}>
-            <Plus aria-hidden="true" />
-            Criar
-          </button>
+          <div className="new-user-form__submit">
+            <button type="submit" className="btn btn--primary" disabled={saving}>
+              <Plus aria-hidden="true" />
+              Criar usuário
+            </button>
+          </div>
         </form>
       </section>
 
@@ -211,13 +318,13 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="data-table">
+            <table className="data-table" style={{ minWidth: 1020 }}>
               <colgroup>
-                <col style={{ width: '24%' }} />
-                <col style={{ width: '170px' }} />
-                <col style={{ width: '150px' }} />
-                <col style={{ width: '140px' }} />
                 <col />
+                <col style={{ width: '160px' }} />
+                <col style={{ width: '150px' }} />
+                <col style={{ width: '150px' }} />
+                <col style={{ width: '340px' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -243,7 +350,8 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
                           value={user.role}
                           onChange={(e) => handleUpdate(user, { role: e.target.value as SessionUser['role'] })}
                           aria-label={`Papel de ${user.displayName}`}
-                          disabled={!user.active}
+                          disabled={!user.active || isSelf}
+                          title={isSelf ? 'Peça a outro administrador para mudar o seu papel' : undefined}
                         >
                           <option value="analyst">Analista</option>
                           <option value="admin">Administrador</option>
@@ -260,23 +368,31 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
                       </td>
                       <td className="font-mono text-[0.72rem] whitespace-nowrap">{formatDate(user.lastLoginAt)}</td>
                       <td>
-                        <div className="flex justify-end gap-1">
-                          <button type="button" className="btn btn--sm" onClick={() => handleReset(user)} disabled={!user.active}>
-                            <KeyRound aria-hidden="true" />
-                            Nova senha
-                          </button>
-                          {user.active ? (
-                            <button type="button" className="btn btn--sm btn--quiet btn--danger" onClick={() => handleUpdate(user, { active: false })} disabled={isSelf} title={isSelf ? 'Você não pode desativar a própria conta' : undefined}>
-                              <UserX aria-hidden="true" />
-                              Desativar
+                        {isSelf ? (
+                          <span className="block text-right text-[11px] text-slate-500">Altere a sua senha clicando no seu nome</span>
+                        ) : (
+                          <div className="flex justify-end gap-1">
+                            <button type="button" className="btn btn--sm" onClick={() => openReset(user)} disabled={!user.active}>
+                              <KeyRound aria-hidden="true" />
+                              Nova senha
                             </button>
-                          ) : (
-                            <button type="button" className="btn btn--sm" onClick={() => handleUpdate(user, { active: true })}>
-                              <UserCheck aria-hidden="true" />
-                              Reativar
+                            {user.active ? (
+                              <button type="button" className="btn btn--sm btn--quiet" onClick={() => handleUpdate(user, { active: false })} title="Bloqueia o acesso sem apagar a conta">
+                                <UserX aria-hidden="true" />
+                                Desativar
+                              </button>
+                            ) : (
+                              <button type="button" className="btn btn--sm" onClick={() => handleUpdate(user, { active: true })}>
+                                <UserCheck aria-hidden="true" />
+                                Reativar
+                              </button>
+                            )}
+                            <button type="button" className="btn btn--sm btn--quiet btn--danger" onClick={() => handleDelete(user)} aria-label={`Apagar ${user.displayName}`} title="Apagar definitivamente">
+                              <Trash2 aria-hidden="true" />
+                              Apagar
                             </button>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
@@ -286,6 +402,36 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
           </div>
         )}
       </section>
+
+      {resetTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" onClick={() => setResetTarget(null)}>
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reset-title"
+            className="data-panel w-full max-w-md p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.key === 'Escape' && setResetTarget(null)}
+            onSubmit={handleReset}
+          >
+            <div>
+              <h2 id="reset-title" className="text-base font-bold text-white">Nova senha</h2>
+              <p className="text-xs text-slate-400 mt-1">
+                {resetTarget.displayName} · {resetTarget.username}. As sessões abertas dessa pessoa serão encerradas.
+              </p>
+            </div>
+            <PasswordChoice idPrefix="reset" value={resetPass} onChange={setResetPass} />
+            {resetError && <p className="text-xs font-semibold text-rose-400" role="alert">{resetError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn" onClick={() => setResetTarget(null)}>Cancelar</button>
+              <button type="submit" className="btn btn--primary">
+                <KeyRound aria-hidden="true" />
+                Salvar senha
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };

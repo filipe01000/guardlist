@@ -1296,3 +1296,60 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
 :root:not([data-theme="light"]) input[type="date"].field::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
+
+/* ---------- Usuários: formulário e escolha de senha ---------- */
+
+.new-user-form {
+  display: grid;
+  gap: 14px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .new-user-form {
+    grid-template-columns: 1fr 1.2fr 160px;
+  }
+
+  .new-user-form__password {
+    grid-column: 1 / 3;
+  }
+
+  .new-user-form__submit {
+    grid-column: 3;
+    align-self: end;
+  }
+}
+
+.new-user-form__submit .btn {
+  width: 100%;
+}
+
+.password-choice {
+  display: grid;
+  gap: 8px;
+  max-width: 460px;
+}
+
+.password-choice .segmented {
+  justify-self: start;
+}
+
+.field-password {
+  position: relative;
+  display: block;
+}
+
+.field-password .field {
+  padding-right: 40px;
+}
+
+.field-password .btn {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  translate: 0 -50%;
+}
+
+.field[aria-invalid="true"] {
+  border-color: var(--danger);
+}

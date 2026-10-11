@@ -172,6 +172,28 @@ export function createStore(db: Database) {
       });
     },
 
+    // Exclusão definitiva do cliente e de tudo dele (lista, versões e histórico). Só administradores.
+    // O nome digitado precisa conferir, para evitar exclusão por engano; a auditoria registra quem apagou.
+    async deleteClient(actor: Actor, clientId: string, confirmName: string) {
+      requireAdmin(actor);
+      return db.tx(async (q) => {
+        const client = await getClient(q, asString(clientId, 'clientId'));
+        if (!client) throw new StoreError('Cliente não encontrado.', 404);
+        if (String(confirmName ?? '').trim().toUpperCase() !== client.name.toUpperCase()) {
+          throw new StoreError('O nome digitado não confere com o do cliente.');
+        }
+        const count = async (table: string) =>
+          (await q<{ n: number }>(`SELECT count(*)::int AS n FROM ${table} WHERE client_id = $1`, [clientId]))[0]?.n ?? 0;
+        const removed = { entries: await count('entries'), snapshots: await count('snapshots'), history: await count('history') };
+        await q('DELETE FROM entries WHERE client_id = $1', [clientId]);
+        await q('DELETE FROM snapshots WHERE client_id = $1', [clientId]);
+        await q('DELETE FROM history WHERE client_id = $1', [clientId]);
+        await q('DELETE FROM clients WHERE id = $1', [clientId]);
+        await audit(q, actor, 'client.delete', { clientId, name: client.name, ...removed });
+        return removed;
+      });
+    },
+
     async archiveClient(actor: Actor, clientId: string, isArchived: boolean) {
       await db.tx(async (q) => {
         const client = await getClient(q, clientId);
@@ -631,6 +653,7 @@ export const PUBLIC_OPS = [
   'saveClient',
   'renameClient',
   'updateClient',
+  'deleteClient',
   'archiveClient',
   'getClientEntries',
   'getClientActiveIndicatorsSet',

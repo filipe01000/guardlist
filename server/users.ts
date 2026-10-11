@@ -121,7 +121,7 @@ export function createUsers(db: Database) {
       return rows.map(toPublic);
     },
 
-    async create(actor: Actor, input: { username?: unknown; displayName?: unknown; role?: unknown; password?: unknown }) {
+    async create(actor: Actor, input: { username?: unknown; displayName?: unknown; role?: unknown; password?: unknown; mustChangePassword?: unknown }) {
       const username = String(input.username ?? '').trim().toLowerCase();
       if (!USERNAME_RE.test(username)) {
         throw new StoreError('Usuário inválido: use de 2 a 64 letras minúsculas, números, ponto, hífen ou sublinhado.');
@@ -129,13 +129,14 @@ export function createUsers(db: Database) {
       const role = input.role === 'admin' ? 'admin' : 'analyst';
       const displayName = String(input.displayName ?? '').trim().slice(0, 80) || username;
       const password = checkPassword(input.password);
+      const mustChange = input.mustChangePassword !== false;
       const exists = await db.query('SELECT 1 FROM users WHERE username = $1', [username]);
       if (exists.length) throw new StoreError('Já existe um usuário com esse nome.', 409);
       const rows = await db.query<UserRow>(
-        `INSERT INTO users (username, display_name, password_hash, role, must_change_password) VALUES ($1, $2, $3, $4, TRUE) RETURNING *`,
-        [username, displayName, hashPassword(password), role]
+        `INSERT INTO users (username, display_name, password_hash, role, must_change_password) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [username, displayName, hashPassword(password), role, mustChange]
       );
-      await audit(actor.username, 'user.create', { username, role });
+      await audit(actor.username, 'user.create', { username, role, mustChange });
       return toPublic(rows[0]);
     },
 
@@ -162,15 +163,32 @@ export function createUsers(db: Database) {
       return toPublic(rows[0]);
     },
 
-    async resetPassword(actor: Actor, id: number, password: unknown) {
+    async resetPassword(actor: Actor, id: number, password: unknown, mustChangePassword: unknown = true) {
       const row = await byId(id);
       if (!row) throw new StoreError('Usuário não encontrado.', 404);
+      if (row.username === actor.username) {
+        throw new StoreError('Para a sua própria conta, use Alterar senha clicando no seu nome na barra lateral.');
+      }
       const pass = checkPassword(password);
+      const mustChange = mustChangePassword !== false;
       await db.query(
-        'UPDATE users SET password_hash = $2, must_change_password = TRUE, session_version = session_version + 1 WHERE id = $1',
-        [id, hashPassword(pass)]
+        'UPDATE users SET password_hash = $2, must_change_password = $3, session_version = session_version + 1 WHERE id = $1',
+        [id, hashPassword(pass), mustChange]
       );
-      await audit(actor.username, 'user.reset_password', { username: row.username });
+      await audit(actor.username, 'user.reset_password', { username: row.username, mustChange });
+      return null;
+    },
+
+    // Exclusão definitiva. Histórico e auditoria guardam o nome, então seguem legíveis.
+    async remove(actor: Actor, id: number) {
+      const row = await byId(id);
+      if (!row) throw new StoreError('Usuário não encontrado.', 404);
+      if (row.username === actor.username) throw new StoreError('Você não pode apagar a própria conta.', 409);
+      if (row.role === 'admin' && row.active && (await activeAdmins()) <= 1) {
+        throw new StoreError('É preciso manter pelo menos um administrador ativo.', 409);
+      }
+      await db.query('DELETE FROM users WHERE id = $1', [id]);
+      await audit(actor.username, 'user.delete', { username: row.username, displayName: row.display_name, role: row.role });
       return null;
     },
 

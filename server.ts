@@ -184,9 +184,18 @@ app.patch('/api/users/:id', adminOnly, jsonSmall, async (req, res) => {
   }
 });
 
+app.delete('/api/users/:id', adminOnly, async (req, res) => {
+  try {
+    await users.remove(res.locals.actor as Actor, Number(req.params.id));
+    return res.json({ ok: true });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
 app.post('/api/users/:id/reset-password', adminOnly, passwordLimit, jsonSmall, async (req, res) => {
   try {
-    await users.resetPassword(res.locals.actor as Actor, Number(req.params.id), req.body?.password);
+    await users.resetPassword(res.locals.actor as Actor, Number(req.params.id), req.body?.password, req.body?.mustChangePassword);
     return res.json({ ok: true });
   } catch (error) {
     return sendError(res, error);

@@ -337,6 +337,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             clients={clients}
             activeCounts={activeCounts}
             onRefreshClients={refreshAllData}
+            isAdmin={currentUser.role === 'admin'}
           />
         )}
 

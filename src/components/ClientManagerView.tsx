@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Archive, ArchiveRestore, Check, X } from 'lucide-react';
+import { Plus, Edit2, Archive, ArchiveRestore, Check, X, Trash2 } from 'lucide-react';
 import { Client } from '../types';
-import { saveClient, updateClient, archiveClient } from '../db/store';
+import { saveClient, updateClient, archiveClient, deleteClient } from '../db/store';
 import { PageHeader } from './PageHeader';
 
 interface ClientManagerViewProps {
   clients: Client[];
   activeCounts: Record<string, number>;
   onRefreshClients: () => void;
+  isAdmin: boolean;
 }
 
 export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
   clients,
   activeCounts,
-  onRefreshClients
+  onRefreshClients,
+  isAdmin
 }) => {
   const [newClientName, setNewClientName] = useState('');
   const [newClientNotes, setNewClientNotes] = useState('');
@@ -22,6 +24,11 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
   const [editNotesText, setEditNotesText] = useState('');
   const [editError, setEditError] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Client | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const handleAddClient = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,6 +89,30 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
     }
   };
 
+  const openDelete = (client: Client) => {
+    setDeleteTarget(client);
+    setDeleteConfirm('');
+    setDeleteError(null);
+  };
+
+  const handleDelete = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const removed = await deleteClient(deleteTarget.id, deleteConfirm);
+      setNotice(`${deleteTarget.name} foi apagado, com ${removed.entries} indicadores, ${removed.history} importações no histórico e ${removed.snapshots} versões.`);
+      setDeleteTarget(null);
+      if (editingClientId === deleteTarget.id) setEditingClientId(null);
+      onRefreshClients();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Não foi possível apagar o cliente.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleToggleArchive = async (client: Client) => {
     const next = !client.isArchived;
     const msg = next
@@ -100,8 +131,68 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
     <div className="space-y-6">
       <PageHeader
         title="Gerenciar clientes"
-        description="Cadastre, renomeie ou arquive clientes. Cada cliente tem a própria lista, sem mistura com as outras."
+        description="Cadastre, edite ou arquive clientes. Cada cliente tem a própria lista, sem mistura com as outras."
       />
+
+      {notice && (
+        <div className="notice notice--ok" role="status">
+          <Check aria-hidden="true" />
+          <p>{notice}</p>
+          <button type="button" className="btn btn--sm btn--quiet" onClick={() => setNotice(null)} aria-label="Fechar aviso">
+            <X aria-hidden="true" />
+          </button>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" onClick={() => setDeleteTarget(null)}>
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-client-title"
+            className="data-panel w-full max-w-md p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.key === 'Escape' && setDeleteTarget(null)}
+            onSubmit={handleDelete}
+          >
+            <div>
+              <h2 id="delete-client-title" className="text-base font-bold text-white">
+                Apagar <span className="font-mono">{deleteTarget.name}</span>?
+              </h2>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                Isso apaga, para toda a equipe, a lista de indicadores, as versões salvas e o histórico de importações deste cliente.
+                Não dá para desfazer pelo app. Se a ideia é só tirar o cliente do painel, use <strong>Arquivar</strong>.
+              </p>
+              <p className="text-xs text-slate-400 mt-2">Se precisar de uma cópia, baixe um backup antes em Backup e ajustes.</p>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="delete-client-confirm">
+                Digite <span className="font-mono text-white">{deleteTarget.name}</span> para confirmar
+              </label>
+              <input
+                id="delete-client-confirm"
+                className="field w-full font-mono uppercase"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                autoComplete="off"
+                autoFocus
+              />
+            </div>
+            {deleteError && <p className="text-xs font-semibold text-rose-400" role="alert">{deleteError}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" className="btn" onClick={() => setDeleteTarget(null)}>Cancelar</button>
+              <button
+                type="submit"
+                className="btn btn--danger"
+                disabled={deleting || deleteConfirm.trim().toUpperCase() !== deleteTarget.name.toUpperCase()}
+              >
+                <Trash2 aria-hidden="true" />
+                {deleting ? 'Apagando…' : 'Apagar cliente'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       <section className="data-panel p-5" aria-labelledby="new-client-title">
         <h2 id="new-client-title" className="text-sm font-bold text-white mb-4">Novo cliente</h2>
@@ -242,6 +333,17 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
                     >
                       {client.isArchived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
                     </button>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => openDelete(client)}
+                        className="btn btn--sm btn--icon btn--quiet btn--danger"
+                        title="Apagar cliente definitivamente"
+                        aria-label={`Apagar ${client.name}`}
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </li>
