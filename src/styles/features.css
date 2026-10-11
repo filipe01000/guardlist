@@ -260,8 +260,8 @@ kbd.key {
   color: var(--text-soft);
 }
 .hbar__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hbar__track { height: 8px; border-radius: 999px; background: var(--surface-subtle); overflow: hidden; }
-.hbar__fill { height: 100%; border-radius: 999px; background: var(--accent); }
+.hbar__track { display: block; height: 8px; border-radius: 999px; background: var(--surface-subtle); overflow: hidden; }
+.hbar__fill { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
 .hbar__value { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; color: var(--text); }
 
 /* ---------- Status do sistema ---------- */
