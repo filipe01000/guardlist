@@ -97,12 +97,37 @@ const LoginForm: React.FC<LoginProps> = ({ onLogin }) => {
   );
 };
 
-export const Login: React.FC<LoginProps> = ({ onLogin }) => (
-  <main className="gl-login-page">
-    <div className="gl-card">
-      <div className="gl-card-bg" aria-hidden="true" />
-      <Hero />
-      <LoginForm onLogin={onLogin} />
-    </div>
-  </main>
-);
+// O loop da porta só toca sem "reduzir movimento" e sem economia de dados; senão fica o pôster.
+function canPlayVaultLoop(): boolean {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const saveData = Boolean((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData);
+  return !reduceMotion && !saveData;
+}
+
+export const Login: React.FC<LoginProps> = ({ onLogin }) => {
+  const [playLoop] = useState(canPlayVaultLoop);
+
+  return (
+    <main className="gl-login-page">
+      <div className="gl-card">
+        <div className="gl-card-bg" aria-hidden="true">
+          {playLoop && (
+            <video
+              className="gl-card-bg__video"
+              src="/brand/login-vault-loop.mp4"
+              poster="/brand/login-vault-poster.webp"
+              autoPlay
+              muted
+              loop
+              playsInline
+              disablePictureInPicture
+              tabIndex={-1}
+            />
+          )}
+        </div>
+        <Hero />
+        <LoginForm onLogin={onLogin} />
+      </div>
+    </main>
+  );
+};

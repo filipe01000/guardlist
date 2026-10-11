@@ -122,7 +122,7 @@ components:
 
 O GuardList é um cofre de perímetros. Cada cliente é um compartimento isolado, e a interface existe para guardar essa separação com calma: nada vaza de um cofre para outro, nada grita, tudo tem lugar e estado. O tom é sóbrio e firme. A interface guarda, não assusta.
 
-O trabalho acontece sobre aço escuro (ou papel bancário no tema claro), em superfícies planas separadas por tom e por costuras de 1px. Acima delas flutua um único console, a sidebar, que acompanha o operador por todas as salas do cofre. A entrada é uma porta: a tela de login, o único lugar onde a marca ganha um painel próprio, com a imagem da porta do cofre em aço azulado. Dentro, a densidade é de bancada técnica: rótulos curtos, números tabulares e um só azul para agir.
+O trabalho acontece sobre aço escuro (ou papel bancário no tema claro), em superfícies planas separadas por tom e por costuras de 1px. Acima delas flutua um único console, a sidebar, que acompanha o operador por todas as salas do cofre. A entrada é uma porta: a tela de login, o único lugar onde a marca ganha um painel próprio, com a porta do cofre em aço azulado em movimento lento. Dentro, a densidade é de bancada técnica: rótulos curtos, números tabulares e um só azul para agir.
 
 **Key Characteristics:**
 
@@ -257,7 +257,7 @@ O console é a navegação. De cima para baixo: marca e botão de recolher (48px
 
 ### Signature: The Vault Door (Login)
 
-Cartão de 660×520px com moldura interna de 8px. O formulário (usuário, senha com mostrar/ocultar, erro, Entrar) fica à esquerda. À direita, o painel de marca: a fotografia da porta do cofre (`public/brand/login-vault.webp`, aço escovado em azul profundo) sob um véu radial de Vault Blue Deep, mais denso no centro para a marca GuardList continuar legível. O degradê azul permanece como fallback se a imagem não carregar. Na entrada, o painel desliza 0.65s da esquerda para a direita e o texto surge em fade, como uma porta que se fecha atrás do operador. Respeita `prefers-reduced-motion`. Não existe cadastro: o acesso é concedido pelo administrador.
+Cartão de 660×520px com moldura interna de 8px. O formulário (usuário, senha com mostrar/ocultar, erro, Entrar) fica à esquerda. À direita, o painel de marca: um loop silencioso de 9s do mecanismo da porta do cofre (`public/brand/login-vault-loop.mp4`, 480×720, ~640 KB, com crossfade de 1s na emenda) sob um véu radial de Vault Blue Deep, mais denso no centro para a marca GuardList continuar legível. O pôster (`login-vault-poster.webp`) é o primeiro quadro do loop e aparece sozinho com `prefers-reduced-motion` ou economia de dados; o degradê azul é o último fallback. Na entrada, o painel desliza 0.65s da esquerda para a direita e o texto surge em fade, como uma porta que se fecha atrás do operador. Respeita `prefers-reduced-motion`. Não existe cadastro: o acesso é concedido pelo administrador.
 
 ### Dialogs
 

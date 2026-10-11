@@ -35,13 +35,30 @@
   bottom: 0;
   width: 50%;
   border-radius: 18px;
-  /* Porta do cofre com véu azul para manter a marca legível; o degradê é o fallback. */
+  overflow: hidden;
+  /* Pôster da porta do cofre (primeiro quadro do loop); o degradê é o fallback. */
   background:
-    radial-gradient(circle at 50% 50%, rgba(13, 24, 48, 0.72) 0%, rgba(13, 24, 48, 0.35) 55%, rgba(13, 24, 48, 0.55) 100%),
-    url("/brand/login-vault.webp") center / cover no-repeat,
+    url("/brand/login-vault-poster.webp") center / cover no-repeat,
     linear-gradient(160deg, #1d3f8f 0%, #0d1830 100%);
   translate: 100% 0;
   animation: gl-slide-in 0.65s ease-in-out;
+}
+
+.gl-card-bg__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* Véu azul sobre a porta para manter a marca legível. */
+.gl-card-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(13, 24, 48, 0.72) 0%, rgba(13, 24, 48, 0.35) 55%, rgba(13, 24, 48, 0.55) 100%);
 }
 
 .gl-hero,
