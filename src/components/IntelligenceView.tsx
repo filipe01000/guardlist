@@ -1,72 +1,114 @@
-import React, { useState, useMemo } from 'react';
-import { ArrowLeftRight, Check, ChevronRight, Copy, Search } from 'lucide-react';
-import { BlocklistEntry, Client } from '../types';
-import { buildCorrelationMatrix } from '../utils/ctiService';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeftRight, Check, ChevronLeft, ChevronRight, Copy, Search } from 'lucide-react';
+import { BlocklistEntry, Client, CorrelationPage } from '../types';
+import { getCorrelationPage, getIndicatorEntries } from '../db/store';
 import { IpDossierModal } from './IpDossierModal';
+import { Modal } from './Modal';
 import { PageHeader } from './PageHeader';
 import { EvolutionPanel } from './EvolutionPanel';
 
 interface IntelligenceViewProps {
-  allEntries: BlocklistEntry[];
   clients: Client[];
   onNavigateToClientList: (clientId: string) => void;
 }
 
 const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
-  allEntries,
-  clients,
-  onNavigateToClientList
+  clients
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [clientFilter, setClientFilter] = useState<string>('ALL');
   const [severityFilter, setSeverityFilter] = useState<'ALL' | 'critical' | 'high' | 'medium'>('ALL');
   const [selectedIpForDossier, setSelectedIpForDossier] = useState<string | null>(null);
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const copyTimeout = useRef<number | null>(null);
+  const copyVersion = useRef(0);
+  const [correlation, setCorrelation] = useState<CorrelationPage | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [reload, setReload] = useState(0);
+  const [dossierEntries, setDossierEntries] = useState<BlocklistEntry[]>([]);
+  const [dossierState, setDossierState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [dossierError, setDossierError] = useState<string | null>(null);
+  const [dossierRetry, setDossierRetry] = useState(0);
+  const activeClients = clients.filter(client => !client.isArchived);
 
-  // Calcular matriz de correlação em tempo real
-  const correlation = useMemo(() => {
-    return buildCorrelationMatrix(allEntries, clients);
-  }, [allEntries, clients]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 200);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
-  // Filtrar indicadores correlacionados
-  const filteredList = useMemo(() => {
-    return correlation.sharedIndicators.filter(item => {
-      // Busca
-      if (searchTerm) {
-        const q = searchTerm.toLowerCase();
-        const matchesIp = item.indicator.toLowerCase().includes(q);
-        const matchesClient = item.clientNames.some(c => c.toLowerCase().includes(q));
-        if (!matchesIp && !matchesClient) return false;
-      }
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    if (searchTerm !== debouncedSearch) return;
+    getCorrelationPage({ search: debouncedSearch, clientId: clientFilter, severity: severityFilter, page, pageSize })
+      .then(result => {
+        if (cancelled) return;
+        setCorrelation(result);
+        if (result.page !== page) setPage(result.page);
+      })
+      .catch(reason => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Não foi possível carregar a correlação.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [searchTerm, debouncedSearch, clientFilter, severityFilter, page, pageSize, reload, clients]);
 
-      // Filtro por cliente
-      if (clientFilter !== 'ALL') {
-        if (!item.clientIds.includes(clientFilter)) return false;
-      }
+  useEffect(() => {
+    if (!selectedIpForDossier) return;
+    let cancelled = false;
+    setDossierState('loading');
+    setDossierError(null);
+    getIndicatorEntries(selectedIpForDossier)
+      .then(matches => {
+        if (cancelled) return;
+        setDossierEntries(matches);
+        setDossierState('ready');
+      })
+      .catch(reason => {
+        if (cancelled) return;
+        setDossierError(reason instanceof Error ? reason.message : 'Não foi possível carregar as ocorrências do indicador.');
+        setDossierState('error');
+      });
+    return () => { cancelled = true; };
+  }, [selectedIpForDossier, dossierRetry]);
 
-      // Filtro por severidade
-      if (severityFilter !== 'ALL') {
-        if (item.severity !== severityFilter) return false;
-      }
+  useEffect(() => () => {
+    copyVersion.current += 1;
+    if (copyTimeout.current !== null) window.clearTimeout(copyTimeout.current);
+  }, []);
 
-      return true;
-    });
-  }, [correlation.sharedIndicators, searchTerm, clientFilter, severityFilter]);
-
-  const handleCopy = (ip: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    navigator.clipboard.writeText(ip);
-    setCopiedIp(ip);
-    setTimeout(() => setCopiedIp(null), 2000);
+  const openDossier = (indicator: string) => {
+    setDossierEntries([]);
+    setDossierState('loading');
+    setDossierError(null);
+    setSelectedIpForDossier(indicator);
   };
 
-  const maxDissemination = correlation.sharedIndicators.length > 0
-    ? Math.max(...correlation.sharedIndicators.map(s => s.occurrencesCount))
-    : 0;
+  const handleCopy = async (ip: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const version = ++copyVersion.current;
+    if (copyTimeout.current !== null) window.clearTimeout(copyTimeout.current);
+    copyTimeout.current = null;
+    setCopiedIp(null);
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText(ip);
+      if (version !== copyVersion.current) return;
+      setCopiedIp(ip);
+      copyTimeout.current = window.setTimeout(() => { setCopiedIp(null); copyTimeout.current = null; }, 2000);
+    } catch {
+      if (version === copyVersion.current) setCopyError(`Não foi possível copiar ${ip}. Selecione o indicador e use Ctrl+C.`);
+    }
+  };
 
-  const cidrSharedCount = correlation.sharedIndicators.filter(
-    s => s.type === 'CIDR_v4' || s.type === 'CIDR_v6' || s.indicator.includes('/')
-  ).length;
+  const filteredList = loading || error ? [] : correlation?.sharedIndicators || [];
+  const summary = correlation?.summary;
+  const activeClientsCount = summary?.activeClientsCount ?? activeClients.length;
+  const totalPages = Math.max(1, Math.ceil((correlation?.total || 0) / pageSize));
 
   const severityChip = (severity: string) =>
     severity === 'critical' ? 'chip chip--danger' : severity === 'high' ? 'chip chip--warn' : 'chip';
@@ -77,22 +119,22 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
       <div className="workspace-summary intelligence-summary" aria-label="Resumo de correlação">
         <div className="workspace-summary__item">
           <span>Indicadores correlacionados</span>
-          <strong>{correlation.totalCorrelatedIpsCount}</strong>
+          <strong>{summary?.totalCorrelatedIpsCount ?? '—'}</strong>
           <small>Presentes em 2 ou mais clientes</small>
         </div>
         <div className="workspace-summary__item intelligence-summary__risk">
           <span>Maior disseminação</span>
-          <strong>{maxDissemination}/{clients.length}</strong>
+          <strong>{summary?.maxDissemination ?? '—'}/{activeClientsCount}</strong>
           <small>Clientes com o mesmo indicador</small>
         </div>
         <div className="workspace-summary__item">
           <span>Redes CIDR em comum</span>
-          <strong>{cidrSharedCount}</strong>
+          <strong>{summary?.cidrSharedCount ?? '—'}</strong>
           <small>Blocos repetidos entre listas</small>
         </div>
         <div className="workspace-summary__item intelligence-summary__critical">
           <span>Nível crítico</span>
-          <strong>{correlation.sharedIndicators.filter(s => s.severity === 'critical').length}</strong>
+          <strong>{summary?.criticalCount ?? '—'}</strong>
           <small>Presentes em 4 ou mais clientes</small>
         </div>
       </div>
@@ -104,18 +146,18 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
             type="search"
             placeholder="Buscar IP, CIDR ou cliente"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             aria-label="Buscar indicador ou cliente"
           />
         </label>
         <div className="toolbar__group">
-          <select className="field" value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} aria-label="Filtrar por cliente">
+          <select className="field" value={clientFilter} onChange={(e) => { setClientFilter(e.target.value); setPage(1); }} aria-label="Filtrar por cliente">
             <option value="ALL">Todos os clientes</option>
-            {clients.map(c => (
+            {activeClients.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
-          <select className="field" value={severityFilter} onChange={(e) => setSeverityFilter(e.target.value as typeof severityFilter)} aria-label="Filtrar por severidade">
+          <select className="field" value={severityFilter} onChange={(e) => { setSeverityFilter(e.target.value as typeof severityFilter); setPage(1); }} aria-label="Filtrar por severidade">
             <option value="ALL">Todas as severidades</option>
             <option value="critical">Crítica (4+ clientes)</option>
             <option value="high">Alta (3 clientes)</option>
@@ -124,10 +166,12 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
         </div>
       </div>
 
-      <section className="data-panel" aria-labelledby="shared-title">
+      {copyError && <p className="notice notice--danger" role="alert">{copyError}</p>}
+
+      <section className="data-panel" aria-labelledby="shared-title" aria-busy={loading}>
         <header className="data-panel__header">
           <h2 id="shared-title">Indicadores em comum</h2>
-          <span>{filteredList.length} {filteredList.length === 1 ? 'resultado' : 'resultados'}</span>
+          <span role="status">{loading ? 'Carregando…' : error ? 'Consulta indisponível' : `${correlation?.total || 0} ${correlation?.total === 1 ? 'resultado' : 'resultados'}`}</span>
         </header>
 
         <div className="overflow-x-auto">
@@ -156,8 +200,13 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
                   <td colSpan={6}>
                     <div className="empty-state">
                       <Search aria-hidden="true" />
-                      <strong>Nenhum indicador encontrado</strong>
-                      <p>Ajuste a busca ou os filtros para ver outros resultados.</p>
+                      <strong>{loading ? 'Carregando indicadores…' : error ? 'Não foi possível carregar a correlação' : summary?.totalCorrelatedIpsCount === 0 ? 'Nenhum indicador em comum' : 'Nenhum indicador encontrado'}</strong>
+                      {error ? (
+                        <>
+                          <p role="alert">{error}</p>
+                          <button type="button" className="btn btn--sm" onClick={() => setReload(value => value + 1)}>Tentar novamente</button>
+                        </>
+                      ) : <p>{loading ? 'Consultando as listas dos clientes.' : summary?.totalCorrelatedIpsCount === 0 ? 'A correlação aparece quando o mesmo indicador ativo é bloqueado por dois ou mais clientes.' : 'Ajuste a busca ou os filtros para ver outros resultados.'}</p>}
                     </div>
                   </td>
                 </tr>
@@ -165,7 +214,7 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
                 filteredList.map((item) => (
                   <tr
                     key={item.indicator}
-                    onClick={() => setSelectedIpForDossier(item.indicator)}
+                    onClick={() => openDossier(item.indicator)}
                     className="is-clickable"
                   >
                     <td>
@@ -173,7 +222,7 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
                         <button
                           type="button"
                           className="data-table__primary"
-                          onClick={(e) => { e.stopPropagation(); setSelectedIpForDossier(item.indicator); }}
+                          onClick={(e) => { e.stopPropagation(); openDossier(item.indicator); }}
                         >
                           {item.indicator}
                         </button>
@@ -198,7 +247,7 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
                     </td>
                     <td>
                       <span className={severityChip(item.severity)}>
-                        {item.occurrencesCount} de {clients.length}
+                        {item.occurrencesCount} de {activeClientsCount}
                       </span>
                     </td>
                     <td>
@@ -215,6 +264,24 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
             </tbody>
           </table>
         </div>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-800 text-xs text-slate-400">
+          <p>Exibindo <strong>{filteredList.length ? `${(page - 1) * pageSize + 1}–${(page - 1) * pageSize + filteredList.length}` : '0'}</strong> de <strong>{correlation?.total || 0}</strong></p>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2">
+              Por página
+              <select className="field" value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }} aria-label="Indicadores correlacionados por página">
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </label>
+            <nav className="flex items-center gap-2" aria-label="Páginas de indicadores correlacionados">
+              <button type="button" className="btn btn--sm btn--icon" disabled={loading || Boolean(error) || page <= 1} onClick={() => setPage(value => value - 1)} aria-label="Página anterior"><ChevronLeft aria-hidden="true" /></button>
+              <span className="font-mono" aria-live="polite">{page} / {totalPages}</span>
+              <button type="button" className="btn btn--sm btn--icon" disabled={loading || Boolean(error) || page >= totalPages} onClick={() => setPage(value => value + 1)} aria-label="Próxima página"><ChevronRight aria-hidden="true" /></button>
+            </nav>
+          </div>
+        </div>
       </section>
 
       <section className="data-panel" aria-labelledby="overlap-title">
@@ -225,7 +292,7 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
           </div>
         </header>
         <div className="overlap-grid">
-          {correlation.clientOverlapTable.slice(0, 9).map((pair) => (
+          {(correlation?.clientOverlapTable || []).slice(0, 9).map((pair) => (
             <div key={`${pair.clientA}-${pair.clientB}`} className="overlap-pair">
               <span className="overlap-pair__names">
                 {pair.clientA} <ArrowLeftRight className="overlap-pair__icon" aria-hidden="true" /><span className="sr-only">e</span> {pair.clientB}
@@ -235,16 +302,31 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
             </div>
           ))}
         </div>
+        {!correlation?.clientOverlapTable.length && (
+          <div className="empty-state">
+            <ArrowLeftRight aria-hidden="true" />
+            <strong>{loading ? 'Carregando sobreposição…' : error ? 'Sobreposição indisponível' : 'Nenhuma sobreposição entre clientes'}</strong>
+            <p>{loading ? 'Consultando indicadores ativos em comum.' : error ? 'Tente carregar a correlação novamente.' : 'Os pares aparecem quando dois clientes bloqueiam o mesmo indicador ativo.'}</p>
+          </div>
+        )}
       </section>
 
-      {selectedIpForDossier && (
+      {selectedIpForDossier && dossierState === 'ready' && (
         <IpDossierModal
           indicator={selectedIpForDossier}
           onClose={() => setSelectedIpForDossier(null)}
-          allEntries={allEntries}
+          allEntries={dossierEntries}
           clients={clients}
         />
       )}
+      <Modal open={Boolean(selectedIpForDossier) && dossierState !== 'ready'} title={`Dossiê de ${selectedIpForDossier || ''}`} onClose={() => setSelectedIpForDossier(null)}>
+        {dossierState === 'error' ? (
+          <div className="space-y-4">
+            <p className="notice notice--danger" role="alert">{dossierError}</p>
+            <button type="button" className="btn btn--primary" onClick={() => setDossierRetry(value => value + 1)}>Tentar novamente</button>
+          </div>
+        ) : <p role="status">Carregando as ocorrências deste indicador nos clientes…</p>}
+      </Modal>
     </div>
   );
 };

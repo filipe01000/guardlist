@@ -179,7 +179,7 @@ app.post('/api/auth/change-password', passwordLimit, jsonSmall, async (req, res)
 app.use('/api', async (req, res, next) => {
   const row = await currentUser(req).catch(() => null);
   if (!row) return res.status(401).json({ error: 'Sessão expirada. Entre novamente.' });
-  if (row.must_change_password) return res.status(403).json({ error: 'Troque sua senha para continuar.' });
+  if (row.must_change_password) return res.status(403).json({ error: 'Troque sua senha para continuar.', code: 'PASSWORD_CHANGE_REQUIRED' });
   res.locals.actor = toActor(row) satisfies Actor;
   res.locals.userId = row.id;
   res.locals.sessionId = row.session_id;

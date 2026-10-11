@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { ValidateAllModal } from './ValidateAllModal';
 import type { ShowToast } from '../App';
-import { BlocklistEntry, Client, ImportHistoryRecord } from '../types';
+import { Client, DashboardStats, ImportHistoryRecord } from '../types';
 import { getDaysSince } from '../utils/validator';
+import { formatDateBR } from '../utils/csv';
 import { getHistoryRecords } from '../db/store';
 import { PageHeader } from './PageHeader';
 
@@ -27,7 +28,7 @@ interface DashboardViewProps {
   totalCidrsAcrossAll: number;
   totalCorrelatedIps: number;
   addedThisWeekCount: number;
-  allActiveEntries: BlocklistEntry[];
+  recurring: DashboardStats['recurring'];
   slaDays: number;
   onNavigateToImport: (clientId: string) => void;
   onNavigateToList: (clientId: string) => void;
@@ -38,6 +39,7 @@ interface DashboardViewProps {
   onRefresh: () => void;
   showToast: ShowToast;
   onOpenReview: () => void;
+  onManageClients: () => void;
 }
 
 const VIEW_MODE_KEY = 'guardlist-dashboard-view';
@@ -68,7 +70,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   totalCidrsAcrossAll,
   totalCorrelatedIps,
   addedThisWeekCount,
-  allActiveEntries,
+  recurring,
   slaDays,
   onNavigateToImport,
   onNavigateToList,
@@ -78,7 +80,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenIntelligenceTab,
   onRefresh,
   showToast,
-  onOpenReview
+  onOpenReview,
+  onManageClients
 }) => {
   const [isValidateOpen, setIsValidateOpen] = useState(false);
   const activeClients = useMemo(() => clients.filter((c) => !c.isArchived), [clients]);
@@ -142,23 +145,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     () => [...enrichedClients].sort((a, b) => b.urgencyScore - a.urgencyScore).slice(0, 6),
     [enrichedClients]
   );
-
-  // Indicadores presentes em mais clientes ativos (mesma regra da correlação).
-  const recurring = useMemo(() => {
-    const activeIds = new Set(activeClients.map((c) => c.id));
-    const byIndicator = new Map<string, Set<string>>();
-    for (const entry of allActiveEntries) {
-      if (!activeIds.has(entry.clientId)) continue;
-      const set = byIndicator.get(entry.indicator) ?? new Set<string>();
-      set.add(entry.clientId);
-      byIndicator.set(entry.indicator, set);
-    }
-    return [...byIndicator.entries()]
-      .filter(([, set]) => set.size >= 2)
-      .map(([indicator, set]) => ({ indicator, count: set.size }))
-      .sort((a, b) => b.count - a.count || a.indicator.localeCompare(b.indicator))
-      .slice(0, 5);
-  }, [allActiveEntries, activeClients]);
 
   const nextExpiring = useMemo(() => {
     const upcoming = enrichedClients.filter((c) => !c.isLate && c.daysSince !== null);
@@ -251,19 +237,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {sortedClients.length === 0 ? (
             <div className="rail-panel empty-state">
               <Calendar aria-hidden="true" />
-              <strong>Nenhum cliente atrasado</strong>
-              <p>Todos os clientes estão dentro do prazo de {slaDays} dias.</p>
-              <button type="button" className="btn btn--sm" onClick={() => setOnlyLateFilter(false)}>Mostrar todos</button>
+              <strong>{activeClients.length === 0 ? 'Cadastre seu primeiro cliente' : 'Nenhum cliente atrasado'}</strong>
+              <p>{activeClients.length === 0 ? 'Crie um cliente para importar e acompanhar sua lista de bloqueios.' : `Todos os clientes estão dentro do prazo de ${slaDays} dias.`}</p>
+              <button type="button" className="btn btn--sm" onClick={activeClients.length === 0 ? onManageClients : () => setOnlyLateFilter(false)}>{activeClients.length === 0 ? 'Gerenciar clientes' : 'Mostrar todos'}</button>
             </div>
           ) : viewMode === 'cards' ? (
-            <div key="cards" className="view-enter grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
+            <div key="cards" className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
               {sortedClients.map(({ client, daysSince, total, ips, cidrs, isLate, isNearDeadline }) => (
                 <article
                   key={client.id}
                   className={`client-tile ${isLate ? 'is-late' : isNearDeadline ? 'is-near' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <h3 className="font-bold text-white text-[0.95rem] tracking-wide font-mono">{client.name}</h3>
+                    <h3 className="font-bold text-white text-base">{client.name}</h3>
                     {statusChip(isLate, isNearDeadline)}
                   </div>
 
@@ -278,7 +264,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <Calendar aria-hidden="true" /> Última revisão
                     </span>
                     <span className="client-tile__review-value">
-                      <strong>{client.lastUpdateDate || 'Nunca'}</strong>
+                      <strong>{client.lastUpdateDate ? formatDateBR(client.lastUpdateDate) : 'Nunca'}</strong>
                       <small className={isLate ? 'text-rose-400' : isNearDeadline ? 'text-amber-400' : 'text-slate-400'}>
                         {daysSince === null ? 'Pendente' : daysSince === 0 ? 'Hoje' : `Há ${daysSince} dias`}
                       </small>
@@ -316,7 +302,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ))}
             </div>
           ) : (
-            <div key="table" className="view-enter client-ledger-table overflow-x-auto">
+            <div key="table" className="client-ledger-table overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-slate-800 text-slate-400 text-[11px] font-semibold">
@@ -338,7 +324,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onNavigateToList(client.id)}
-                          className="font-mono font-bold text-white hover:text-blue-400 transition-colors cursor-pointer"
+                          className="font-bold text-white hover:text-blue-400 transition-colors cursor-pointer"
                         >
                           {client.name}
                         </button>
@@ -347,7 +333,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-300">{ips.toLocaleString('pt-BR')}</td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-300">{cidrs}</td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <span className="font-mono text-slate-300">{client.lastUpdateDate || 'Nunca'}</span>
+                        <span className="font-mono text-slate-300">{client.lastUpdateDate ? formatDateBR(client.lastUpdateDate) : 'Nunca'}</span>
                         <span className="text-slate-500 ml-2">{daysSince === null ? '' : `há ${daysSince}d`}</span>
                       </td>
                       <td className="py-2.5 px-3">{statusChip(isLate, isNearDeadline)}</td>

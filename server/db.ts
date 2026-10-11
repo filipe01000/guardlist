@@ -11,6 +11,7 @@ export interface Database {
   kind: 'postgres' | 'pglite';
   query: Query;
   tx<T>(fn: (query: Query) => Promise<T>): Promise<T>;
+  close?: () => Promise<void>;
 }
 
 const SCHEMA = `
@@ -151,6 +152,7 @@ async function connectPostgres(url: string): Promise<Database> {
   return {
     kind: 'postgres',
     query,
+    close: () => pool.end(),
     async tx(fn) {
       const client = await pool.connect();
       try {
@@ -168,9 +170,9 @@ async function connectPostgres(url: string): Promise<Database> {
   };
 }
 
-async function connectPglite(dataDir: string): Promise<Database> {
+async function connectPglite(dataDir?: string): Promise<Database> {
   const { PGlite } = await import('@electric-sql/pglite');
-  mkdirSync(path.dirname(dataDir), { recursive: true });
+  if (dataDir) mkdirSync(path.dirname(dataDir), { recursive: true });
   const lite = new PGlite(dataDir);
   await lite.waitReady;
 
@@ -185,11 +187,24 @@ async function connectPglite(dataDir: string): Promise<Database> {
   return {
     kind: 'pglite',
     query,
+    close: () => lite.close(),
     tx: (fn) =>
       lite.transaction((tx) =>
         fn(async (sql, params) => (await tx.query(sql, (params ?? []) as unknown[])).rows as never[])
       )
   };
+}
+
+// Banco descartável de testes: usa o mesmo schema, sem arquivos e sem ler DATABASE_URL.
+export async function openMemoryDatabase(): Promise<Database> {
+  const db = await connectPglite();
+  try {
+    await db.query(SCHEMA);
+    return db;
+  } catch (error) {
+    await db.close?.();
+    throw error;
+  }
 }
 
 export async function openDatabase(rootDir: string): Promise<Database> {

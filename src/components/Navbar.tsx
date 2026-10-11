@@ -1,9 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import {
-  AlertTriangle,
   Building2,
   HardDrive,
-  HardDriveDownload,
   History,
   LayoutDashboard,
   ListFilter,
@@ -22,6 +20,7 @@ import {
   X
 } from 'lucide-react';
 import { SessionUser } from '../types';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import './Sidebar.css';
 
 export type AppTab = 'dashboard' | 'import' | 'client-list' | 'review' | 'intelligence' | 'history' | 'reports' | 'clients' | 'admin' | 'backup';
@@ -77,6 +76,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   pendingApprovals = 0
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
+  const menuId = useId();
   const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
   // Administração aparece só para administradores, antes de Backup e ajustes.
   const visibleItems = currentUser?.role === 'admin' ? [...navItems.slice(0, -1), adminItem, navItems[navItems.length - 1]] : navItems;
@@ -87,6 +88,30 @@ export const Navbar: React.FC<NavbarProps> = ({
   const backupLabel = isBackupOutdated
     ? 'Backup pendente'
     : `Backup há ${daysSinceBackup} ${daysSinceBackup === 1 ? 'dia' : 'dias'}`;
+
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 1023px)');
+    const sync = () => {
+      setIsMobile(media.matches);
+      if (!media.matches) setMobileOpen(false);
+    };
+    media.addEventListener('change', sync);
+    return () => media.removeEventListener('change', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile || !mobileOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const background = Array.from(document.querySelectorAll<HTMLElement>('#main-content, .studio-footer, .gl-mobilebar, .skip-link'));
+    const previousInert = background.map(element => element.inert);
+    document.body.style.overflow = 'hidden';
+    background.forEach(element => { element.inert = true; });
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      background.forEach((element, index) => { element.inert = previousInert[index]; });
+    };
+  }, [isMobile, mobileOpen]);
+  const menuRef = useDialogFocus<HTMLElement>(isMobile && mobileOpen);
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -106,7 +131,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   // Dicas flutuantes no modo recolhido; ficam fora da sidebar para não serem cortadas.
   const showTip = (event: React.SyntheticEvent<HTMLElement>) => {
-    if (!collapsed) return;
+    if (!collapsed || isMobile) return;
     const target = (event.target as HTMLElement).closest<HTMLElement>('[data-tip]');
     if (!target) return;
     const rect = target.getBoundingClientRect();
@@ -117,7 +142,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <>
       <div className="gl-mobilebar">
-        <button type="button" className="gl-icon-btn" onClick={() => setMobileOpen(true)} aria-label="Abrir menu">
+        <button type="button" className="gl-icon-btn" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen} aria-controls={menuId}>
           <Menu aria-hidden="true" />
         </button>
         <span className="gl-mobilebar__brand">
@@ -136,6 +161,13 @@ export const Navbar: React.FC<NavbarProps> = ({
       />
 
       <aside
+        id={menuId}
+        ref={menuRef}
+        tabIndex={-1}
+        role={isMobile && mobileOpen ? 'dialog' : undefined}
+        aria-modal={isMobile && mobileOpen ? true : undefined}
+        aria-hidden={isMobile && !mobileOpen ? true : undefined}
+        inert={isMobile && !mobileOpen}
         className={`gl-sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'is-open' : ''}`}
         aria-label="Menu principal"
         onMouseOver={showTip}
@@ -182,7 +214,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <KeyRound className="gl-profile-key label" aria-hidden="true" />
           </button>
 
-          <button type="button" className="gl-row gl-search" onClick={onOpenQuickSearch} data-tip="Consultar IP (Ctrl/⌘ K)" aria-label="Consultar IP">
+          <button type="button" className="gl-row gl-search" onClick={() => { setMobileOpen(false); onOpenQuickSearch(); }} data-tip="Consultar IP (Ctrl/⌘ K)" aria-label="Consultar IP">
             <Search aria-hidden="true" />
             <span className="label">Consultar IP</span>
             <kbd className="label">Ctrl K</kbd>
@@ -197,11 +229,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className={`gl-row ${currentTab === id ? 'active' : ''}`}
                   onClick={() => go(id)}
                   aria-current={currentTab === id ? 'page' : undefined}
-                  data-tip={label}
-                  aria-label={label}
+                  data-tip={id === 'backup' ? `${label} · ${backupLabel}` : label}
+                  aria-label={id === 'backup' ? `${label}. ${backupLabel}` : label}
                 >
                   <Icon aria-hidden="true" />
                   <span className="label">{label}</span>
+                  {id === 'backup' && isBackupOutdated && <span className="nav-status-dot" aria-hidden="true" />}
                   {id === 'admin' && pendingApprovals > 0 && (
                     <span className="nav-badge" aria-label={`${pendingApprovals} aprovações pendentes`}>{pendingApprovals}</span>
                   )}
@@ -211,17 +244,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </ul>
 
           <hr className="gl-divider" />
-
-          <button
-            type="button"
-            className={`gl-row gl-backup ${isBackupOutdated ? 'is-warning' : ''}`}
-            onClick={() => go('backup')}
-            data-tip={backupLabel}
-            aria-label={backupLabel}
-          >
-            {isBackupOutdated ? <AlertTriangle aria-hidden="true" /> : <HardDriveDownload aria-hidden="true" />}
-            <span className="label">{backupLabel}</span>
-          </button>
 
           {/* O rótulo mostra o tema de destino: no escuro oferece "Modo claro" e vice-versa. */}
           <button

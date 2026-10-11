@@ -4,6 +4,8 @@ description: Cofre operacional para manutenção e investigação de blocklists 
 colors:
   vault-blue: "#5791ff"
   vault-blue-day: "#2f6fdf"
+  vault-action: "#2f6fdf"
+  vault-action-hover: "#285fc5"
   vault-blue-soft: "rgba(87, 145, 255, 0.12)"
   vault-blue-deep: "#1d3f8f"
   vault-steel: "#0a0c10"
@@ -22,7 +24,7 @@ colors:
   ink-night-muted: "#8e9aaa"
   ink-day: "#17202b"
   ink-day-soft: "#344154"
-  ink-day-muted: "#667489"
+  ink-day-muted: "#5f6d80"
   danger: "#f56a77"
   warning: "#e7ab4e"
   success: "#4ec995"
@@ -40,12 +42,12 @@ typography:
     lineHeight: 1.3
   body:
     fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, Segoe UI, sans-serif"
-    fontSize: "0.78rem"
+    fontSize: "0.875rem"
     fontWeight: 400
     lineHeight: 1.5
   label:
     fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, Segoe UI, sans-serif"
-    fontSize: "0.68rem"
+    fontSize: "0.8rem"
     fontWeight: 620
     lineHeight: 1.3
   data:
@@ -71,8 +73,8 @@ spacing:
   xl: "30px"
 components:
   button-primary:
-    backgroundColor: "{colors.vault-blue}"
-    textColor: "{colors.ink-night}"
+    backgroundColor: "{colors.vault-action}"
+    textColor: "#ffffff"
     rounded: "{rounded.control}"
     padding: "8px 12px"
   card:
@@ -108,8 +110,8 @@ components:
     width: "660px"
     height: "520px"
   login-submit:
-    backgroundColor: "{colors.vault-blue}"
-    textColor: "{colors.ink-night}"
+    backgroundColor: "{colors.vault-action}"
+    textColor: "#ffffff"
     rounded: "{rounded.pill}"
     height: "44px"
 ---
@@ -139,7 +141,7 @@ Aço quase preto ou papel bancário frio, um azul de cofre para tudo o que se ac
 
 ### Primary
 
-- **Vault Blue** (escuro) e **Vault Blue Day** (claro): seleção, foco, ações primárias, item ativo da navegação e o interruptor de tema ligado. É a cor que "abre" algo. Aparece em pouca área para continuar significando intenção.
+- **Vault Blue** (escuro) e **Vault Blue Day** (claro): seleção, foco e item ativo da navegação. **Vault Action** é o fundo dos botões com texto branco nos dois temas, com hover mais escuro, para manter contraste de leitura.
 - **Vault Blue Soft:** faixa do item ativo na sidebar, anel de foco de campos e fundos de seleção.
 - **Vault Blue Deep:** só no painel de marca do login, como fim do degradê, e no avatar do perfil.
 
@@ -155,7 +157,7 @@ Aço quase preto ou papel bancário frio, um azul de cofre para tudo o que se ac
 ### Semantic
 
 - **Danger:** atraso fora do SLA, risco e ações destrutivas.
-- **Warning:** prazos próximos e backup pendente (inclusive na linha de backup da sidebar).
+- **Warning:** prazos próximos e indicador de backup pendente no único acesso “Backup e ajustes”.
 - **Success:** em dia, importação concluída.
 
 ### Named Rules

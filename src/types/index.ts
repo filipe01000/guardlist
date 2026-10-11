@@ -106,6 +106,69 @@ export interface BlocklistEntry {
   reviewedBy?: string;
 }
 
+export interface ClientEntriesPageParams {
+  clientId: string;
+  status?: IndicatorStatus | 'ALL';
+  type?: IndicatorType | 'ALL';
+  period?: 'ALL' | '7d' | '30d' | 'year';
+  search?: string;
+  sort?: 'numeric' | 'date';
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ClientEntriesPage {
+  entries: BlocklistEntry[];
+  total: number;
+  totalClient: number;
+  activeCount: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface DashboardStats {
+  activeCounts: Record<string, number>;
+  ipCounts: Record<string, number>;
+  cidrCounts: Record<string, number>;
+  totalActiveAcrossAll: number;
+  totalIpsAcrossAll: number;
+  totalCidrsAcrossAll: number;
+  totalCorrelatedIps: number;
+  addedThisWeekCount: number;
+  recurring: Array<{ indicator: string; count: number }>;
+}
+
+export interface CorrelationPageParams {
+  search?: string;
+  clientId?: string;
+  severity?: 'ALL' | 'critical' | 'high' | 'medium';
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CorrelationPage {
+  sharedIndicators: Array<{
+    indicator: string;
+    type: string;
+    clientIds: string[];
+    clientNames: string[];
+    occurrencesCount: number;
+    severity: 'critical' | 'high' | 'medium';
+    firewallsImpacted: string[];
+  }>;
+  total: number;
+  page: number;
+  pageSize: number;
+  summary: {
+    totalCorrelatedIpsCount: number;
+    maxDissemination: number;
+    cidrSharedCount: number;
+    criticalCount: number;
+    activeClientsCount: number;
+  };
+  clientOverlapTable: Array<{ clientA: string; clientB: string; sharedCount: number }>;
+}
+
 export interface ImportPreviewItem {
   indicator: string;
   original: string;

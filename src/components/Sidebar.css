@@ -90,6 +90,7 @@
   flex-direction: column;
   width: 100%;
   min-height: 0;
+  overflow-y: auto;
   padding: 22px 0;
 }
 
@@ -363,8 +364,8 @@
   }
 
   .gl-mobilebar .gl-icon-btn {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     border-radius: 12px;
   }
 
@@ -397,6 +398,11 @@
     translate: calc(-100% - 24px) 0;
   }
 
+  .gl-sidebar { --sb-row: 44px; --sb-avatar: 44px; }
+  .gl-sidebar-inner { padding: 18px 0; }
+  .gl-sidebar .gl-nav { flex-shrink: 0; overflow: visible; }
+  .gl-close-btn { width: 44px; height: 44px; }
+
   .gl-sidebar.is-open {
     translate: 0 0;
   }
@@ -424,6 +430,20 @@
     opacity: 1;
     pointer-events: auto;
   }
+}
+
+.nav-status-dot {
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--warning);
+}
+
+.gl-sidebar.collapsed .nav-status-dot {
+  position: absolute;
+  right: 8px;
 }
 
 @media (prefers-reduced-motion: reduce) {

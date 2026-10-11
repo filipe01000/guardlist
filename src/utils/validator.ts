@@ -20,13 +20,16 @@ export function normalizeIndicator(raw: string): string {
   // Ignorar ou limpar aspas
   clean = clean.replace(/^['"]+|['"]+$/g, '');
 
-  // Remover protocolos acidentais
+  // URLs têm caminhos; um IP sem protocolo tem uma máscara que precisa ser validada.
+  const isUrl = /^(?:https?|ftp|sftp):\/\//i.test(clean);
   clean = clean.replace(/^(?:https?|ftp|sftp):\/\//i, '');
 
   // Remover caminhos de URL se houver (exceto se for barra de CIDR como /24)
   if (clean.includes('/')) {
     const parts = clean.split('/');
-    if (parts.length > 2 || !/^\d{1,3}$/.test(parts[1])) {
+    // Identificar o formato antes de normalizar octetos ou validar seus valores.
+    const isIp = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(parts[0]) || isValidIPv6(parts[0]);
+    if (isUrl || (!isIp && (parts.length > 2 || !/^\d{1,3}$/.test(parts[1])))) {
       clean = parts[0];
     }
   }
@@ -43,7 +46,7 @@ export function normalizeIndicator(raw: string): string {
   }
 
   // Normalização de zeros à esquerda em CIDR IPv4 (ex: 010.000.000.000/024 -> 10.0.0.0/24)
-  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2}$/.test(clean)) {
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,3}$/.test(clean)) {
     const [ipPart, maskPart] = clean.split('/');
     const octets = ipPart.split('.').map(o => String(parseInt(o, 10)));
     const mask = parseInt(maskPart, 10);
@@ -75,7 +78,7 @@ export function isValidCIDRv4(cidr: string): boolean {
   if (parts.length !== 2) return false;
   const ip = parts[0];
   const maskStr = parts[1];
-  if (!/^\d{1,2}$/.test(maskStr)) return false;
+  if (!/^\d{1,3}$/.test(maskStr)) return false;
   const mask = Number(maskStr);
   return isValidIPv4(ip) && mask >= 0 && mask <= 32;
 }
@@ -97,6 +100,7 @@ export function isValidCIDRv6(cidr: string): boolean {
   const parts = cidr.split('/');
   if (parts.length !== 2) return false;
   const ip = parts[0];
+  if (!/^\d{1,3}$/.test(parts[1])) return false;
   const mask = Number(parts[1]);
   return isValidIPv6(ip) && !isNaN(mask) && mask >= 0 && mask <= 128;
 }

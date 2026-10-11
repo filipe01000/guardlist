@@ -1,5 +1,5 @@
 import { hashPassword, hashSessionId, newSessionId, parseUsers, SESSION_TTL_MS, verifyPassword } from '../auth.ts';
-import type { Database } from './db.ts';
+import type { Database, Query } from './db.ts';
 import { StoreError, type Actor } from './store.ts';
 
 // Usuários da equipe, guardados no banco. Administradores gerenciam contas; analistas trabalham nas listas.
@@ -88,8 +88,8 @@ export function createUsers(db: Database) {
     return rows[0]?.n ?? 0;
   }
 
-  async function audit(actor: string, action: string, detail: Record<string, unknown>) {
-    await db.query('INSERT INTO audit_log (username, action, detail) VALUES ($1, $2, $3::jsonb)', [actor, action, JSON.stringify(detail)]);
+  async function audit(actor: string, action: string, detail: Record<string, unknown>, query: Query = db.query) {
+    await query('INSERT INTO audit_log (username, action, detail) VALUES ($1, $2, $3::jsonb)', [actor, action, JSON.stringify(detail)]);
   }
 
   return {
@@ -126,30 +126,33 @@ export function createUsers(db: Database) {
     // Resultado do login: usuário, conta travada (com horário de liberação) ou credenciais inválidas.
     async authenticate(username: string, password: string): Promise<{ row: UserRow } | { lockedUntil: string } | null> {
       const normalized = username.trim().toLowerCase();
-      const rows = await db.query<UserRow>('SELECT * FROM users WHERE username = $1', [normalized]);
-      const row = rows[0];
-      const ok = verifyPassword(password, row?.password_hash || dummyHash);
-      if (row && row.locked_until && new Date(row.locked_until).getTime() > Date.now()) {
-        return { lockedUntil: new Date(row.locked_until).toISOString() };
-      }
-      if (row && !ok) {
-        const failed = (row.failed_logins || 0) + 1;
-        if (failed >= MAX_FAILED_LOGINS) {
-          const locked = await db.query<{ locked_until: string }>(
-            "UPDATE users SET failed_logins = 0, locked_until = now() + make_interval(mins => $2::int) WHERE id = $1 RETURNING locked_until",
-            [row.id, LOCK_MINUTES]
-          );
-          await audit(row.username, 'auth.locked', { minutes: LOCK_MINUTES });
-          return { lockedUntil: new Date(locked[0].locked_until).toISOString() };
+      // Serializa tentativas da mesma conta: duas requisições não podem sobrescrever o contador.
+      return db.tx(async (q) => {
+        const rows = await q<UserRow>('SELECT * FROM users WHERE username = $1 FOR UPDATE', [normalized]);
+        const row = rows[0];
+        const ok = verifyPassword(password, row?.password_hash || dummyHash);
+        if (row && row.locked_until && new Date(row.locked_until).getTime() > Date.now()) {
+          return { lockedUntil: new Date(row.locked_until).toISOString() };
         }
-        await db.query('UPDATE users SET failed_logins = $2 WHERE id = $1', [row.id, failed]);
-        await audit(row.username, 'auth.failed', { attempt: failed });
-        return null;
-      }
-      if (!row || !ok || !row.active) return null;
-      await db.query('UPDATE users SET last_login_at = now(), failed_logins = 0, locked_until = NULL WHERE id = $1', [row.id]);
-      await audit(row.username, 'auth.login', {});
-      return { row };
+        if (row && !ok) {
+          const failed = (row.failed_logins || 0) + 1;
+          if (failed >= MAX_FAILED_LOGINS) {
+            const locked = await q<{ locked_until: string }>(
+              "UPDATE users SET failed_logins = 0, locked_until = now() + make_interval(mins => $2::int) WHERE id = $1 RETURNING locked_until",
+              [row.id, LOCK_MINUTES]
+            );
+            await audit(row.username, 'auth.locked', { minutes: LOCK_MINUTES }, q);
+            return { lockedUntil: new Date(locked[0].locked_until).toISOString() };
+          }
+          await q('UPDATE users SET failed_logins = $2 WHERE id = $1', [row.id, failed]);
+          await audit(row.username, 'auth.failed', { attempt: failed }, q);
+          return null;
+        }
+        if (!row || !ok || !row.active) return null;
+        await q('UPDATE users SET last_login_at = now(), failed_logins = 0, locked_until = NULL WHERE id = $1', [row.id]);
+        await audit(row.username, 'auth.login', {}, q);
+        return { row };
+      });
     },
 
     async createSession(row: UserRow, ip: string | null, userAgent: string | null): Promise<string> {

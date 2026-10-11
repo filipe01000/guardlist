@@ -1,4 +1,4 @@
-import { AppSettings, BlocklistEntry, Client, ClientException, ClientSnapshot, CtiSummary, EntryComment, ImportHistoryRecord, ImportOutcome, PendingImport, ReportData } from '../types';
+import { AppSettings, BlocklistEntry, Client, ClientEntriesPage, ClientEntriesPageParams, ClientException, ClientSnapshot, CorrelationPage, CorrelationPageParams, CtiSummary, DashboardStats, EntryComment, ImportHistoryRecord, ImportOutcome, PendingImport, ReportData } from '../types';
 export type { ReportClientRow, ReportChangeRow, ReportData } from '../types';
 
 // Acesso à base compartilhada da equipe pelo servidor (/api/data/<operação>).
@@ -14,7 +14,7 @@ async function call<T>(op: string, ...args: unknown[]): Promise<T> {
     cache: 'no-store'
   });
   const body = await response.json().catch(() => ({}));
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401 || (response.status === 403 && body.code === 'PASSWORD_CHANGE_REQUIRED')) {
     window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: body.error }));
   }
   if (!response.ok) throw new Error(body.error || 'Não foi possível falar com o servidor.');
@@ -35,6 +35,15 @@ export const archiveClient = (clientId: string, isArchived: boolean) => call<nul
 export const getClientEntries = (clientId: string, status?: 'active' | 'removed') =>
   call<BlocklistEntry[]>('getClientEntries', clientId, status);
 
+export const getClientEntriesPage = (params: ClientEntriesPageParams) =>
+  call<ClientEntriesPage>('getClientEntriesPage', params);
+
+export const getCorrelationPage = (params: CorrelationPageParams = {}) =>
+  call<CorrelationPage>('getCorrelationPage', params);
+
+export const getIndicatorEntries = (indicator: string) =>
+  call<BlocklistEntry[]>('getIndicatorEntries', indicator);
+
 export async function getClientActiveIndicatorsSet(clientId: string): Promise<{ activeSet: Set<string>; activeCidrs: string[] }> {
   const result = await call<{ activeSet: string[]; activeCidrs: string[] }>('getClientActiveIndicatorsSet', clientId);
   return { activeSet: new Set(result.activeSet), activeCidrs: result.activeCidrs };
@@ -53,17 +62,7 @@ export const restoreClientSnapshot = (snapshotId: string) => call<{ restoredCoun
 export const deleteClientEntriesAll = (clientId: string) => call<number>('deleteClientEntriesAll', clientId);
 export const deleteSnapshot = (snapshotId: string) => call<null>('deleteSnapshot', snapshotId);
 
-export const getDashboardStats = () =>
-  call<{
-    activeCounts: Record<string, number>;
-    ipCounts: Record<string, number>;
-    cidrCounts: Record<string, number>;
-    totalActiveAcrossAll: number;
-    totalIpsAcrossAll: number;
-    totalCidrsAcrossAll: number;
-    totalCorrelatedIps: number;
-    addedThisWeekCount: number;
-  }>('getDashboardStats');
+export const getDashboardStats = () => call<DashboardStats>('getDashboardStats');
 
 export const searchIndicatorAcrossClients = (searchQuery: string) =>
   call<Array<{ client: Client; entry: BlocklistEntry }>>('searchIndicatorAcrossClients', searchQuery);
@@ -131,7 +130,9 @@ export const reviewEntries = (ids: string[], decision: 'keep' | 'remove') => cal
 export const getComments = (entryId: string) => call<EntryComment[]>('getComments', entryId);
 export const addComment = (entryId: string, body: string) => call<EntryComment[]>('addComment', entryId, body);
 export const deleteComment = (id: number) => call<EntryComment[]>('deleteComment', id);
-export const getCommentCounts = (clientId: string) => call<Record<string, number>>('getCommentCounts', clientId);
+export const getCommentCounts = (clientId: string, entryIds?: string[]) =>
+  entryIds === undefined ? call<Record<string, number>>('getCommentCounts', clientId)
+    : call<Record<string, number>>('getCommentCounts', clientId, entryIds);
 
 // ---------- Auditoria, busca múltipla e evolução ----------
 export interface AuditRow {
@@ -186,7 +187,9 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
     cache: 'no-store'
   });
   const json = await response.json().catch(() => ({}));
-  if (response.status === 401) window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: json.error }));
+  if (response.status === 401 || (response.status === 403 && json.code === 'PASSWORD_CHANGE_REQUIRED')) {
+    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: json.error }));
+  }
   if (!response.ok) throw new Error(json.error || 'Não foi possível falar com o servidor.');
   return json as T;
 }

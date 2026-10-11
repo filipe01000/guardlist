@@ -21,12 +21,17 @@ GREYNOISE_API_KEY=sua_chave
 OTX_API_KEY=sua_chave
 ```
 
+## Testes e validação
+
 Para validar a versão de produção:
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
+
+`npm test` cobre autenticação, bloqueio de contas, comunicação com o backend e validação de indicadores. Também executa `server/store.integration.test.ts` e `server/pagination.test.ts`: importação append/replace, aprovação e rejeição, isolamento entre clientes, desfazer, validação e restauração de backups, rollback e paginação. Esses testes usam o schema real num PGlite descartável em memória, sem conectar ao banco da equipe nem ler `DATABASE_URL`.
 
 ## Deploy no Render
 

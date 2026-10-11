@@ -15,10 +15,11 @@ export function hashPassword(password: string): string {
 }
 
 export function verifyPassword(password: string, stored: string): boolean {
-  const [scheme, saltHex, hashHex] = stored.split(':');
-  if (scheme !== 'scrypt' || !saltHex || !hashHex) return false;
+  // Buffer.from ignora hex inválido; um hash vazio acabava comparando dois buffers vazios.
+  if (!/^scrypt:[a-f0-9]{32}:[a-f0-9]{128}$/i.test(stored)) return false;
+  const [, saltHex, hashHex] = stored.split(':');
   const expected = Buffer.from(hashHex, 'hex');
-  const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+  const actual = scryptSync(password, Buffer.from(saltHex, 'hex'), SCRYPT_KEYLEN);
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 

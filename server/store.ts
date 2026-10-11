@@ -3,8 +3,13 @@ import type {
   AppSettings,
   BlocklistEntry,
   Client,
+  ClientEntriesPage,
+  ClientEntriesPageParams,
   ClientException,
   ClientSnapshot,
+  CorrelationPage,
+  CorrelationPageParams,
+  DashboardStats,
   EntryComment,
   ImportHistoryRecord,
   ImportOutcome,
@@ -84,14 +89,17 @@ async function entriesOf(q: Query, clientId: string, status?: 'active' | 'remove
 async function upsertEntries(q: Query, entries: BlocklistEntry[], actor: Actor) {
   for (let i = 0; i < entries.length; i += 2000) {
     const chunk = entries.slice(i, i + 2000);
-    await q(
+    const saved = await q<{ id: string }>(
       `INSERT INTO entries (id, client_id, indicator, status, data, updated_by)
        SELECT e->>'id', e->>'clientId', e->>'indicator', e->>'status', e, $2
        FROM jsonb_array_elements($1::jsonb) AS e
        ON CONFLICT (id) DO UPDATE SET client_id = EXCLUDED.client_id, indicator = EXCLUDED.indicator,
-         status = EXCLUDED.status, data = EXCLUDED.data, updated_at = now(), updated_by = EXCLUDED.updated_by`,
+         status = EXCLUDED.status, data = EXCLUDED.data, updated_at = now(), updated_by = EXCLUDED.updated_by
+       WHERE entries.client_id = EXCLUDED.client_id
+       RETURNING id`,
       [JSON.stringify(chunk), actor.username]
     );
+    if (saved.length !== chunk.length) throw new StoreError('Um item deste lote pertence a outro cliente.', 409);
   }
 }
 
@@ -121,6 +129,36 @@ async function snapshot(q: Query, clientId: string, label: string, actor: Actor)
     [clientId, SNAPSHOTS_PER_CLIENT]
   );
   return snap;
+}
+
+async function restoreStoredSnapshot(q: Query, actor: Actor, snapshotId: string, historyId?: string) {
+  const rows = await q<{ client_id: string; data: ClientSnapshot }>(
+    'SELECT client_id, data FROM snapshots WHERE id = $1 FOR UPDATE', [snapshotId]
+  );
+  const row = rows[0];
+  const snap = row?.data;
+  if (!snap) throw new StoreError('Versão não encontrada.', 404);
+  if (snap.clientId !== row.client_id || !Array.isArray(snap.entries) || snap.entries.some((e) => e.clientId !== snap.clientId)) {
+    throw new StoreError('Versão inválida: os itens pertencem a outro cliente.');
+  }
+  if (!(await getClient(q, snap.clientId))) throw new StoreError('Cliente não encontrado.', 404);
+  if (historyId) {
+    const history = await q<{ client_id: string }>('SELECT client_id FROM history WHERE id = $1 FOR UPDATE', [historyId]);
+    if (!history[0]) throw new StoreError('Importação não encontrada.', 404);
+    if (history[0].client_id !== snap.clientId) throw new StoreError('A versão e a importação precisam ser do mesmo cliente.');
+  }
+  await snapshot(q, snap.clientId, `Segurança antes de restaurar versão de ${new Date(snap.createdAt).toLocaleDateString('pt-BR')}`, actor);
+  await q('DELETE FROM entries WHERE client_id = $1', [snap.clientId]);
+  await upsertEntries(q, snap.entries, actor);
+  await audit(q, actor, 'snapshot.restore', { clientId: snap.clientId, snapshotId, count: snap.entries.length });
+  if (historyId) {
+    await q(
+      `UPDATE history SET data = data || jsonb_build_object('undone', true, 'notes',
+         coalesce(data->>'notes' || ' • ', '') || $2::text) WHERE id = $1`,
+      [historyId, `Desfeito por ${actor.displayName}`]
+    );
+  }
+  return { restoredCount: snap.entries.length };
 }
 
 // Retira da lista ativa o que está repetido ou contido em um CIDR maior da mesma lista.
@@ -306,6 +344,33 @@ function asArray<T>(value: unknown, field: string): T[] {
   return value as T[];
 }
 
+function pageNumber(value: unknown, fallback: number, max = 1_000_000): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(max, Math.max(1, Math.floor(n))) : fallback;
+}
+
+// Cada indicador conta uma vez por cliente; todas as estatísticas ficam no banco.
+const CORRELATION_CTE = `
+  WITH active_clients AS (
+    SELECT id, coalesce(data->>'name', id) AS name,
+           coalesce(nullif(data->>'targetFirewall', ''), 'Firewall Padrão') AS firewall
+    FROM clients WHERE coalesce(data->>'isArchived', 'false') <> 'true'
+  ), members AS (
+    SELECT trim(e.indicator) AS indicator, e.client_id, c.name, c.firewall,
+           min(coalesce(e.data->>'type', 'IPv4')) AS type
+    FROM entries e JOIN active_clients c ON c.id = e.client_id
+    WHERE e.status = 'active' AND trim(e.indicator) <> ''
+    GROUP BY trim(e.indicator), e.client_id, c.name, c.firewall
+  ), shared AS (
+    SELECT indicator, min(type) AS type,
+           array_agg(client_id ORDER BY client_id) AS client_ids,
+           array_agg(name ORDER BY client_id) AS client_names,
+           array_agg(DISTINCT firewall ORDER BY firewall) AS firewalls,
+           count(*)::int AS occurrences,
+           CASE WHEN count(*) >= 4 THEN 'critical' WHEN count(*) = 3 THEN 'high' ELSE 'medium' END AS severity
+    FROM members GROUP BY indicator HAVING count(*) >= 2
+  )`;
+
 export function createStore(db: Database) {
   const ops = {
     async initializeDatabaseIfEmpty() {
@@ -439,6 +504,79 @@ export function createStore(db: Database) {
 
     async getClientEntries(_actor: Actor, clientId: string, status?: 'active' | 'removed') {
       return entriesOf(db.query, asString(clientId, 'clientId'), status);
+    },
+
+    async getClientEntriesPage(_actor: Actor, params: ClientEntriesPageParams): Promise<ClientEntriesPage> {
+      const clientId = asString(params?.clientId, 'clientId');
+      const pageSize = pageNumber(params.pageSize, 100, 500);
+      const requestedPage = pageNumber(params.page, 1);
+      const args: unknown[] = [clientId];
+      const where: string[] = [];
+      const add = (condition: string, value: unknown) => {
+        args.push(value);
+        where.push(condition.replace('?', `$${args.length}`));
+      };
+      if (params.status && params.status !== 'ALL') {
+        if (!['active', 'removed'].includes(params.status)) throw new StoreError('Status inválido.');
+        add('status = ?', params.status);
+      }
+      if (params.type && params.type !== 'ALL') {
+        if (!['IPv4', 'IPv6', 'CIDR_v4', 'CIDR_v6', 'Domain', 'Invalid'].includes(params.type)) throw new StoreError('Tipo inválido.');
+        add("data->>'type' = ?", params.type);
+      }
+      const now = new Date();
+      if (params.period && params.period !== 'ALL') {
+        if (!['7d', '30d', 'year'].includes(params.period)) throw new StoreError('Período inválido.');
+        const from = params.period === 'year' ? `${now.getFullYear()}-01-01`
+          : new Date(now.getTime() - (params.period === '7d' ? 7 : 30) * 86_400_000).toISOString().slice(0, 10);
+        add("data->>'addedDate' >= ?", from);
+      }
+      const search = String(params.search ?? '').trim().toLowerCase();
+      if (search) {
+        args.push(search);
+        const p = `$${args.length}`;
+        where.push(`(strpos(lower(indicator), ${p}) > 0 OR strpos(lower(coalesce(data->>'sourceTicket', '')), ${p}) > 0 OR strpos(lower(coalesce(data->>'notes', '')), ${p}) > 0)`);
+      }
+      const octet = '(0?[0-9]{1,2}|1[0-9]{2}|2[0-4][0-9]|25[0-5])';
+      const validIpv4 = `(data->>'type' = 'IPv4' AND indicator ~ '^${octet}(\\.${octet}){3}$')`;
+      const numeric = `CASE WHEN ${validIpv4} THEN
+        coalesce(CASE WHEN jsonb_typeof(data->'numericValue') = 'number' THEN (data->>'numericValue')::numeric END,
+          split_part(indicator, '.', 1)::bigint * 16777216 + split_part(indicator, '.', 2)::bigint * 65536
+          + split_part(indicator, '.', 3)::bigint * 256 + split_part(indicator, '.', 4)::bigint) END`;
+      const order = params.sort === 'date' ? "data->>'addedDate' DESC NULLS LAST, id"
+        : `${numeric} ASC NULLS LAST, indicator, id`;
+      args.push(requestedPage, pageSize);
+      const pageParam = `$${args.length - 1}`;
+      const sizeParam = `$${args.length}`;
+      const rows = await db.query<{ result: ClientEntriesPage }>(`
+        WITH client_entries AS MATERIALIZED (
+          SELECT id, indicator, status, data FROM entries WHERE client_id = $1
+        ), filtered AS MATERIALIZED (
+          SELECT * FROM client_entries ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        ), counts AS (
+          SELECT count(*)::int AS total,
+                 (SELECT count(*)::int FROM client_entries) AS total_client,
+                 (SELECT count(*)::int FROM client_entries WHERE status = 'active') AS active_count FROM filtered
+        ), paging AS (
+          SELECT *, least(${pageParam}::int, greatest(1, ceil(total::numeric / ${sizeParam}::int)::int)) AS page FROM counts
+        ), selected AS (
+          SELECT data, row_number() OVER (ORDER BY ${order}) AS position FROM filtered
+          ORDER BY ${order} LIMIT ${sizeParam}::int OFFSET ((SELECT page FROM paging) - 1) * ${sizeParam}::int
+        )
+        SELECT jsonb_build_object('entries', coalesce((SELECT jsonb_agg(data ORDER BY position) FROM selected), '[]'::jsonb),
+          'total', total, 'totalClient', total_client, 'activeCount', active_count,
+          'page', page, 'pageSize', ${sizeParam}::int) AS result FROM paging`, args);
+      return rows[0].result;
+    },
+
+    async getIndicatorEntries(_actor: Actor, indicator: string): Promise<BlocklistEntry[]> {
+      const key = asString(indicator, 'indicator').trim().toLowerCase();
+      const rows = await db.query<{ data: BlocklistEntry }>(
+        `SELECT e.data FROM entries e JOIN clients c ON c.id = e.client_id
+         WHERE lower(trim(e.indicator)) = $1 AND coalesce(c.data->>'isArchived', 'false') <> 'true'
+         ORDER BY e.client_id, e.data->>'addedDate' DESC, e.id`, [key]
+      );
+      return rows.map((row) => row.data);
     },
 
     async getClientActiveIndicatorsSet(_actor: Actor, clientId: string) {
@@ -581,15 +719,9 @@ export function createStore(db: Database) {
 
     // Desfaz uma importação: volta a lista para a versão salva antes dela e marca o histórico.
     async undoImport(actor: Actor, snapshotId: string, historyId?: string) {
-      const result = await ops.restoreClientSnapshot(actor, asString(snapshotId, 'snapshotId'));
-      if (typeof historyId === 'string' && historyId) {
-        await db.query(
-          `UPDATE history SET data = data || jsonb_build_object('undone', true, 'notes',
-             coalesce(data->>'notes' || ' • ', '') || $2::text) WHERE id = $1`,
-          [historyId, `Desfeito por ${actor.displayName}`]
-        );
-      }
-      return result;
+      const id = asString(snapshotId, 'snapshotId');
+      if (historyId != null && typeof historyId !== 'string') throw new StoreError('Importação inválida.');
+      return db.tx((q) => restoreStoredSnapshot(q, actor, id, historyId || undefined));
     },
 
     // Validação de todas as listas: repetidos, cobertos por CIDR, conflitos com exceções e itens para revisão.
@@ -732,10 +864,13 @@ export function createStore(db: Database) {
       return ops.getComments(actor, row.entry_id);
     },
 
-    async getCommentCounts(_actor: Actor, clientId: string) {
+    async getCommentCounts(_actor: Actor, clientId: string, entryIds?: string[]) {
+      const ids = entryIds === undefined ? undefined : asArray<string>(entryIds, 'entryIds');
+      if (ids && (ids.length > 500 || ids.some((id) => typeof id !== 'string'))) throw new StoreError('Lista de itens inválida.');
       const rows = await db.query<{ entry_id: string; n: number }>(
-        'SELECT entry_id, count(*)::int AS n FROM comments WHERE client_id = $1 GROUP BY entry_id',
-        [asString(clientId, 'clientId')]
+        `SELECT entry_id, count(*)::int AS n FROM comments WHERE client_id = $1
+         ${ids ? 'AND entry_id = ANY($2::text[])' : ''} GROUP BY entry_id`,
+        ids ? [asString(clientId, 'clientId'), ids] : [asString(clientId, 'clientId')]
       );
       return Object.fromEntries(rows.map((r) => [r.entry_id, r.n]));
     },
@@ -928,16 +1063,7 @@ export function createStore(db: Database) {
     },
 
     async restoreClientSnapshot(actor: Actor, snapshotId: string) {
-      return db.tx(async (q) => {
-        const rows = await q<{ data: ClientSnapshot }>('SELECT data FROM snapshots WHERE id = $1', [snapshotId]);
-        const snap = rows[0]?.data;
-        if (!snap) throw new StoreError('Versão não encontrada.', 404);
-        await snapshot(q, snap.clientId, `Segurança antes de restaurar versão de ${new Date(snap.createdAt).toLocaleDateString('pt-BR')}`, actor);
-        await q('DELETE FROM entries WHERE client_id = $1', [snap.clientId]);
-        await upsertEntries(q, snap.entries, actor);
-        await audit(q, actor, 'snapshot.restore', { clientId: snap.clientId, snapshotId, count: snap.entries.length });
-        return { restoredCount: snap.entries.length };
-      });
+      return db.tx((q) => restoreStoredSnapshot(q, actor, asString(snapshotId, 'snapshotId')));
     },
 
     async deleteClientEntriesAll(actor: Actor, clientId: string) {
@@ -960,48 +1086,79 @@ export function createStore(db: Database) {
       return null;
     },
 
-    async getDashboardStats() {
-      const entries = await ops.getAllActiveEntries();
-      const activeCounts: Record<string, number> = {};
-      const ipCounts: Record<string, number> = {};
-      const cidrCounts: Record<string, number> = {};
-      const indicatorClients = new Map<string, Set<string>>();
-      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      let totalIps = 0;
-      let totalCidrs = 0;
-      let addedThisWeek = 0;
+    async getDashboardStats(): Promise<DashboardStats> {
+      const rows = await db.query<{ result: DashboardStats }>(`
+        WITH active AS MATERIALIZED (
+          SELECT client_id, indicator, data->>'addedDate' AS added_date,
+                 (data->>'type' IN ('CIDR_v4', 'CIDR_v6') OR strpos(indicator, '/') > 0) AS is_cidr
+          FROM entries WHERE status = 'active'
+        ), counts AS (
+          SELECT client_id, count(*)::int AS total,
+                 count(*) FILTER (WHERE is_cidr)::int AS cidrs,
+                 count(*) FILTER (WHERE NOT coalesce(is_cidr, false))::int AS ips
+          FROM active GROUP BY client_id
+        ), correlations AS (
+          SELECT lower(trim(indicator)) FROM active GROUP BY lower(trim(indicator)) HAVING count(DISTINCT client_id) >= 2
+        ), recurring AS (
+          SELECT a.indicator, count(DISTINCT a.client_id)::int AS count FROM active a
+          JOIN clients c ON c.id = a.client_id WHERE coalesce(c.data->>'isArchived', 'false') <> 'true'
+          GROUP BY a.indicator HAVING count(DISTINCT a.client_id) >= 2
+          ORDER BY count DESC, a.indicator LIMIT 4
+        )
+        SELECT jsonb_build_object(
+          'activeCounts', coalesce((SELECT jsonb_object_agg(client_id, total) FROM counts), '{}'::jsonb),
+          'ipCounts', coalesce((SELECT jsonb_object_agg(client_id, ips) FROM counts WHERE ips > 0), '{}'::jsonb),
+          'cidrCounts', coalesce((SELECT jsonb_object_agg(client_id, cidrs) FROM counts WHERE cidrs > 0), '{}'::jsonb),
+          'totalActiveAcrossAll', (SELECT count(*)::int FROM active),
+          'totalIpsAcrossAll', (SELECT count(*)::int FROM active WHERE NOT coalesce(is_cidr, false)),
+          'totalCidrsAcrossAll', (SELECT count(*)::int FROM active WHERE is_cidr),
+          'totalCorrelatedIps', (SELECT count(*)::int FROM correlations),
+          'addedThisWeekCount', (SELECT count(*)::int FROM active WHERE
+            added_date ~ '^[0-9]{4}-(0[1-9]|1[0-2])-([012][0-9]|3[01])($|T)' AND
+            CASE WHEN length(added_date) = 10 THEN added_date || 'T00:00:00.000Z' ELSE added_date END >= $1),
+          'recurring', coalesce((SELECT jsonb_agg(jsonb_build_object('indicator', indicator, 'count', count) ORDER BY count DESC, indicator) FROM recurring), '[]'::jsonb)
+        ) AS result`, [new Date(Date.now() - 7 * 86_400_000).toISOString()]);
+      return rows[0].result;
+    },
 
-      for (const entry of entries) {
-        const id = entry.clientId;
-        activeCounts[id] = (activeCounts[id] || 0) + 1;
-        const isCidr = entry.type === 'CIDR_v4' || entry.type === 'CIDR_v6' || entry.indicator.includes('/');
-        if (isCidr) {
-          cidrCounts[id] = (cidrCounts[id] || 0) + 1;
-          totalCidrs++;
-        } else {
-          ipCounts[id] = (ipCounts[id] || 0) + 1;
-          totalIps++;
-        }
-        const key = entry.indicator.trim().toLowerCase();
-        if (!indicatorClients.has(key)) indicatorClients.set(key, new Set());
-        indicatorClients.get(key)!.add(id);
-        const added = entry.addedDate ? new Date(entry.addedDate).getTime() : NaN;
-        if (!Number.isNaN(added) && added >= weekAgo) addedThisWeek++;
-      }
-
-      let correlated = 0;
-      for (const set of indicatorClients.values()) if (set.size >= 2) correlated++;
-
-      return {
-        activeCounts,
-        ipCounts,
-        cidrCounts,
-        totalActiveAcrossAll: entries.length,
-        totalIpsAcrossAll: totalIps,
-        totalCidrsAcrossAll: totalCidrs,
-        totalCorrelatedIps: correlated,
-        addedThisWeekCount: addedThisWeek
-      };
+    async getCorrelationPage(_actor: Actor, params: CorrelationPageParams = {}): Promise<CorrelationPage> {
+      const input = params ?? {};
+      const pageSize = pageNumber(input.pageSize, 50, 100);
+      const requestedPage = pageNumber(input.page, 1);
+      const search = String(input.search ?? '').trim().toLowerCase();
+      const clientId = input.clientId && input.clientId !== 'ALL' ? asString(input.clientId, 'clientId') : '';
+      const severity = input.severity && input.severity !== 'ALL' ? input.severity : '';
+      if (severity && !['critical', 'high', 'medium'].includes(severity)) throw new StoreError('Severidade inválida.');
+      const rows = await db.query<{ result: CorrelationPage }>(`${CORRELATION_CTE}, filtered AS (
+          SELECT * FROM shared WHERE ($1 = '' OR strpos(lower(indicator), $1) > 0
+            OR EXISTS (SELECT 1 FROM unnest(client_names) AS name WHERE strpos(lower(name), $1) > 0))
+            AND ($2 = '' OR $2 = ANY(client_ids)) AND ($3 = '' OR severity = $3)
+        ), paging AS (
+          SELECT count(*)::int AS total, least($4::int, greatest(1, ceil(count(*)::numeric / $5::int)::int)) AS page FROM filtered
+        ), selected AS (
+          SELECT * FROM filtered ORDER BY occurrences DESC, indicator
+          LIMIT $5::int OFFSET ((SELECT page FROM paging) - 1) * $5::int
+        ), client_pairs AS (
+          SELECT a.name AS client_a, b.name AS client_b, count(*)::int AS shared_count
+          FROM members a JOIN members b ON a.indicator = b.indicator AND a.client_id < b.client_id
+          GROUP BY a.client_id, b.client_id, a.name, b.name ORDER BY shared_count DESC, a.name, b.name LIMIT 9
+        )
+        SELECT jsonb_build_object(
+          'sharedIndicators', coalesce((SELECT jsonb_agg(jsonb_build_object(
+            'indicator', indicator, 'type', type, 'clientIds', client_ids, 'clientNames', client_names,
+            'occurrencesCount', occurrences, 'severity', severity, 'firewallsImpacted', firewalls)
+            ORDER BY occurrences DESC, indicator) FROM selected), '[]'::jsonb),
+          'total', total, 'page', page, 'pageSize', $5::int,
+          'summary', jsonb_build_object(
+            'totalCorrelatedIpsCount', (SELECT count(*)::int FROM shared),
+            'maxDissemination', coalesce((SELECT max(occurrences) FROM shared), 0),
+            'cidrSharedCount', (SELECT count(*)::int FROM shared WHERE type IN ('CIDR_v4', 'CIDR_v6') OR strpos(indicator, '/') > 0),
+            'criticalCount', (SELECT count(*)::int FROM shared WHERE severity = 'critical'),
+            'activeClientsCount', (SELECT count(*)::int FROM active_clients)),
+          'clientOverlapTable', coalesce((SELECT jsonb_agg(jsonb_build_object('clientA', client_a, 'clientB', client_b, 'sharedCount', shared_count)
+            ORDER BY shared_count DESC, client_a, client_b) FROM client_pairs), '[]'::jsonb)
+        ) AS result FROM paging`, [search, clientId, severity, requestedPage, pageSize]);
+      return rows[0].result;
     },
 
     async searchIndicatorAcrossClients(_actor: Actor, searchQuery: string) {
@@ -1098,7 +1255,36 @@ export function createStore(db: Database) {
       }
       const clients = data.clients;
       const entries = data.entries;
+      const clientIds = new Set<string>();
+      const entryIds = new Set<string>();
+      const historyIds = new Set<string>();
+      for (const client of clients) {
+        if (!client || typeof client.id !== 'string' || !client.id.trim() || clientIds.has(client.id)
+          || typeof client.name !== 'string' || !client.name.trim()) {
+          throw new StoreError('Backup inválido: cliente sem identificação ou repetido.');
+        }
+        clientIds.add(client.id);
+      }
+      for (const entry of entries) {
+        if (!entry || typeof entry.id !== 'string' || !entry.id.trim() || entryIds.has(entry.id)) {
+          throw new StoreError('Backup inválido: item sem identificação ou repetido.');
+        }
+        if (!clientIds.has(entry.clientId)) throw new StoreError('Backup inválido: item vinculado a cliente inexistente.');
+        if (typeof entry.indicator !== 'string' || !classifyIndicator(entry.indicator).isValid) {
+          throw new StoreError('Backup inválido: indicador de bloqueio inválido.');
+        }
+        if (!['active', 'removed'].includes(entry.status)) throw new StoreError('Backup inválido: status de item inválido.');
+        entryIds.add(entry.id);
+      }
+      if (data.history !== undefined && !Array.isArray(data.history)) throw new StoreError('Backup inválido: histórico corrompido.');
       const history = Array.isArray(data.history) ? data.history : [];
+      for (const record of history) {
+        if (!record || typeof record.id !== 'string' || !record.id.trim() || historyIds.has(record.id)
+          || typeof record.clientId !== 'string' || !record.clientId || !record.date || Number.isNaN(new Date(record.date).getTime())) {
+          throw new StoreError('Backup inválido: registro de histórico corrompido ou repetido.');
+        }
+        historyIds.add(record.id);
+      }
       await db.tx(async (q) => {
         await q('DELETE FROM entries');
         await q('DELETE FROM clients');
@@ -1271,6 +1457,9 @@ export const PUBLIC_OPS = [
   'deleteClient',
   'archiveClient',
   'getClientEntries',
+  'getClientEntriesPage',
+  'getIndicatorEntries',
+  'getCorrelationPage',
   'getClientActiveIndicatorsSet',
   'importBatch',
   'listPendingImports',

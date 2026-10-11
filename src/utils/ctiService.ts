@@ -149,7 +149,7 @@ export function getIpCtiRecord(
     e => e.indicator.toLowerCase() === indicator.toLowerCase()
   );
 
-  const correlatedClients = matchingEntries.map(e => {
+  const occurrences = matchingEntries.map(e => {
     const client = clientsMap.get(e.clientId);
     return {
       clientId: e.clientId,
@@ -160,6 +160,17 @@ export function getIpCtiRecord(
       notes: e.notes
     };
   });
+
+  // Reimportações preservam registros antigos; disseminação conta clientes distintos.
+  const byClient = new Map<string, IpCtiRecord['correlatedClients'][number]>();
+  for (const occurrence of occurrences) {
+    const previous = byClient.get(occurrence.clientId);
+    if (!previous || (occurrence.status === 'active' && previous.status !== 'active')
+      || (occurrence.status === previous.status && occurrence.addedDate > previous.addedDate)) {
+      byClient.set(occurrence.clientId, occurrence);
+    }
+  }
+  const correlatedClients = [...byClient.values()];
 
   // Determinar severidade com base no hash e número de clientes correlacionados
   const isHighVolumeScanner = hash % 3 === 0;
@@ -224,7 +235,7 @@ export function getIpCtiRecord(
   });
 
   // Eventos de inclusão em clientes
-  for (const match of correlatedClients) {
+  for (const match of occurrences) {
     timeline.push({
       date: match.addedDate,
       clientName: match.clientName,

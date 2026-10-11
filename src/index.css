@@ -21,6 +21,8 @@
   --text-soft: #c3cbd5;
   --muted: #8e9aaa;
   --accent: #5791ff;
+  --action: #2f6fdf;
+  --action-hover: #285fc5;
   --accent-soft: rgba(87, 145, 255, 0.12);
   --danger: #f56a77;
   --warning: #e7ab4e;
@@ -38,7 +40,7 @@
   --line-strong: #b9c3cf;
   --text: #17202b;
   --text-soft: #344154;
-  --muted: #667489;
+  --muted: #5f6d80;
   --accent: #2f6fdf;
   --accent-soft: rgba(47, 111, 223, 0.1);
   --danger: #b4233c;
@@ -53,7 +55,7 @@
 html {
   min-width: 320px;
   background: var(--app-bg);
-  scrollbar-color: #3b4655 #12161d;
+  scrollbar-color: var(--line-strong) var(--surface-subtle);
   scrollbar-width: thin;
 }
 
@@ -80,7 +82,7 @@ textarea {
 }
 
 :focus-visible {
-  outline: 2px solid #78a8ff;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -99,17 +101,17 @@ a {
 }
 
 ::-webkit-scrollbar-track {
-  background: #12161d;
+  background: var(--surface-subtle);
 }
 
 ::-webkit-scrollbar-thumb {
-  border: 2px solid #12161d;
+  border: 2px solid var(--surface-subtle);
   border-radius: 999px;
-  background: #3b4655;
+  background: var(--line-strong);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #4b596b;
+  background: var(--muted);
 }
 
 .app-shell {
@@ -232,7 +234,7 @@ a {
 
 .workspace-summary__item > span {
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   font-weight: 620;
 }
 
@@ -251,9 +253,9 @@ a {
   max-width: 100%;
   margin-top: 5px;
   color: var(--muted);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .workspace-summary__action {
@@ -266,15 +268,15 @@ a {
 }
 
 .workspace-summary__item.has-warning strong {
-  color: #ff8a94;
+  color: var(--danger);
 }
 
 .intelligence-summary__risk strong {
-  color: #ff8a94;
+  color: var(--danger);
 }
 
 .intelligence-summary__critical strong {
-  color: #efbf67;
+  color: var(--warning);
 }
 
 .client-ledger-heading {
@@ -316,7 +318,7 @@ a {
 .client-tile__metrics span {
   display: block;
   color: var(--muted);
-  font-size: 0.61rem;
+  font-size: 0.75rem;
   font-weight: 620;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -338,7 +340,7 @@ a {
   gap: 14px;
   margin-bottom: 14px;
   color: var(--muted);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
 }
 
 .client-tile__review-label {
@@ -364,13 +366,13 @@ a {
 
 .client-tile__review-value strong {
   color: var(--text-soft);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 620;
 }
 
 .client-tile__review-value small {
   margin-top: 3px;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
 }
 
 .app-shell .bg-slate-900,

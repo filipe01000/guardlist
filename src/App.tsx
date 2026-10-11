@@ -1,27 +1,18 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { Navbar, type AppTab } from './components/Navbar';
-import { AdminView } from './components/AdminView';
-import { ReportsView } from './components/ReportsView';
+import { PageBoundary } from './components/PageBoundary';
 import { AccountModal } from './components/AccountModal';
 import { DashboardView } from './components/DashboardView';
-import { WeeklyImportView } from './components/WeeklyImportView';
-import { ClientListView } from './components/ClientListView';
-import { IntelligenceView } from './components/IntelligenceView';
-import { HistoryView } from './components/HistoryView';
-import { ClientManagerView } from './components/ClientManagerView';
-import { BackupView } from './components/BackupView';
-import { ReviewView } from './components/ReviewView';
 import { QuickSearchModal } from './components/QuickSearchView';
 import { TestRunnerModal } from './components/TestRunnerModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
-import { Client, AppSettings, BlocklistEntry, ImportOutcome, SessionUser } from './types';
+import { Client, AppSettings, ImportOutcome, SessionUser, DashboardStats } from './types';
 import {
   getAllClients,
   getDashboardStats,
   getAppSettings,
   getClientEntries,
-  getAllActiveEntries,
   getNotifications,
   importBatch,
   undoImport,
@@ -29,7 +20,17 @@ import {
 } from './db/store';
 import { generateFirewallTxt, generateNanoFormattedTxt, triggerDownload } from './utils/exporter';
 import { getDaysSince } from './utils/validator';
-import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, Loader2 } from 'lucide-react';
+
+const AdminView = lazy(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
+const ReportsView = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
+const WeeklyImportView = lazy(() => import('./components/WeeklyImportView').then(m => ({ default: m.WeeklyImportView })));
+const ClientListView = lazy(() => import('./components/ClientListView').then(m => ({ default: m.ClientListView })));
+const IntelligenceView = lazy(() => import('./components/IntelligenceView').then(m => ({ default: m.IntelligenceView })));
+const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
+const ClientManagerView = lazy(() => import('./components/ClientManagerView').then(m => ({ default: m.ClientManagerView })));
+const BackupView = lazy(() => import('./components/BackupView').then(m => ({ default: m.BackupView })));
+const ReviewView = lazy(() => import('./components/ReviewView').then(m => ({ default: m.ReviewView })));
 
 interface AppProps {
   currentUser: SessionUser;
@@ -66,8 +67,10 @@ function isTyping(target: EventTarget | null): boolean {
 export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   const isAdmin = currentUser.role === 'admin';
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const savedTheme = window.localStorage.getItem('guardlist-theme');
-    if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
+    try {
+      const savedTheme = window.localStorage.getItem('guardlist-theme');
+      if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
+    } catch { /* Preferência opcional. */ }
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   });
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
@@ -98,8 +101,12 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   const [totalCidrsAcrossAll, setTotalCidrsAcrossAll] = useState<number>(0);
   const [totalCorrelatedIps, setTotalCorrelatedIps] = useState<number>(0);
   const [addedThisWeekCount, setAddedThisWeekCount] = useState<number>(0);
-  const [allActiveEntries, setAllActiveEntries] = useState<BlocklistEntry[]>([]);
+  const [recurring, setRecurring] = useState<DashboardStats['recurring']>([]);
   const [notifications, setNotifications] = useState<{ pendingApprovals: number; failedJobs: string[] }>({ pendingApprovals: 0, failedJobs: [] });
+  const [hasLoadedData, setHasLoadedData] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(true);
+  const [dataLoadError, setDataLoadError] = useState(false);
+  const refreshVersion = useRef(0);
 
   const [settings, setSettings] = useState<AppSettings>({
     slaDays: 7,
@@ -125,17 +132,20 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     setToast({ id: Date.now(), text, type: opts.type || 'success', action: opts.action, durationMs });
     toastTimer.current = window.setTimeout(() => setToast(null), durationMs);
   }, []);
+  useEffect(() => () => { window.clearTimeout(toastTimer.current); }, []);
 
   // Carrega a base compartilhada da equipe.
   const refreshAllData = useCallback(async () => {
+    const version = ++refreshVersion.current;
+    setIsRefreshing(true);
     try {
-      const [loadedClients, stats, loadedSettings, entries, notes] = await Promise.all([
+      const [loadedClients, stats, loadedSettings, notes] = await Promise.all([
         getAllClients(),
         getDashboardStats(),
         getAppSettings(),
-        getAllActiveEntries(),
         getNotifications().catch(() => null)
       ]);
+      if (version !== refreshVersion.current) return;
 
       setClients(loadedClients);
       setActiveCounts(stats.activeCounts);
@@ -146,18 +156,26 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       setTotalCidrsAcrossAll(stats.totalCidrsAcrossAll);
       setTotalCorrelatedIps(stats.totalCorrelatedIps);
       setAddedThisWeekCount(stats.addedThisWeekCount);
-      setAllActiveEntries(entries);
+      setRecurring(stats.recurring);
       setSettings(loadedSettings);
       if (notes) setNotifications(notes);
 
-      setSelectedClientId((current) => current || loadedClients.find((c) => !c.isArchived)?.id || '');
+      setSelectedClientId((current) => loadedClients.some(c => c.id === current)
+        ? current : loadedClients.find(c => !c.isArchived)?.id || '');
+      setHasLoadedData(true);
+      setDataLoadError(false);
     } catch (err) {
+      if (version !== refreshVersion.current) return;
+      setDataLoadError(true);
       console.error('Erro ao carregar os dados da equipe:', err);
+    } finally {
+      if (version === refreshVersion.current) setIsRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     refreshAllData();
+    return () => { refreshVersion.current += 1; };
   }, [refreshAllData]);
 
   // Mantém a tela em dia com o que os colegas alteram: ao voltar para a aba e a cada minuto.
@@ -178,7 +196,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     document.documentElement.style.colorScheme = theme;
-    window.localStorage.setItem('guardlist-theme', theme);
+    try { window.localStorage.setItem('guardlist-theme', theme); } catch { /* Preferência opcional. */ }
   }, [theme]);
 
   useEffect(() => {
@@ -192,13 +210,13 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   // Atalhos globais: Ctrl/⌘ K ou / consulta; ? mostra a lista; letras navegam.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (document.querySelector('[aria-modal="true"]')) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setIsQuickSearchOpen(true);
         return;
       }
       if (event.ctrlKey || event.metaKey || event.altKey || isTyping(event.target)) return;
-      if (document.querySelector('[aria-modal="true"]')) return;
       if (event.key === '/') {
         event.preventDefault();
         setIsQuickSearchOpen(true);
@@ -240,6 +258,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       showToast(`Lista de ${client.name} baixada em .txt.`);
     } catch (err) {
       console.error(err);
+      showToast('Não foi possível exportar a lista. Verifique a conexão e tente novamente.', 'warn');
     }
   };
 
@@ -252,6 +271,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       showToast(`Lista de ${client.name} baixada no formato NANO.`);
     } catch (err) {
       console.error(err);
+      showToast('Não foi possível exportar a lista NANO. Verifique a conexão e tente novamente.', 'warn');
     }
   };
 
@@ -316,6 +336,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''} min-h-screen text-slate-100 flex flex-col font-sans`}>
+      <a className="skip-link" href="#main-content">Ir para o conteúdo</a>
       {toast && (
         <div key={toast.id} className={`toast toast--${toast.type}`} role="status" aria-live="polite">
           <ToastIcon aria-hidden="true" />
@@ -326,6 +347,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
               className="toast__action"
               onClick={async () => {
                 const action = toast.action!;
+                window.clearTimeout(toastTimer.current);
                 setToast(null);
                 try {
                   await action.onClick();
@@ -359,7 +381,18 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       />
 
       {/* Conteúdo Principal */}
-      <main className="studio-main flex-1">
+      <main id="main-content" tabIndex={-1} className="studio-main flex-1">
+        {dataLoadError && (
+          <div className="banner" role="alert">
+            <AlertTriangle aria-hidden="true" />
+            <span>{hasLoadedData
+              ? 'Não foi possível atualizar os dados. Os valores exibidos são da última atualização.'
+              : 'Não foi possível carregar os dados da equipe. Verifique a conexão e tente novamente.'}</span>
+            <button type="button" className="btn btn--sm" disabled={isRefreshing} onClick={() => void refreshAllData()}>
+              {isRefreshing ? 'Tentando…' : 'Tentar novamente'}
+            </button>
+          </div>
+        )}
         {isAdmin && notifications.failedJobs.length > 0 && currentTab !== 'admin' && (
           <div className="banner" role="alert">
             <AlertTriangle aria-hidden="true" />
@@ -379,6 +412,10 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
           </div>
         )}
 
+        {!hasLoadedData && !dataLoadError && (
+          <div className="app-loading" role="status"><Loader2 className="gl-spin" aria-hidden="true" />Carregando dados da equipe…</div>
+        )}
+        {hasLoadedData && <PageBoundary key={currentTab}><Suspense fallback={<div className="app-loading" role="status"><Loader2 className="gl-spin" aria-hidden="true" />Abrindo página…</div>}>
         <div key={currentTab} className="view-enter">
         {currentTab === 'dashboard' && (
           <DashboardView
@@ -391,7 +428,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             totalCidrsAcrossAll={totalCidrsAcrossAll}
             totalCorrelatedIps={totalCorrelatedIps}
             addedThisWeekCount={addedThisWeekCount}
-            allActiveEntries={allActiveEntries}
+            recurring={recurring}
             slaDays={settings.slaDays || 7}
             onNavigateToImport={handleNavigateToImport}
             onNavigateToList={handleNavigateToList}
@@ -402,12 +439,12 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             onRefresh={refreshAllData}
             showToast={showToast}
             onOpenReview={() => setCurrentTab('review')}
+            onManageClients={() => setCurrentTab('clients')}
           />
         )}
 
         {currentTab === 'intelligence' && (
           <IntelligenceView
-            allEntries={allActiveEntries}
             clients={clients}
             onNavigateToClientList={handleNavigateToList}
           />
@@ -476,6 +513,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
           />
         )}
         </div>
+        </Suspense></PageBoundary>}
       </main>
 
       <AccountModal

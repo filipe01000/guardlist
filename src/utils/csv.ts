@@ -17,6 +17,33 @@ export function toCsv(rows: CsvCell[][]): string {
   return '﻿' + rows.map((row) => row.map(cell).join(';')).join('\r\n') + '\r\n';
 }
 
+// Lê campos entre aspas, aspas escapadas e quebras de linha dentro de uma célula.
+export function parseCsv(text: string, delimiter: string = ';'): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (quoted) {
+      if (char === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (char === '"') quoted = false;
+      else field += char;
+    } else if (char === '"' && field.length === 0) {
+      quoted = true;
+    } else if (char === delimiter) {
+      row.push(field); field = '';
+    } else if (char === '\r' || char === '\n') {
+      row.push(field); rows.push(row); row = []; field = '';
+      if (char === '\r' && text[i + 1] === '\n') i++;
+    } else {
+      field += char;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
 // Datas sempre no horário de Brasília, também quando geradas no servidor (que roda em UTC).
 const TIME_ZONE = 'America/Sao_Paulo';
 

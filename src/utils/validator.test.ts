@@ -11,8 +11,9 @@ import {
   checkReservedRange,
   ipv4ToNumber
 } from './validator';
-import { generateNanoFormattedTxt } from './exporter';
-import { extractTokensFromRawInput, extractValidIndicatorsFromText } from './importer';
+import { generateFullCSV, generateNanoFormattedTxt } from './exporter';
+import { analyzeImportBatch, extractTokensFromRawInput, extractValidIndicatorsFromText } from './importer';
+import { parseCsv, toCsv } from './csv';
 
 export interface TestResult {
   suite: string;
@@ -171,6 +172,15 @@ export function runValidatorTests(): {
     false
   );
 
+  for (const malformed of ['8.8.8.8/', '8.8.8.8/-1', '8.8.8.8/24/extra', '010.008.001.001/', '010.008.001.001/-1', '010.008.001.001/24/extra', '2001:db8::/1.5', '2001:db8::/2e1', '2001:db8::/']) {
+    assertEqual(sCidr, `Deve rejeitar máscara inválida sem converter em IP: ${malformed}`,
+      classifyIndicator(normalizeIndicator(malformed)).isValid, false);
+  }
+  for (const valid of ['8.8.8.8/0', '8.8.8.8/32', '2001:db8::/0', '2001:db8::/128']) {
+    assertEqual(sCidr, `Deve aceitar máscara nos limites: ${valid}`,
+      classifyIndicator(normalizeIndicator(valid)).isValid, true);
+  }
+
   // --- 4. Testes de Faixas Reservadas e Privadas (RFC 1918 / Bogons) ---
   const sRes = 'Detecção de Faixas Reservadas e Privadas';
 
@@ -288,6 +298,25 @@ export function runValidatorTests(): {
     valids.includes('45.205.1.240/29'),
     true
   );
+
+  const sCsv = 'Integridade de Importação CSV';
+  const csvEntries = [
+    { id: '1', clientId: 'c1', indicator: '8.8.8.8', type: 'IPv4' as const, addedDate: '2026-10-10', status: 'active' as const,
+      sourceTicket: 'safe.example', notes: 'Não bloquear; "safe.example"\r\n1.1.1.1' },
+    { id: '2', clientId: 'c1', indicator: '9.9.9.9', type: 'IPv4' as const, addedDate: '2026-10-10', status: 'removed' as const }
+  ];
+  for (const delimiter of [';', ',']) {
+    const csv = generateFullCSV(csvEntries, true, delimiter);
+    assertEqual(sCsv, `CSV (${delimiter}) importa só indicadores ativos, ignorando notas e tickets`,
+      extractValidIndicatorsFromText(csv), ['8.8.8.8']);
+    assertEqual(sCsv, `CSV (${delimiter}) mantém a prévia sem resíduos dos demais campos`,
+      analyzeImportBatch(csv, new Set()).items.map((item) => [item.indicator, item.category]), [['8.8.8.8', 'new']]);
+  }
+  const quotedRows = [['Indicador', 'Observação'], ['8.8.8.8', 'texto; "aspas"\r\n9.9.9.9']];
+  assertEqual(sCsv, 'Parser preserva células com delimitadores, aspas e quebras de linha',
+    parseCsv(toCsv(quotedRows).replace(/^\uFEFF/, '')), quotedRows);
+  assertEqual(sCsv, 'CSV permite que a coluna Indicador venha depois de outra coluna',
+    extractValidIndicatorsFromText('Observação;Indicador\r\n"1.1.1.1";"8.8.8.8"'), ['8.8.8.8']);
 
   const passedCount = results.filter(r => r.passed).length;
   return {

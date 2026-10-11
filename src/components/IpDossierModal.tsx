@@ -3,6 +3,7 @@ import { ShieldAlert, X, ExternalLink, Copy, Check, Clock, Building2, Radio } fr
 import { BlocklistEntry, Client, IpCtiRecord } from '../types';
 import { ExternalCtiResponse, fetchExternalCti, getIpCtiRecord, mergeExternalCti } from '../utils/ctiService';
 import { useDialogFocus } from '../hooks/useDialogFocus';
+import { formatDateBR } from '../utils/csv';
 
 interface IpDossierModalProps {
   indicator: string | null;
@@ -164,26 +165,25 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
               <div className="flex items-center gap-2 font-semibold text-sm">
                 <Radio className="w-4 h-4 shrink-0 text-blue-400" />
                 <span>
-                  {ctiData.correlatedClients.length > 1
-                    ? `Presente em ${ctiData.correlatedClients.length} clientes`
-                    : 'Presente em 1 cliente'}
+                  {ctiData.correlatedClients.length === 0 ? 'Sem registros locais'
+                    : `Registrado em ${ctiData.correlatedClients.length} ${ctiData.correlatedClients.length === 1 ? 'cliente' : 'clientes'}`}
                 </span>
               </div>
               <p className="text-xs opacity-90 mt-1">
                 {ctiData.correlatedClients.length > 1
                   ? 'O indicador aparece em listas locais de infraestruturas diferentes; investigue a causa antes de atribuir atividade coordenada.'
-                  : 'Este indicador foi registrado apenas na lista do cliente indicado abaixo.'}
+                  : ctiData.correlatedClients.length === 1 ? 'Este indicador foi registrado na lista do cliente indicado abaixo.' : 'Nenhuma ocorrência local foi encontrada para este indicador.'}
               </p>
               <div className="flex flex-wrap gap-1.5 mt-2.5">
                 {ctiData.correlatedClients.map(c => (
                   <span
                     key={c.clientId}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-mono font-bold bg-slate-900 border border-slate-700 text-white"
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-bold bg-slate-900 border border-slate-700 text-white"
                   >
                     <Building2 className="w-3 h-3 text-blue-400" />
                     {c.clientName}
                     <span className="text-[10px] text-slate-400 font-normal">
-                      ({c.addedDate})
+                      ({formatDateBR(c.addedDate)}{c.status === 'removed' ? ' · removido' : ''})
                     </span>
                   </span>
                 ))}
@@ -195,7 +195,7 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
                 Disseminação
               </span>
               <span className="text-2xl font-bold font-mono">
-                {ctiData.correlatedClients.length} / {clients.length}
+                {ctiData.correlatedClients.length} / {clients.filter(client => !client.isArchived).length}
               </span>
             </div>
           </div>

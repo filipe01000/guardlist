@@ -8,6 +8,7 @@
 import { ImportPreviewItem, ImportPreviewSummary } from '../types';
 import { normalizeIndicator, classifyIndicator, checkReservedRange } from './validator';
 import { exceptionHit, findRedundant, toRange } from './redundancy';
+import { parseCsv } from './csv';
 
 /**
  * Remove cabeçalhos NANO e divide qualquer texto em tokens individuais
@@ -19,6 +20,23 @@ export function extractTokensFromRawInput(rawInput: string): Array<{
   wasInlineHeader?: boolean;
 }> {
   if (!rawInput) return [];
+
+  // Em planilhas com cabeçalho, somente a coluna de indicadores é uma lista de bloqueio.
+  // Tickets e observações podem mencionar IPs/domínios que não devem ser importados.
+  const csvText = rawInput.replace(/^\uFEFF/, '');
+  const firstLine = csvText.split(/\r?\n/, 1)[0];
+  for (const delimiter of [';', ',', '\t']) {
+    const headers = (parseCsv(firstLine, delimiter)[0] ?? []).map((value) =>
+      value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+    const indicatorColumn = headers.findIndex((header) => /^(indicador|indicator|ip|cidr|dominio|domain)$/.test(header));
+    if (headers.length < 2 || indicatorColumn === -1) continue;
+    const statusColumn = headers.indexOf('status');
+    return parseCsv(csvText, delimiter).slice(1)
+      .filter((row) => statusColumn === -1 || !/^(removido|removed)$/i.test(row[statusColumn]?.trim() ?? ''))
+      .map((row) => (row[indicatorColumn] ?? '').trim())
+      .filter(Boolean)
+      .map((token) => ({ token, original: token }));
+  }
 
   // 1. Substituir cabeçalhos conhecidos do nano ou marcadores por quebra de linha
   // Ex: === IPS ÚNICOS ===, === REDES CIDR ===, === DOMÍNIOS ===

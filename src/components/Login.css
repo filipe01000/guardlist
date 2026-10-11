@@ -217,16 +217,16 @@
   gap: 8px;
   height: 44px;
   border-radius: 50px;
-  background: var(--accent);
+  background: var(--action);
   color: #fff;
   font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;
-  transition: filter 0.3s, opacity 0.3s;
+  transition: background 0.3s, opacity 0.3s;
 }
 
 .gl-submit:hover {
-  filter: brightness(1.1);
+  background: var(--action-hover);
 }
 
 .gl-submit:focus-visible {

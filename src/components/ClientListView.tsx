@@ -1,13 +1,15 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
-import { Client, BlocklistEntry, IndicatorType, IndicatorStatus, ClientSnapshot, EntryComment } from '../types';
+import { Client, BlocklistEntry, IndicatorType, ClientSnapshot, EntryComment } from '../types';
 import { Modal } from './Modal';
 import type { ShowToast } from '../App';
-import { formatDateTimeBR } from '../utils/csv';
+import { formatDateBR, formatDateTimeBR } from '../utils/csv';
 import { IpDossierModal } from './IpDossierModal';
 import { PageHeader } from './PageHeader';
 import { 
   getClientEntries, 
+  getClientEntriesPage,
+  getIndicatorEntries,
   updateEntryStatus, 
   updateEntryNotes, 
   bulkDeleteEntries,
@@ -31,8 +33,7 @@ import {
   generateFirewallTxt, 
   generateNanoFormattedTxt,
   generateFullCSV, 
-  triggerDownload, 
-  sortEntriesNumerically 
+  triggerDownload
 } from '../utils/exporter';
 import { extractTokensFromRawInput } from '../utils/importer';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -80,13 +81,21 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
   const [entries, setEntries] = useState<BlocklistEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [totalFiltered, setTotalFiltered] = useState(0);
+  const [totalClient, setTotalClient] = useState(0);
+  const requestVersion = useRef(0);
+  const selectedEntryCache = useRef(new Map<string, BlocklistEntry>());
+  const [fullListBusy, setFullListBusy] = useState(false);
+  const fullActionBusy = useRef(false);
   const [rowCti, setRowCti] = useState<Record<string, RowCtiState>>({});
   const [ctiProgress, setCtiProgress] = useState<{ done: number; total: number } | null>(null);
   const [lastCtiRefresh, setLastCtiRefresh] = useState<{ at: Date; elapsedMs: number; count: number } | null>(null);
 
   // Filtros e Busca
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('ALL');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'ALL' | IndicatorType>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'active' | 'removed'>('active');
   const [periodFilter, setPeriodFilter] = useState<'ALL' | '7d' | '30d' | 'year'>('ALL');
   const [sortNumeric, setSortNumeric] = useState(true);
@@ -129,9 +138,20 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   // Modal de Exportação / Pré-visualização NANO
   const [showNanoModal, setShowNanoModal] = useState(false);
   const [copiedNano, setCopiedNano] = useState(false);
+  const [nanoText, setNanoText] = useState('');
 
   // Ficha de Inteligência CTI
   const [selectedIpForDossier, setSelectedIpForDossier] = useState<string | null>(null);
+  const [dossierEntries, setDossierEntries] = useState<BlocklistEntry[]>([]);
+  const [dossierState, setDossierState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [dossierError, setDossierError] = useState<string | null>(null);
+  const [dossierRetry, setDossierRetry] = useState(0);
+  const openDossier = (indicator: string) => {
+    setDossierEntries([]);
+    setDossierState('loading');
+    setDossierError(null);
+    setSelectedIpForDossier(indicator);
+  };
   const hasInternalDialog = showBatchMatchModal || showSnapshotsModal || showClearAllModal || showDuplicateModal || showNanoModal || Boolean(editingEntry) || Boolean(deleteConfirmId);
   const internalDialogRef = useDialogFocus(hasInternalDialog);
 
@@ -150,41 +170,94 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     return () => window.removeEventListener('keydown', handleEscape);
   }, []);
 
-  // Carregar dados sempre que mudar o cliente
-  const loadClientData = async () => {
-    if (!currentClient) return;
-    setIsLoading(true);
-    try {
-      const data = await getClientEntries(currentClient.id);
-      setEntries(data);
+  const queryRef = useRef({ clientId: '', search: '', type: typeFilter, status: statusFilter, period: periodFilter, sort: 'numeric' as 'numeric' | 'date', page: 1, pageSize: 100 });
+  queryRef.current = { clientId: currentClient?.id || '', search: debouncedSearch, type: typeFilter, status: statusFilter, period: periodFilter, sort: sortNumeric ? 'numeric' : 'date', page, pageSize };
+
+  // Filtros, ordenação e paginação são aplicados no servidor.
+  const loadClientData = useCallback(async (clearSelection = false) => {
+    const query = queryRef.current;
+    if (!query.clientId) return;
+    const version = ++requestVersion.current;
+    const isCurrent = () => version === requestVersion.current && JSON.stringify(query) === JSON.stringify(queryRef.current);
+    if (clearSelection) {
       setSelectedIds(new Set());
-      setLastClickedIndex(null);
-    } catch (err) {
-      console.error('Erro ao carregar entradas:', err);
-    } finally {
-      setIsLoading(false);
+      selectedEntryCache.current.clear();
     }
-  };
+    setIsLoading(true);
+    setLoadError(null);
+    setEntries([]);
+    try {
+      const data = await getClientEntriesPage(query);
+      if (!isCurrent()) return;
+      setEntries(data.entries);
+      setTotalFiltered(data.total);
+      setTotalClient(data.totalClient);
+      if (data.page !== query.page) setPage(data.page);
+      setLastClickedIndex(null);
+      getCommentCounts(query.clientId, data.entries.map(item => item.id))
+        .then(counts => { if (version === requestVersion.current) setCommentCounts(counts); })
+        .catch(() => { if (version === requestVersion.current) setCommentCounts({}); });
+    } catch (err) {
+      if (isCurrent()) setLoadError(err instanceof Error ? err.message : 'Não foi possível carregar a lista.');
+    } finally {
+      if (isCurrent()) setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(searchTerm), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    void loadClientData();
+    return () => { requestVersion.current += 1; };
+  }, [currentClient?.id, debouncedSearch, typeFilter, statusFilter, periodFilter, sortNumeric, page, pageSize, loadClientData]);
+
+  useEffect(() => {
+    entries.forEach(item => { if (selectedIds.has(item.id)) selectedEntryCache.current.set(item.id, item); });
+    selectedEntryCache.current.forEach((_, id) => { if (!selectedIds.has(id)) selectedEntryCache.current.delete(id); });
+  }, [entries, selectedIds]);
+
+  useEffect(() => {
+    if (!selectedIpForDossier) return;
+    let cancelled = false;
+    setDossierState('loading');
+    setDossierError(null);
+    getIndicatorEntries(selectedIpForDossier)
+      .then(matches => {
+        if (cancelled) return;
+        setDossierEntries(matches);
+        setDossierState('ready');
+      })
+      .catch(error => {
+        if (cancelled) return;
+        setDossierError(error instanceof Error ? error.message : 'Não foi possível carregar as ocorrências deste indicador nos clientes.');
+        setDossierState('error');
+      });
+    return () => { cancelled = true; };
+  }, [selectedIpForDossier, dossierRetry]);
 
   const loadSnapshots = async () => {
     if (!currentClient) return;
     try {
       const snaps = await getClientSnapshots(currentClient.id);
-      setSnapshots(snaps);
+      if (currentClient.id === queryRef.current.clientId) setSnapshots(snaps);
     } catch (err) {
       console.error(err);
     }
   };
 
-  const loadCommentCounts = () => {
-    if (!currentClient) return;
-    getCommentCounts(currentClient.id).then(setCommentCounts).catch(() => undefined);
-  };
-
   useEffect(() => {
-    loadClientData();
-    loadSnapshots();
-    loadCommentCounts();
+    void loadSnapshots();
+    setSelectedIds(new Set());
+    selectedEntryCache.current.clear();
+    setLastClickedIndex(null);
+    setShowNanoModal(false);
+    setNanoText('');
+    setSelectedIpForDossier(null);
+    setTotalFiltered(0);
+    setTotalClient(0);
     setPage(1);
   }, [currentClient?.id]);
 
@@ -267,57 +340,9 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     }
   };
 
-  // Filtragem e Ordenação
-  const filteredEntries = useMemo(() => {
-    const now = new Date();
-    const d7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const d30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const yearStart = `${now.getFullYear()}-01-01`;
-
-    const q = searchTerm.trim().toLowerCase();
-
-    return entries.filter(item => {
-      // Filtro de Status
-      if (statusFilter !== 'ALL' && item.status !== statusFilter) {
-        return false;
-      }
-
-      // Filtro de Tipo
-      if (typeFilter !== 'ALL' && item.type !== typeFilter) {
-        return false;
-      }
-
-      // Filtro de Período
-      if (periodFilter === '7d' && item.addedDate < d7) return false;
-      if (periodFilter === '30d' && item.addedDate < d30) return false;
-      if (periodFilter === 'year' && item.addedDate < yearStart) return false;
-
-      // Busca por texto
-      if (q) {
-        const matchInd = item.indicator.toLowerCase().includes(q);
-        const matchTicket = (item.sourceTicket || '').toLowerCase().includes(q);
-        const matchNotes = (item.notes || '').toLowerCase().includes(q);
-        if (!matchInd && !matchTicket && !matchNotes) return false;
-      }
-
-      return true;
-    });
-  }, [entries, statusFilter, typeFilter, periodFilter, searchTerm]);
-
-  // Ordenação
-  const sortedEntries = useMemo(() => {
-    if (sortNumeric) {
-      return sortEntriesNumerically(filteredEntries);
-    }
-    return [...filteredEntries].sort((a, b) => new Date(b.addedDate).getTime() - new Date(a.addedDate).getTime());
-  }, [filteredEntries, sortNumeric]);
-
-  // Paginação
-  const totalPages = Math.ceil(sortedEntries.length / pageSize) || 1;
-  const paginatedEntries = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    return sortedEntries.slice(start, start + pageSize);
-  }, [sortedEntries, page, pageSize]);
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const paginatedEntries = entries;
+  const emptyMessage = isLoading ? 'Carregando indicadores…' : loadError ? 'A lista não pôde ser carregada.' : 'Nenhum indicador encontrado para os filtros selecionados.';
 
   const handleEnrichVisibleIps = async () => {
     const targets = Array.from(new Map(
@@ -371,38 +396,56 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     setCtiProgress(null);
   };
 
-  // Exportar para Arquivo
-  const handleExportTxt = () => {
-    if (!currentClient) return;
-    const activeOnly = entries.filter(e => e.status === 'active');
-    const content = generateFirewallTxt(activeOnly, sortNumeric);
+  // Ações da lista inteira carregam os dados somente quando solicitadas.
+  const runFullListAction = async (action: (all: BlocklistEntry[]) => void | Promise<void>, status?: 'active' | 'removed') => {
+    if (!currentClient || fullActionBusy.current) return;
+    const clientId = currentClient.id;
+    fullActionBusy.current = true;
+    setFullListBusy(true);
+    try {
+      const all = await getClientEntries(clientId, status);
+      if (clientId === queryRef.current.clientId) await action(all);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Não foi possível carregar a lista completa.', 'warn');
+    } finally {
+      fullActionBusy.current = false;
+      setFullListBusy(false);
+    }
+  };
+
+  const handleExportTxt = () => runFullListAction(all => {
+    const content = generateFirewallTxt(all, sortNumeric);
     const today = new Date().toISOString().split('T')[0];
     triggerDownload(`${currentClient.name}_blocklist_${today}.txt`, content, 'text/plain;charset=utf-8');
-  };
+  }, 'active');
 
-  const handleExportNanoTxt = () => {
-    if (!currentClient) return;
-    const activeOnly = entries.filter(e => e.status === 'active');
-    const content = generateNanoFormattedTxt(activeOnly, sortNumeric);
+  const handleExportNanoTxt = () => runFullListAction(all => {
+    const content = generateNanoFormattedTxt(all, sortNumeric);
     const today = new Date().toISOString().split('T')[0];
     triggerDownload(`${currentClient.name}_blocklist_nano_${today}.txt`, content, 'text/plain;charset=utf-8');
+  }, 'active');
+
+  const handleOpenNano = () => runFullListAction(all => {
+    setNanoText(generateNanoFormattedTxt(all, sortNumeric));
+    setCopiedNano(false);
+    setShowNanoModal(true);
+  }, 'active');
+
+  const handleCopyNanoText = async () => {
+    try {
+      await navigator.clipboard.writeText(nanoText);
+      setCopiedNano(true);
+      setTimeout(() => setCopiedNano(false), 2000);
+    } catch {
+      showToast('Não foi possível copiar. Selecione o texto e use Ctrl+C.', 'warn');
+    }
   };
 
-  const handleCopyNanoText = () => {
-    if (!currentClient) return;
-    const activeOnly = entries.filter(e => e.status === 'active');
-    const content = generateNanoFormattedTxt(activeOnly, sortNumeric);
-    navigator.clipboard.writeText(content);
-    setCopiedNano(true);
-    setTimeout(() => setCopiedNano(false), 2000);
-  };
-
-  const handleExportCsv = () => {
-    if (!currentClient) return;
-    const content = generateFullCSV(entries, sortNumeric);
+  const handleExportCsv = () => runFullListAction(all => {
+    const content = generateFullCSV(all, sortNumeric);
     const today = new Date().toISOString().split('T')[0];
     triggerDownload(`${currentClient.name}_blocklist_${today}.csv`, content, 'text/csv;charset=utf-8');
-  };
+  });
 
   // ==========================================
   // SELEÇÃO MÚLTIPLA & ATALHOS (CTRL / SHIFT)
@@ -463,36 +506,32 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     if (!batchMatchInput.trim()) return;
     const tokens = extractTokensFromRawInput(batchMatchInput).map(t => t.token.toLowerCase());
     const tokenSet = new Set(tokens);
-
-    let matchCount = 0;
-    const matchedIds: string[] = [];
-
-    for (const item of entries) {
-      if (tokenSet.has(item.indicator.toLowerCase())) {
-        matchedIds.push(item.id);
-        matchCount++;
-      }
-    }
-
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      matchedIds.forEach(id => next.add(id));
-      return next;
+    return runFullListAction(all => {
+      const matches = all.filter(item => tokenSet.has(item.indicator.toLowerCase()));
+      matches.forEach(item => selectedEntryCache.current.set(item.id, item));
+      setSelectedIds(prev => {
+        const next = new Set(prev);
+        matches.forEach(item => next.add(item.id));
+        return next;
+      });
+      setMatchFeedback(`${matches.length} indicadores localizados e marcados em toda a lista, incluindo outras páginas.`);
     });
-
-    setMatchFeedback(`${matchCount} indicadores localizados e marcados na tabela.`);
   };
+
+  const getSelectedEntries = () => Array.from(selectedIds)
+    .map(id => selectedEntryCache.current.get(id) || entries.find(item => item.id === id))
+    .filter((item): item is BlocklistEntry => Boolean(item));
 
   // Ações em Lote para Selecionados
   const handleBulkToggleStatus = async (targetStatus: 'active' | 'removed') => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    const previous = entries.filter(e => ids.includes(e.id)).map(e => ({ id: e.id, status: e.status }));
+    const previous = getSelectedEntries().map(e => ({ id: e.id, status: e.status }));
     for (const id of ids) {
       await updateEntryStatus(id, targetStatus);
     }
-    setEntries(prev => prev.map(e => ids.includes(e.id) ? { ...e, status: targetStatus } : e));
     setSelectedIds(new Set());
+    await loadClientData();
     onRefreshStats();
     showToast(`${ids.length} ${targetStatus === 'removed' ? 'marcado(s) como removido(s)' : 'reativado(s)'}.`, {
       action: {
@@ -514,8 +553,8 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
       // Criar snapshot de segurança antes
       const snap = await createClientSnapshot(currentClient.id, `Antes de excluir ${ids.length} itens em lote`);
       await bulkDeleteEntries(ids);
-      setEntries(prev => prev.filter(e => !ids.includes(e.id)));
       setSelectedIds(new Set());
+      await loadClientData();
       loadSnapshots();
       onRefreshStats();
       showToast(`${ids.length} item(ns) excluído(s).`, {
@@ -523,7 +562,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
           label: 'Desfazer',
           onClick: async () => {
             await restoreClientSnapshot(snap.id);
-            await loadClientData();
+            await loadClientData(true);
             await loadSnapshots();
             onRefreshStats();
             showToast('Exclusão desfeita.', 'info');
@@ -534,7 +573,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   };
 
   const handleExportSelectedNano = () => {
-    const selectedEntries = entries.filter(e => selectedIds.has(e.id));
+    const selectedEntries = getSelectedEntries();
     const content = generateNanoFormattedTxt(selectedEntries, sortNumeric);
     const today = new Date().toISOString().split('T')[0];
     triggerDownload(`${currentClient.name}_selecionados_nano_${today}.txt`, content, 'text/plain;charset=utf-8');
@@ -557,7 +596,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     setIsRestoringSnapshot(true);
     try {
       await restoreClientSnapshot(snap.id);
-      await loadClientData();
+      await loadClientData(true);
       await loadSnapshots();
       onRefreshStats();
       setShowSnapshotsModal(false);
@@ -585,7 +624,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     }
 
     const removed = await deleteClientEntriesAll(currentClient.id);
-    await loadClientData();
+    await loadClientData(true);
     await loadSnapshots();
     onRefreshStats();
     setShowClearAllModal(false);
@@ -597,14 +636,14 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   const handleToggleStatus = async (item: BlocklistEntry) => {
     const nextStatus = item.status === 'active' ? 'removed' : 'active';
     await updateEntryStatus(item.id, nextStatus);
-    setEntries(prev => prev.map(e => e.id === item.id ? { ...e, status: nextStatus } : e));
+    await loadClientData();
     onRefreshStats();
     showToast(`${item.indicator} ${nextStatus === 'removed' ? 'marcado como removido' : 'reativado'}.`, {
       action: {
         label: 'Desfazer',
         onClick: async () => {
           await updateEntryStatus(item.id, item.status);
-          setEntries(prev => prev.map(e => e.id === item.id ? { ...e, status: item.status } : e));
+          await loadClientData();
           onRefreshStats();
         }
       }
@@ -615,7 +654,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   const handleSaveNotes = async () => {
     if (!editingEntry) return;
     await updateEntryNotes(editingEntry.id, editNotesText.trim());
-    setEntries(prev => prev.map(e => e.id === editingEntry.id ? { ...e, notes: editNotesText.trim() } : e));
+    await loadClientData();
     setEditingEntry(null);
   };
 
@@ -625,7 +664,8 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     const target = entries.find(e => e.id === deleteConfirmId);
     const snap = await createClientSnapshot(currentClient.id, `Antes de excluir ${target?.indicator ?? 'um item'}`);
     await bulkDeleteEntries([deleteConfirmId]);
-    setEntries(prev => prev.filter(e => e.id !== deleteConfirmId));
+    setSelectedIds(previous => { const next = new Set(previous); next.delete(deleteConfirmId); return next; });
+    await loadClientData();
     setDeleteConfirmId(null);
     onRefreshStats();
     loadSnapshots();
@@ -634,7 +674,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
         label: 'Desfazer',
         onClick: async () => {
           await restoreClientSnapshot(snap.id);
-          await loadClientData();
+          await loadClientData(true);
           await loadSnapshots();
           onRefreshStats();
         }
@@ -650,19 +690,23 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   };
 
   // Repetidos e itens já cobertos por um CIDR da lista ativa (mesma regra do servidor: fica o mais antigo/abrangente)
-  const handleCheckDuplicates = () => {
+  const handleCheckDuplicates = async () => {
+    if (!currentClient || fullActionBusy.current) return;
     setIsCheckingDuplicates(true);
-    const activeEntries = entries
-      .filter(e => e.status === 'active')
-      .sort((a, b) => String(a.addedDate || '').localeCompare(String(b.addedDate || '')) || a.id.localeCompare(b.id));
-    const conflicts = findExceptionConflicts(activeEntries, e => e.indicator, (currentClient?.exceptions || []).map(x => x.indicator));
-    const conflictSet = new Set(conflicts.map(c => c.item));
-    setRedundantMatches([
-      ...conflicts.map(c => ({ item: c.item, coveredBy: c.exception, reason: 'exception' as const })),
-      ...findRedundant(activeEntries.filter(e => !conflictSet.has(e)), e => e.indicator)
-    ]);
-    setShowDuplicateModal(true);
-    setIsCheckingDuplicates(false);
+    try {
+      await runFullListAction(all => {
+        const activeEntries = all.sort((a, b) => String(a.addedDate || '').localeCompare(String(b.addedDate || '')) || a.id.localeCompare(b.id));
+        const conflicts = findExceptionConflicts(activeEntries, e => e.indicator, (currentClient.exceptions || []).map(x => x.indicator));
+        const conflictSet = new Set(conflicts.map(c => c.item));
+        setRedundantMatches([
+          ...conflicts.map(c => ({ item: c.item, coveredBy: c.exception, reason: 'exception' as const })),
+          ...findRedundant(activeEntries.filter(e => !conflictSet.has(e)), e => e.indicator)
+        ]);
+        setShowDuplicateModal(true);
+      }, 'active');
+    } finally {
+      setIsCheckingDuplicates(false);
+    }
   };
 
   // Retira os redundantes (ficam como removidos, com o motivo na observação; uma versão é salva antes)
@@ -671,7 +715,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     setIsCleaningRedundant(true);
     try {
       await cleanRedundantEntries(currentClient.id);
-      await loadClientData();
+      await loadClientData(true);
       await loadSnapshots();
       onRefreshStats();
       setShowDuplicateModal(false);
@@ -721,6 +765,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
           <button
             type="button"
             onClick={handleExportNanoTxt}
+            disabled={fullListBusy}
             className="btn btn--primary"
             title="Baixar .txt no formato NANO, com as seções === IPS ÚNICOS === e === REDES CIDR ==="
           >
@@ -729,17 +774,18 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => setShowNanoModal(true)}
+            onClick={handleOpenNano}
+            disabled={fullListBusy}
             className="btn"
             title="Ver e copiar o texto NANO para colar no terminal"
           >
             <Terminal aria-hidden="true" />
             Copiar NANO
           </button>
-          <button type="button" onClick={handleExportTxt} className="btn" title="Baixar só os ativos, um por linha">
+          <button type="button" onClick={handleExportTxt} disabled={fullListBusy} className="btn" title="Baixar só os ativos, um por linha">
             .txt
           </button>
-          <button type="button" onClick={handleExportCsv} className="btn" title="Baixar todas as colunas e o histórico em CSV">
+          <button type="button" onClick={handleExportCsv} disabled={fullListBusy} className="btn" title="Baixar todas as colunas e o histórico em CSV">
             .csv
           </button>
         </div>
@@ -761,11 +807,12 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
           <button
             type="button"
             onClick={handleCheckDuplicates}
+            disabled={fullListBusy || isCheckingDuplicates}
             className="btn"
             title="Procurar indicadores repetidos e IPs já cobertos por um CIDR da lista ativa"
           >
             <ScanSearch aria-hidden="true" />
-            Validar lista
+            {isCheckingDuplicates ? 'Validando…' : 'Validar lista'}
           </button>
           <button
             type="button"
@@ -843,7 +890,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
           <select
             value={typeFilter}
             onChange={(e) => {
-              setTypeFilter(e.target.value);
+              setTypeFilter(e.target.value as typeof typeFilter);
               setPage(1);
             }}
             className="field"
@@ -874,7 +921,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setSortNumeric(!sortNumeric)}
+            onClick={() => { setSortNumeric(!sortNumeric); setPage(1); }}
             className="btn btn--sm"
             aria-pressed={sortNumeric}
             title="Alternar entre ordem numérica de IP e ordem por data"
@@ -884,6 +931,14 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
           </button>
         </div>
       </div>
+
+      {fullListBusy && <p className="text-xs text-slate-400" role="status">Preparando a lista completa…</p>}
+      {loadError && (
+        <div className="notice notice--danger flex items-center justify-between gap-3" role="alert">
+          <p>{loadError}</p>
+          <button type="button" className="btn btn--sm" onClick={() => void loadClientData()}>Tentar novamente</button>
+        </div>
+      )}
 
       {selectedIds.size > 0 && (
         <div className="selection-bar" role="region" aria-label="Ações para os itens selecionados">
@@ -910,32 +965,37 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
       )}
 
       {/* Tabela de Entradas com Checkboxes e Suporte a Ctrl/Shift */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm" aria-busy={isLoading}>
         <div className="entry-cards" aria-label="Itens da lista">
           {paginatedEntries.length === 0 ? (
-            <p className="py-8 text-center text-slate-500 text-xs">Nenhum indicador encontrado para os filtros selecionados.</p>
+            <p className="py-8 text-center text-slate-500 text-xs" role="status">{emptyMessage}</p>
           ) : (
-            paginatedEntries.map(item => (
+            paginatedEntries.map((item, idx) => (
               <article key={item.id} className={`entry-card ${item.status === 'active' ? '' : 'opacity-60'}`}>
                 <div className="entry-card__top">
-                  <button type="button" className="entry-card__indicator text-left" onClick={() => setSelectedIpForDossier(item.indicator)}>{item.indicator}</button>
+                  <button type="button" className="btn btn--sm btn--icon" onClick={event => handleToggleSelectRow(item.id, idx, event)} aria-pressed={selectedIds.has(item.id)} aria-label={`${selectedIds.has(item.id) ? 'Desmarcar' : 'Marcar'} ${item.indicator}`}>
+                    {selectedIds.has(item.id) ? <CheckSquare aria-hidden="true" /> : <Square aria-hidden="true" />}
+                  </button>
+                  <button type="button" className="entry-card__indicator text-left" onClick={() => openDossier(item.indicator)}>{item.indicator}</button>
                   <span className={item.status === 'active' ? 'chip chip--ok' : 'chip'}>{item.status === 'active' ? 'Ativo' : 'Removido'}</span>
                 </div>
                 <div className="entry-card__meta">
                   <span>{item.type.replace('_', ' ')}</span>
-                  <span>Incluído {item.addedDate}</span>
+                  <span>Incluído {formatDateBR(item.addedDate)}</span>
                   {item.sourceTicket && <span>Ticket {item.sourceTicket}</span>}
                   {item.addedBy && <span>Por {item.addedBy}</span>}
                 </div>
                 {item.notes && <p className="entry-card__notes">{item.notes}</p>}
                 <div className="entry-card__actions">
                   <button type="button" className="btn btn--sm" onClick={() => handleToggleStatus(item)}>{item.status === 'active' ? 'Remover' : 'Reativar'}</button>
-                  <button type="button" className="btn btn--sm" onClick={() => openComments(item)}>
+                  <button type="button" className="btn btn--sm" onClick={() => openComments(item)} aria-label={`Comentários de ${item.indicator}`}>
                     <MessageSquare aria-hidden="true" /> {commentCounts[item.id] || ''}
                   </button>
                   <button type="button" className="btn btn--sm btn--icon" onClick={() => handleCopy(item.indicator)} aria-label={`Copiar ${item.indicator}`}>
                     {copiedIndicator === item.indicator ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
                   </button>
+                  <button type="button" className="btn btn--sm btn--icon" onClick={() => { setEditingEntry(item); setEditNotesText(item.notes || ''); }} aria-label={`Editar observação de ${item.indicator}`}><Edit3 aria-hidden="true" /></button>
+                  <button type="button" className="btn btn--sm btn--icon btn--danger" onClick={() => setDeleteConfirmId(item.id)} aria-label={`Excluir ${item.indicator}`}><Trash2 aria-hidden="true" /></button>
                 </div>
               </article>
             ))
@@ -950,6 +1010,9 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                   <button
                     type="button"
                     onClick={handleSelectAllVisible}
+                    disabled={isLoading || paginatedEntries.length === 0}
+                    aria-label={isAllVisibleSelected ? 'Desmarcar todos desta página' : 'Selecionar todos desta página'}
+                    aria-pressed={isAllVisibleSelected}
                     className="text-slate-400 hover:text-white transition p-1"
                     title={isAllVisibleSelected ? 'Desmarcar visíveis' : 'Selecionar todos os visíveis'}
                   >
@@ -976,7 +1039,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               {paginatedEntries.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="py-12 text-center text-slate-500 font-sans">
-                    Nenhum indicador encontrado para os filtros selecionados.
+                    <span role="status">{emptyMessage}</span>
                   </td>
                 </tr>
               ) : (
@@ -1009,6 +1072,8 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                         <button
                           type="button"
                           onClick={(e) => handleToggleSelectRow(item.id, idx, e)}
+                          aria-label={`${isSelected ? 'Desmarcar' : 'Marcar'} ${item.indicator}`}
+                          aria-pressed={isSelected}
                           className="p-1 text-slate-400 hover:text-white transition"
                         >
                           {isSelected ? (
@@ -1026,7 +1091,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedIpForDossier(item.indicator);
+                              openDossier(item.indicator);
                             }}
                             className={`text-xs font-bold hover:text-blue-300 hover:underline transition cursor-pointer text-left ${item.isReservedAlert ? 'text-amber-400' : 'text-white'}`}
                             title="Clique para abrir a Ficha Técnica / Dossiê CTI Completo"
@@ -1037,7 +1102,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedIpForDossier(item.indicator);
+                              openDossier(item.indicator);
                             }}
                             className="p-1 text-slate-500 hover:text-blue-300 rounded transition opacity-0 group-hover:opacity-100"
                             title="Abrir Ficha de Inteligência CTI"
@@ -1131,7 +1196,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
                       {/* Data Inclusão */}
                       <td className="py-2.5 px-3 font-sans text-slate-400 text-[11px]">
-                        {item.addedDate}
+                        {formatDateBR(item.addedDate)}
                       </td>
 
                       {/* Fonte / Ticket */}
@@ -1224,7 +1289,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
         {/* Rodapé da Tabela com Paginação */}
         <div className="bg-slate-950/80 px-4 py-3 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
           <div>
-            Exibindo <strong>{paginatedEntries.length}</strong> de <strong>{sortedEntries.length}</strong> itens filtrados (Total do cliente: {entries.length})
+            Exibindo <strong>{paginatedEntries.length ? `${(page - 1) * pageSize + 1}–${(page - 1) * pageSize + paginatedEntries.length}` : '0'}</strong> de <strong>{totalFiltered}</strong> itens filtrados (Total do cliente: {totalClient})
             {selectedIds.size > 0 && <span className="ml-2 text-blue-400 font-semibold">• {selectedIds.size} marcados</span>}
           </div>
 
@@ -1233,6 +1298,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               <span>Por página:</span>
               <select
                 value={pageSize}
+                aria-label="Indicadores por página"
                 onChange={(e) => {
                   setPageSize(Number(e.target.value));
                   setPage(1);
@@ -1248,7 +1314,9 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
             <div className="flex items-center gap-1">
               <button
-                disabled={page <= 1}
+                type="button"
+                aria-label="Página anterior"
+                disabled={isLoading || page <= 1}
                 onClick={() => setPage(page - 1)}
                 className="p-1.5 rounded bg-slate-900 border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800"
               >
@@ -1258,7 +1326,9 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 {page} / {totalPages}
               </span>
               <button
-                disabled={page >= totalPages}
+                type="button"
+                aria-label="Próxima página"
+                disabled={isLoading || page >= totalPages}
                 onClick={() => setPage(page + 1)}
                 className="p-1.5 rounded bg-slate-900 border border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-800"
               >
@@ -1327,10 +1397,10 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 <button
                   type="button"
                   onClick={handleExecuteBatchMatch}
-                  disabled={!batchMatchInput.trim()}
+                  disabled={fullListBusy || !batchMatchInput.trim()}
                   className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow"
                 >
-                  Marcar na tabela
+                  {fullListBusy ? 'Localizando…' : 'Marcar na tabela'}
                 </button>
               </div>
             </div>
@@ -1443,7 +1513,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Você está prestes a excluir <strong>todas as {entries.length} entradas</strong> cadastradas para este cliente.
+              Você está prestes a excluir <strong>todas as {totalClient} entradas</strong> cadastradas para este cliente.
             </p>
 
             <div className="p-3 bg-blue-950/40 border border-blue-800/60 rounded-xl text-xs text-blue-300">
@@ -1643,7 +1713,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                       <div className="flex items-center gap-3 min-w-0">
                         <span className="font-semibold text-white truncate">{match.item.indicator}</span>
                         <span className="data-tag">{match.item.type.replace('_', ' ')}</span>
-                        <span className="text-[11px] text-slate-500 font-sans truncate">{match.item.addedDate}</span>
+                        <span className="text-[11px] text-slate-500 font-sans truncate">{formatDateBR(match.item.addedDate)}</span>
                       </div>
                       <span className="font-sans text-slate-400 shrink-0">
                         {match.reason === 'duplicate' ? 'Repetido de ' : match.reason === 'exception' ? 'Conflita com a exceção ' : 'Coberto por '}
@@ -1683,7 +1753,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
             <div className="relative">
               <pre className="w-full bg-slate-950 font-mono text-xs text-blue-300 p-4 rounded-xl border border-slate-800 overflow-x-auto max-h-80 select-all leading-relaxed whitespace-pre">
-                {generateNanoFormattedTxt(entries, sortNumeric)}
+                {nanoText}
               </pre>
             </div>
 
@@ -1756,7 +1826,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               <h3 className="text-sm font-bold text-white">Excluir definitivamente?</h3>
             </div>
             <p className="text-xs text-slate-300">
-              Esta ação removerá este indicador definitivamente do banco local (sem manter histórico). Se desejar apenas desativar, use a opção de marcar como "Removido".
+              Esta ação excluirá o indicador da lista compartilhada deste cliente, sem manter seu histórico. Para apenas desativar o bloqueio, marque-o como "Removido".
             </p>
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
@@ -1777,14 +1847,22 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
       )}
 
       {/* MODAL: Ficha Técnica / Dossiê CTI do Indicador */}
-      {selectedIpForDossier && (
+      {selectedIpForDossier && dossierState === 'ready' && (
         <IpDossierModal
           indicator={selectedIpForDossier}
           onClose={() => setSelectedIpForDossier(null)}
-          allEntries={entries}
+          allEntries={dossierEntries}
           clients={clients}
         />
       )}
+      <Modal open={Boolean(selectedIpForDossier) && dossierState !== 'ready'} title={`Dossiê de ${selectedIpForDossier || ''}`} onClose={() => setSelectedIpForDossier(null)}>
+        {dossierState === 'error' ? (
+          <div className="space-y-4">
+            <p className="notice notice--danger" role="alert">{dossierError}</p>
+            <button type="button" className="btn btn--primary" onClick={() => setDossierRetry(value => value + 1)}>Tentar novamente</button>
+          </div>
+        ) : <p role="status">Carregando as ocorrências deste indicador nos clientes…</p>}
+      </Modal>
     </div>
   );
 };
