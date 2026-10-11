@@ -1,29 +1,43 @@
 ---
 name: GuardList
-description: Bancada operacional para manutenção e investigação de blocklists isoladas por cliente.
+description: Cofre operacional para manutenção e investigação de blocklists isoladas por cliente.
 colors:
-  action-blue: "#5791ff"
-  action-blue-soft: "rgba(87, 145, 255, 0.12)"
-  canvas-charcoal: "#0a0c10"
-  sidebar-charcoal: "#101319"
-  surface-graphite: "#131820"
-  surface-raised: "#181e27"
-  surface-subtle: "#0f1319"
-  divider: "#29313d"
-  divider-strong: "#3a4554"
-  text-primary: "#f2f5f8"
-  text-secondary: "#c3cbd5"
-  text-muted: "#8e9aaa"
+  vault-blue: "#5791ff"
+  vault-blue-day: "#2f6fdf"
+  vault-blue-soft: "rgba(87, 145, 255, 0.12)"
+  vault-blue-deep: "#1d3f8f"
+  vault-steel: "#0a0c10"
+  vault-steel-console: "#101319"
+  vault-steel-surface: "#131820"
+  vault-steel-raised: "#181e27"
+  vault-steel-recess: "#0f1319"
+  vault-steel-seam: "#29313d"
+  vault-steel-seam-strong: "#3a4554"
+  bank-paper: "#f3f5f8"
+  bank-paper-sheet: "#ffffff"
+  bank-paper-recess: "#edf1f5"
+  bank-paper-seam: "#d9e0e8"
+  ink-night: "#f2f5f8"
+  ink-night-soft: "#c3cbd5"
+  ink-night-muted: "#8e9aaa"
+  ink-day: "#17202b"
+  ink-day-soft: "#344154"
+  ink-day-muted: "#667489"
   danger: "#f56a77"
   warning: "#e7ab4e"
   success: "#4ec995"
 typography:
   headline:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "1.55rem"
-    fontWeight: 720
-    lineHeight: 1.2
+    fontSize: "1.35rem"
+    fontWeight: 710
+    lineHeight: 1.25
     letterSpacing: "-0.025em"
+  title:
+    fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontSize: "0.9rem"
+    fontWeight: 700
+    lineHeight: 1.3
   body:
     fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
     fontSize: "0.78rem"
@@ -39,162 +53,232 @@ typography:
     fontSize: "1.45rem"
     fontWeight: 650
     lineHeight: 1.2
+    letterSpacing: "-0.03em"
 rounded:
   control: "8px"
   surface: "11px"
   panel: "12px"
+  console-key: "13px"
+  inset: "18px"
+  console: "24px"
+  pill: "999px"
 spacing:
   xs: "6px"
   sm: "8px"
   md: "14px"
   lg: "20px"
+  gutter: "24px"
   xl: "30px"
 components:
   button-primary:
-    backgroundColor: "{colors.action-blue}"
-    textColor: "{colors.text-primary}"
+    backgroundColor: "{colors.vault-blue}"
+    textColor: "{colors.ink-night}"
     rounded: "{rounded.control}"
     padding: "8px 12px"
   card:
-    backgroundColor: "{colors.surface-graphite}"
-    textColor: "{colors.text-primary}"
+    backgroundColor: "{colors.vault-steel-surface}"
+    textColor: "{colors.ink-night}"
     rounded: "{rounded.surface}"
     padding: "18px 20px"
   input:
-    backgroundColor: "{colors.surface-subtle}"
-    textColor: "{colors.text-primary}"
+    backgroundColor: "{colors.vault-steel-recess}"
+    textColor: "{colors.ink-night}"
     rounded: "{rounded.control}"
     padding: "10px 12px"
+  sidebar-console:
+    backgroundColor: "{colors.vault-steel-console}"
+    textColor: "{colors.ink-night-muted}"
+    rounded: "{rounded.console}"
+    width: "280px"
+  sidebar-console-collapsed:
+    backgroundColor: "{colors.vault-steel-console}"
+    rounded: "{rounded.console}"
+    width: "70px"
+  nav-row:
+    textColor: "{colors.ink-night-muted}"
+    height: "46px"
+    padding: "0 24px"
+  nav-row-active:
+    backgroundColor: "{colors.vault-blue-soft}"
+    textColor: "{colors.vault-blue}"
+    height: "46px"
+  login-door:
+    backgroundColor: "{colors.vault-steel-surface}"
+    rounded: "{rounded.console}"
+    width: "660px"
+    height: "520px"
+  login-submit:
+    backgroundColor: "{colors.vault-blue}"
+    textColor: "{colors.ink-night}"
+    rounded: "{rounded.pill}"
+    height: "44px"
 ---
 
 # Design System: GuardList
 
 ## Overview
 
-**Creative North Star: "Laboratory Chain-of-Custody Worksheet"**
+**Creative North Star: "The Perimeter Vault"**
 
-O GuardList é uma bancada operacional digital: sóbria, precisa e orientada a evidências. A interface deve parecer uma ferramenta usada continuamente por analistas de segurança, com alta densidade informacional, hierarquia curta e ações inequívocas.
+O GuardList é um cofre de perímetros. Cada cliente é um compartimento isolado, e a interface existe para guardar essa separação com calma: nada vaza de um cofre para outro, nada grita, tudo tem lugar e estado. O tom é sóbrio e firme. A interface guarda, não assusta.
 
-Superfícies carvão, divisórias finas e numerais tabulares dão ritmo de registro técnico sem simular papel ou terminal. O sistema rejeita composição de campanha, slogans, métricas gigantes, brilhos e qualquer decoração que concorra com estado, urgência ou procedência dos dados.
+O trabalho acontece sobre aço escuro (ou papel bancário no tema claro), em superfícies planas separadas por tom e por costuras de 1px. Acima delas flutua um único console, a sidebar, que acompanha o operador por todas as salas do cofre. A entrada é uma porta: a tela de login, o único lugar onde a marca ganha um painel próprio, com degradê de aço azulado e grade de cofre. Dentro, a densidade é de bancada técnica: rótulos curtos, números tabulares e um só azul para agir.
 
 **Key Characteristics:**
 
-- Navegação persistente e compacta.
-- Um único azul para ações; cores semânticas apenas para estado.
-- Superfícies planas separadas por tom e linha, não por sombra ornamental.
-- Dados numéricos alinhados e legíveis em varredura rápida.
-- Mesma linguagem visual em painel, importação, listas, histórico, clientes e ajustes.
+- Um console flutuante (sidebar) acima de uma bancada plana.
+- Isolamento visível: cada cliente em sua própria superfície, sem misturar estados.
+- Um único azul de ação; verde, amarelo e vermelho apenas para estado.
+- Profundidade em camadas suaves: o conteúdo é plano, o que flutua tem sombra ambiente.
+- Dois turnos com o mesmo sistema: aço (escuro) e papel bancário (claro).
+- Dados técnicos sempre em monoespaçado com numerais tabulares.
 
 ## Colors
 
-A paleta combina carvão quase preto com um azul de ação frio e três cores semânticas reservadas.
+Aço quase preto ou papel bancário frio, um azul de cofre para tudo o que se aciona e três cores semânticas guardadas para estado.
 
 ### Primary
 
-- **Action Blue:** usado em seleção, foco e ações primárias; deve permanecer raro o bastante para indicar intenção.
+- **Vault Blue** (escuro) e **Vault Blue Day** (claro): seleção, foco, ações primárias, item ativo da navegação e o interruptor de tema ligado. É a cor que "abre" algo. Aparece em pouca área para continuar significando intenção.
+- **Vault Blue Soft:** faixa do item ativo na sidebar, anel de foco de campos e fundos de seleção.
+- **Vault Blue Deep:** só no painel de marca do login, como fim do degradê, e no avatar do perfil.
 
 ### Neutral
 
-- **Canvas Charcoal:** fundo contínuo da aplicação.
-- **Sidebar Charcoal:** plano estrutural da navegação.
-- **Surface Graphite:** cards, tabelas e painéis de trabalho.
-- **Divider / Divider Strong:** estrutura, agrupamento e estados de foco discreto.
-- **Primary, Secondary e Muted Text:** três níveis de leitura sem recorrer a opacidade excessiva.
+- **Vault Steel:** fundo contínuo da aplicação no tema escuro.
+- **Vault Steel Console:** a chapa da sidebar flutuante.
+- **Vault Steel Surface / Raised / Recess:** cards e tabelas, áreas elevadas por tom e campos rebaixados.
+- **Vault Steel Seam / Seam Strong:** costuras de 1px que separam compartimentos e marcam bordas de controle.
+- **Bank Paper / Sheet / Recess / Seam:** os mesmos papéis no tema claro, com fundo cinza frio, folhas brancas, recessos e costuras claras.
+- **Ink Night / Ink Day** (com Soft e Muted): três níveis de leitura por tema, sem recorrer a opacidade.
+
+### Semantic
+
+- **Danger:** atraso fora do SLA, risco e ações destrutivas.
+- **Warning:** prazos próximos e backup pendente (inclusive na linha de backup da sidebar).
+- **Success:** em dia, importação concluída.
 
 ### Named Rules
 
-**The One Action Voice Rule.** Azul representa interação; roxo e ciano não formam famílias paralelas de ação.
+**The One Key Rule.** Só existe uma chave: o azul. Roxo, ciano ou verde nunca formam uma família paralela de ação.
 
-**The Semantic Reserve Rule.** Verde, amarelo e vermelho só comunicam sucesso, atenção e risco.
+**The Semantic Reserve Rule.** Verde, amarelo e vermelho comunicam estado e mais nada. Sempre acompanhados de texto ou ícone.
+
+**The Two Shifts Rule.** Todo componente novo precisa existir nos dois temas, aço e papel bancário, usando os tokens de tema, nunca hex fixo no componente.
 
 ## Typography
 
-**Display Font:** System UI sans-serif
+**Display Font:** System UI sans-serif (ui-sans-serif, Segoe UI)
 **Body Font:** System UI sans-serif
-**Label/Mono Font:** SFMono-compatible monospace
+**Label/Mono Font:** SFMono-compatible monospace (SFMono-Regular, Menlo, Consolas)
 
-**Character:** compacta, neutra e confiável. O sans organiza instruções e controles; o monoespaçado diferencia IPs, CIDRs, datas e contagens.
+**Character:** compacta, neutra e confiável. O sans conduz instruções e controles; o monoespaçado identifica o que é evidência (IPs, CIDRs, datas, contagens).
 
 ### Hierarchy
 
-- **Headline:** forte e curto, usado uma vez por página.
-- **Title:** identifica seções e clientes sem competir com o título da página.
-- **Body:** texto operacional direto, preferencialmente abaixo de 70 caracteres por linha.
-- **Label:** pequeno e firme, usado para metadados e cabeçalhos.
-- **Data:** monoespaçado com numerais tabulares para comparação rápida.
+- **Headline** (710, 1.35rem, 1.25): título da página, uma vez por tela.
+- **Title** (700, 0.9rem, 1.3): nome de cliente, título de seção e nome no perfil da sidebar.
+- **Body** (400, 0.78rem, 1.5): texto operacional, até cerca de 70 caracteres por linha.
+- **Label** (620, 0.68rem): metadados, cabeçalhos de coluna e rótulos de resumo.
+- **Data** (650, 1.45rem, mono, tabular): valores dos resumos operacionais; em tabelas, o mesmo monoespaçado em tamanho de corpo.
 
 ### Named Rules
 
-**The Evidence Type Rule.** Valores técnicos e identificadores usam monoespaçado; explicações e comandos usam sans-serif.
+**The Evidence Type Rule.** Valor técnico ou identificador usa monoespaçado; explicação e comando usam sans-serif.
 
 ## Layout
 
-No desktop, uma barra lateral fixa de 252px mantém contexto e libera o restante da largura para trabalho. O conteúdo usa padding fluido entre 22px e 42px, resumos em quatro colunas e tabelas com rolagem apenas quando a densidade exige.
+No desktop (a partir de 1024px), o console flutua a 24px das bordas superior, esquerda e inferior, com 280px aberto ou 70px recolhido. A escolha fica salva por navegador. O conteúdo reserva o espaço do console mais as duas margens de 24px e desliza junto quando ele recolhe (0.35s). A bancada usa padding fluido (16 a 42px), resumos em quatro colunas e tabelas com rolagem só quando a densidade exige.
 
-Abaixo de 1024px, a navegação vira uma faixa horizontal aderente ao topo. Em telas estreitas, resumos ficam em grade 2×2 e o conteúdo recebe margens de 14px. A ordem responsiva preserva título, estado, ação principal e dados antes de opções secundárias.
+Abaixo de 1024px, o console vira gaveta. Uma barra superior fixa traz menu, marca e busca; a gaveta abre sobre um véu escuro e fecha por X, Escape ou toque fora. Em telas estreitas, os resumos ficam em grade 2×2 e o conteúdo usa margens de 14px. A ordem responsiva preserva título, estado, ação principal e dados antes de opções secundárias.
+
+O login centraliza um cartão de 660×520px: formulário à esquerda, painel de marca à direita. Abaixo de 680px, o cartão vira coluna com o painel em faixa de 200px no topo.
 
 ## Elevation & Depth
 
-O sistema é plano por padrão. Profundidade vem da diferença entre canvas, sidebar e superfícies, reforçada por bordas de 1px. Sombras não são linguagem estrutural e devem ser removidas de controles comuns.
+Camadas suaves. A bancada é plana: profundidade vem do tom (aço, superfície, elevado, recesso) e das costuras de 1px. Sombra existe apenas no que flutua acima da bancada (console, modais, toasts, dicas), e sempre ambiente: larga, difusa e de baixa opacidade. Degradê é reservado a painéis de marca. Hoje existe um só, a porta do login.
 
-**The Flat-by-Default Rule.** Uma superfície precisa justificar seu nível por função e agrupamento, não por brilho ou elevação decorativa.
+### Shadow Vocabulary
+
+- **Console float** (`0 0 0 1px seam, 0 12px 40px rgba(0,0,0,0.35)` no escuro; `0 12px 40px rgba(31,26,74,0.08)` no claro): sidebar flutuante.
+- **Door float** (`0 0 0 1px seam, 0 12px 80px rgba(41,30,113,0.12)`): cartão de login.
+- **Tip lift** (`0 6px 18px rgba(0,0,0,0.2)`): dicas flutuantes e toasts.
+- **Avatar lift** (`0 6px 16px rgba(31,26,74,0.16)`): avatar do perfil.
+
+### Named Rules
+
+**The Floating Layer Rule.** Só ganha sombra o que flutua sobre a bancada. Card, tabela, campo e botão ficam planos; botões nunca têm sombra.
+
+**The Brand Panel Rule.** Degradê só em painel de marca dedicado, como a porta do login. Nunca em botões, cards de dados ou estados.
 
 ## Shapes
 
-Controles usam cantos contidos de 8px; cards e painéis usam 11–12px. Pills ficam restritas a estados breves e filtros compactos. Bordas são finas, contínuas e nunca luminosas.
+Precisos e contidos na bancada, generosos no que flutua. Controles usam 8px; cards e painéis, 11–12px. O console e a porta do login usam 24px, com cantos internos de 18px quando há uma chapa interna. Pílulas (999px) ficam para status curtos, o interruptor de tema e o botão de entrar do login. Costuras são finas e contínuas.
+
+**The Float-Is-Round Rule.** Quanto mais um elemento flutua, mais arredondado ele é: bancada com 8–12px, console e porta com 24px.
 
 ## Components
 
 ### Buttons
 
-- **Shape:** cantos de controle, altura compacta e área de toque preservada.
-- **Primary:** azul de ação com texto claro.
-- **Hover / Focus:** mudança tonal discreta e contorno visível; sem deslocamento ou glow.
-- **Secondary / Ghost:** grafite, borda neutra e texto secundário.
+- **Shape:** cantos de controle (8px), altura compacta, área de toque preservada.
+- **Primary:** Vault Blue com texto claro.
+- **Hover / Focus:** mudança tonal discreta e contorno azul visível; sem deslocamento e sem sombra.
+- **Secondary / Ghost:** superfície, costura neutra e texto secundário.
+- **Exceção da porta:** no login, o botão Entrar é pílula (44px de altura), com ícone e estado de carregamento.
 
 ### Chips
 
 - **Style:** fundo tonal baixo, borda semântica e texto curto.
-- **State:** azul para seleção; verde, amarelo e vermelho apenas para condição operacional.
+- **State:** azul para seleção; verde, amarelo e vermelho só para condição operacional (Em dia, Atrasado).
 
 ### Cards / Containers
 
-- **Corner Style:** superfície suavemente curva.
-- **Background:** grafite sobre canvas carvão.
-- **Shadow Strategy:** nenhuma sombra em repouso.
-- **Border:** divisor neutro de 1px.
+- **Corner Style:** superfície suavemente curva (11–12px).
+- **Background:** Vault Steel Surface sobre Vault Steel, ou Sheet sobre Bank Paper.
+- **Shadow Strategy:** nenhuma (ver Floating Layer Rule).
+- **Border:** costura de 1px.
 - **Internal Padding:** 14–20px conforme densidade.
 
 ### Inputs / Fields
 
-- **Style:** fundo sutil, borda neutra e raio de controle.
-- **Focus:** borda azul e outline visível.
-- **Error / Disabled:** cor semântica ou grafite desaturado, sempre com contraste de texto suficiente.
+- **Style:** fundo de recesso, costura forte e raio de controle (8px). No login, 42px de altura e raio de 12px.
+- **Focus:** borda azul com anel Vault Blue Soft de 3px.
+- **Error / Disabled:** mensagem em Danger abaixo do campo com `role="alert"`; desabilitado em tom rebaixado, sempre com contraste suficiente.
 
 ### Navigation
 
-A navegação usa texto compacto, ícone linear e estado ativo com fundo azul suave e marcador de 2px. No mobile, mantém a mesma ordem em uma faixa horizontal rolável sem scrollbar decorativa.
+O console é a navegação. De cima para baixo: marca e botão de recolher (48px, 13px de raio), costura, perfil (avatar de 46px com iniciais e "Acesso autorizado"), Consultar IP com atalho Ctrl K, os sete destinos, costura, linha de backup (amarela quando pendente), interruptor de modo escuro e Sair.
 
-### Operational Summary
+- **Linhas:** 46px de altura, ícone linear de 22px, rótulo de 0.86rem e cor Muted, que vira Ink no hover.
+- **Ativo:** faixa Vault Blue Soft com uma pílula azul de 8×16px na borda direita. A faixa desliza até o item com `cubic-bezier(0.34, 1.16, 0.42, 1)` em 0.38s, uma leve "mola" de trinco.
+- **Recolhido:** só ícones, com dica flutuante à direita no hover ou foco. Toda linha tem `aria-label`.
+- **Mobile:** gaveta com a mesma ordem e um X no lugar do botão de recolher.
 
-Quatro células compartilham uma única superfície. Cada célula contém rótulo, valor tabular e contexto curto; apenas células acionáveis respondem ao hover.
+### Signature: The Vault Door (Login)
+
+Cartão de 660×520px com moldura interna de 8px. O formulário (usuário, senha com mostrar/ocultar, erro, Entrar) fica à esquerda. À direita, o painel de marca: degradê de Vault Blue Deep para aço noturno, grade de 28px em linhas brancas a 5% e a marca GuardList centralizada. Na entrada, o painel desliza 0.65s da esquerda para a direita e o texto surge em fade, como uma porta que se fecha atrás do operador. Respeita `prefers-reduced-motion`. Não existe cadastro: o acesso é concedido pelo administrador.
 
 ### Dialogs
 
-Diálogos têm nome acessível, foco inicial, contenção de Tab, fechamento por Escape e restauração de foco. O overlay escurece o contexto sem efeitos visuais promocionais.
+Têm nome acessível, foco inicial, contenção de Tab, fechamento por Escape e restauração de foco. O véu escurece o contexto; o diálogo usa a sombra Tip lift ou maior, nunca brilho.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** priorize o próximo trabalho operacional e o estado do dado.
-- **Do** use azul para ações e foco em todas as páginas.
-- **Do** mantenha numerais, IPs, CIDRs e datas alinhados com fonte monoespaçada.
+- **Do** mantenha cada cliente em sua própria superfície e seu próprio estado. O isolamento é visível.
+- **Do** use Vault Blue para ação, foco e item ativo em todas as telas.
+- **Do** dê sombra ambiente apenas ao que flutua: console, modais, toasts e dicas.
+- **Do** mantenha IPs, CIDRs, datas e contagens em monoespaçado tabular.
+- **Do** construa nos dois temas com os tokens de tema (`--accent`, `--surface`, `--line`…).
 - **Do** rebaixe diagnóstico e manutenção para seções recolhíveis.
 
 ### Don't:
 
-- **Don't** use slogans, heróis, métricas gigantes ou composição de landing page.
+- **Don't** use slogans, heróis, métricas gigantes ou composição de landing page dentro do app.
 - **Don't** crie famílias roxa, ciano ou verde para ações comuns.
-- **Don't** use glow, gradientes decorativos ou sombras para simular importância.
-- **Don't** esconda diferenças de risco usando apenas cor; mantenha texto e ícone de estado.
+- **Don't** coloque degradê em botões, cards de dados ou estados. Degradê é só para painel de marca.
+- **Don't** dê sombra a cards, tabelas, campos ou botões da bancada.
+- **Don't** comunique risco só por cor; mantenha texto e ícone de estado.
+- **Don't** ofereça autocadastro: a porta só abre para usuários concedidos.

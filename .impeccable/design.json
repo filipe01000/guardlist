@@ -1,54 +1,82 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-10T16:30:00-03:00",
+  "generatedAt": "2026-10-10T21:50:00-03:00",
   "title": "Design System: GuardList",
   "extensions": {
     "colorMeta": {
-      "action-blue": {
+      "vault-blue": {
         "role": "primary",
-        "displayName": "Action Blue",
+        "displayName": "Vault Blue",
         "canonical": "#5791ff",
         "tonalRamp": ["#07152f", "#0c2552", "#173a75", "#27569f", "#3d73cc", "#5791ff", "#93b8ff", "#dce8ff"]
       },
-      "canvas-charcoal": {
+      "vault-blue-day": {
+        "role": "primary",
+        "displayName": "Vault Blue Day",
+        "canonical": "#2f6fdf",
+        "tonalRamp": ["#081a3d", "#0f2c63", "#18408c", "#2256b5", "#2f6fdf", "#5b8ff0", "#9dbcf7", "#e1ebfd"]
+      },
+      "vault-blue-deep": {
+        "role": "primary",
+        "displayName": "Vault Blue Deep",
+        "canonical": "#1d3f8f",
+        "tonalRamp": ["#060f24", "#0d1830", "#14295c", "#1d3f8f", "#3b6fd8", "#6d97e8", "#a8c2f3", "#e3ecfc"]
+      },
+      "vault-steel": {
         "role": "neutral",
-        "displayName": "Canvas Charcoal",
+        "displayName": "Vault Steel",
         "canonical": "#0a0c10",
         "tonalRamp": ["#08090c", "#101319", "#181e27", "#29313d", "#3a4554", "#667385", "#aab3bf", "#eef1f5"]
       },
+      "bank-paper": {
+        "role": "neutral",
+        "displayName": "Bank Paper",
+        "canonical": "#f3f5f8",
+        "tonalRamp": ["#17202b", "#344154", "#667489", "#b9c3cf", "#d9e0e8", "#edf1f5", "#f3f5f8", "#ffffff"]
+      },
       "danger": {
         "role": "semantic",
-        "displayName": "Operational Danger",
+        "displayName": "Breach Red",
         "canonical": "#f56a77",
         "tonalRamp": ["#2c0a0e", "#56131b", "#7f202c", "#ac3442", "#d94d5b", "#f56a77", "#ff9da6", "#ffe1e4"]
       },
       "warning": {
         "role": "semantic",
-        "displayName": "Operational Warning",
+        "displayName": "Deadline Amber",
         "canonical": "#e7ab4e",
         "tonalRamp": ["#271904", "#493006", "#6f4a0d", "#986817", "#c0862c", "#e7ab4e", "#f3ca86", "#fbe9c5"]
       },
       "success": {
         "role": "semantic",
-        "displayName": "Operational Success",
+        "displayName": "Sealed Green",
         "canonical": "#4ec995",
         "tonalRamp": ["#05231a", "#0a4432", "#12654b", "#218766", "#34a97f", "#4ec995", "#88dfba", "#d2f3e5"]
       }
     },
     "typographyMeta": {
-      "headline": { "displayName": "Page Headline", "purpose": "Um título compacto por página." },
-      "body": { "displayName": "Operational Body", "purpose": "Instruções e contexto de trabalho." },
-      "data": { "displayName": "Tabular Data", "purpose": "IPs, CIDRs, datas e contagens comparáveis." }
+      "headline": { "displayName": "Page Headline", "purpose": "Título da página, uma vez por tela." },
+      "title": { "displayName": "Compartment Title", "purpose": "Nome de cliente, título de seção e nome no perfil." },
+      "body": { "displayName": "Operational Body", "purpose": "Instruções e descrições, até ~70 caracteres por linha." },
+      "label": { "displayName": "Ledger Label", "purpose": "Metadados, cabeçalhos de coluna e rótulos de resumo." },
+      "data": { "displayName": "Evidence Data", "purpose": "Valores tabulares em monoespaçado: contagens, IPs, CIDRs, datas." }
     },
-    "shadows": [],
+    "shadows": [
+      { "name": "console-float", "value": "0 0 0 1px #29313d, 0 12px 40px rgba(0, 0, 0, 0.35)", "purpose": "Sidebar flutuante no tema escuro." },
+      { "name": "console-float-day", "value": "0 0 0 1px #edeef2, 0 12px 40px rgba(31, 26, 74, 0.08)", "purpose": "Sidebar flutuante no tema claro." },
+      { "name": "door-float", "value": "0 0 0 1px #29313d, 0 12px 80px rgba(41, 30, 113, 0.12)", "purpose": "Cartão da tela de login." },
+      { "name": "tip-lift", "value": "0 6px 18px rgba(0, 0, 0, 0.2)", "purpose": "Dicas flutuantes, toasts e diálogos." },
+      { "name": "avatar-lift", "value": "0 6px 16px rgba(31, 26, 74, 0.16)", "purpose": "Avatar do perfil na sidebar." }
+    ],
     "motion": [
-      { "name": "state-standard", "value": "160ms ease-out", "purpose": "Hover e seleção sem deslocamento físico." },
-      { "name": "reduced-motion", "value": "0.01ms", "purpose": "Fallback para preferência de movimento reduzido." }
+      { "name": "latch-spring", "value": "0.38s cubic-bezier(0.34, 1.16, 0.42, 1)", "purpose": "Faixa do item ativo deslizando entre destinos da navegação." },
+      { "name": "console-resize", "value": "0.35s ease", "purpose": "Sidebar recolhendo/expandindo e o conteúdo acompanhando." },
+      { "name": "door-close", "value": "0.65s ease-in-out", "purpose": "Painel de marca do login deslizando na entrada." },
+      { "name": "state-quick", "value": "0.25s", "purpose": "Hover e cor de linhas, botões e campos." }
     ],
     "breakpoints": [
-      { "name": "mobile", "value": "420px" },
-      { "name": "compact", "value": "760px" },
-      { "name": "navigation", "value": "1023px" }
+      { "name": "door-stack", "value": "680px", "purpose": "Login vira coluna." },
+      { "name": "summary-2x2", "value": "760px", "purpose": "Resumo operacional em grade 2×2." },
+      { "name": "console-drawer", "value": "1024px", "purpose": "Abaixo disso, a sidebar vira gaveta com barra superior." }
     ]
   },
   "components": [
@@ -56,75 +84,102 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Ação operacional principal, uma por agrupamento.",
-      "html": "<button class=\"ds-btn-primary\">Confirmar importação</button>",
-      "css": ".ds-btn-primary{border:1px solid rgba(87,145,255,.42);border-radius:8px;background:#244a85;color:#eef4ff;padding:8px 12px;font:650 .75rem ui-sans-serif,system-ui;transition:background-color 160ms ease-out,border-color 160ms ease-out}.ds-btn-primary:hover{background:#2d5b9f}.ds-btn-primary:focus-visible{outline:2px solid #78a8ff;outline-offset:2px}.ds-btn-primary:active{background:#1d3c6d}"
+      "description": "Ação principal da bancada: azul de cofre, cantos de controle, sem sombra.",
+      "html": "<button class=\"ds-btn-primary\">Adicionar cliente</button>",
+      "css": ".ds-btn-primary { background: var(--accent, #5791ff); color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; font: 600 0.78rem/1.3 ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: filter 0.25s; } .ds-btn-primary:hover { filter: brightness(1.1); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #5791ff); outline-offset: 2px; }"
     },
     {
-      "name": "Secondary Button",
+      "name": "Ghost Button",
       "kind": "button",
-      "description": "Ação auxiliar em superfícies densas.",
-      "html": "<button class=\"ds-btn-secondary\">Ver lista</button>",
-      "css": ".ds-btn-secondary{border:1px solid #3a4554;border-radius:8px;background:#181e27;color:#c3cbd5;padding:8px 12px;font:620 .75rem ui-sans-serif,system-ui;transition:background-color 160ms ease-out,border-color 160ms ease-out}.ds-btn-secondary:hover{border-color:#4b596b;background:#202630;color:#f2f5f8}.ds-btn-secondary:focus-visible{outline:2px solid #78a8ff;outline-offset:2px}.ds-btn-secondary:active{background:#131820}"
+      "refersTo": "button-ghost",
+      "description": "Ação secundária: superfície, costura neutra e texto secundário.",
+      "html": "<button class=\"ds-btn-ghost\">Ver lista</button>",
+      "css": ".ds-btn-ghost { background: var(--surface, #131820); color: var(--text-soft, #c3cbd5); border: 1px solid var(--line, #29313d); border-radius: 8px; padding: 8px 12px; font: 600 0.78rem/1.3 ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: background 0.25s, color 0.25s; } .ds-btn-ghost:hover { background: var(--surface-raised, #181e27); color: var(--text, #f2f5f8); } .ds-btn-ghost:focus-visible { outline: 2px solid var(--accent, #5791ff); outline-offset: 2px; }"
     },
     {
-      "name": "Search Input",
+      "name": "Field",
       "kind": "input",
       "refersTo": "input",
-      "description": "Busca e filtros de indicadores.",
-      "html": "<input class=\"ds-input\" placeholder=\"Pesquisar IP ou CIDR\" />",
-      "css": ".ds-input{width:100%;border:1px solid #29313d;border-radius:8px;background:#0f1319;color:#f2f5f8;padding:10px 12px;font:400 .78rem ui-sans-serif,system-ui}.ds-input:hover{border-color:#3a4554}.ds-input:focus-visible{border-color:#5791ff;outline:2px solid #78a8ff;outline-offset:2px}.ds-input::placeholder{color:#8e9aaa}"
+      "description": "Campo rebaixado com foco azul e anel suave.",
+      "html": "<label class=\"ds-field\"><span>Nome do cliente</span><input placeholder=\"EX: HOSPITAL SANTO ANTONIO\" /></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; font: 620 0.68rem/1.3 ui-sans-serif, system-ui, sans-serif; color: var(--text-soft, #c3cbd5); } .ds-field input { height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line-strong, #3a4554); background: var(--surface-subtle, #0f1319); color: var(--text, #f2f5f8); font: 400 0.85rem ui-sans-serif, system-ui, sans-serif; transition: border-color 0.2s, box-shadow 0.2s; } .ds-field input:focus { outline: none; border-color: var(--accent, #5791ff); box-shadow: 0 0 0 3px var(--accent-soft, rgba(87,145,255,0.12)); }"
     },
     {
-      "name": "Navigation Item",
-      "kind": "nav",
-      "description": "Item persistente do rail operacional.",
-      "html": "<button class=\"ds-nav-item ds-nav-item-active\"><svg aria-hidden=\"true\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\"><path d=\"M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z\"/></svg>Painel geral</button>",
-      "css": ".ds-nav-item{position:relative;display:flex;align-items:center;gap:10px;min-height:40px;width:100%;border:0;border-radius:8px;background:transparent;color:#98a4b3;padding:0 12px;font:560 .76rem ui-sans-serif,system-ui;text-align:left}.ds-nav-item:hover{background:rgba(255,255,255,.04);color:#c3cbd5}.ds-nav-item:focus-visible{outline:2px solid #78a8ff;outline-offset:2px}.ds-nav-item-active{background:rgba(87,145,255,.12);color:#a9c5ff}.ds-nav-item-active:before{content:'';position:absolute;left:0;width:2px;height:20px;background:#5791ff}"
-    },
-    {
-      "name": "Operational Summary",
+      "name": "Compartment Card",
       "kind": "card",
       "refersTo": "card",
-      "description": "Célula de leitura rápida com contexto curto.",
-      "html": "<section class=\"ds-summary\"><span>Entradas ativas</span><strong>65</strong><small>51 IPs · 14 CIDRs</small></section>",
-      "css": ".ds-summary{display:flex;min-height:104px;flex-direction:column;justify-content:center;border:1px solid #29313d;border-radius:11px;background:#131820;color:#f2f5f8;padding:18px 20px}.ds-summary span,.ds-summary small{color:#8e9aaa;font:620 .68rem ui-sans-serif,system-ui}.ds-summary strong{margin-top:5px;font:650 1.45rem ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}.ds-summary:focus-within{border-color:#5791ff}"
+      "description": "Compartimento de um cliente: plano, costura de 1px, dados em monoespaçado.",
+      "html": "<article class=\"ds-card\"><header><strong>DELFINANCE</strong><span class=\"ds-chip ds-chip--danger\">Atrasado</span></header><dl><div><dt>Total</dt><dd>5</dd></div><div><dt>IPs</dt><dd>4</dd></div><div><dt>CIDRs</dt><dd>1</dd></div></dl></article>",
+      "css": ".ds-card { width: 260px; padding: 18px 20px; border-radius: 11px; border: 1px solid var(--line, #29313d); background: var(--surface, #131820); color: var(--text, #f2f5f8); font-family: ui-sans-serif, system-ui, sans-serif; } .ds-card header { display: flex; justify-content: space-between; align-items: center; } .ds-card strong { font: 700 0.8rem ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 0.04em; } .ds-card dl { display: flex; gap: 22px; margin: 16px 0 0; } .ds-card dt { font-size: 0.6rem; font-weight: 620; color: var(--muted, #8e9aaa); text-transform: uppercase; } .ds-card dd { margin: 2px 0 0; font: 650 1.1rem ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; } .ds-chip { padding: 2px 8px; border-radius: 999px; font-size: 0.62rem; font-weight: 650; } .ds-chip--danger { color: #f56a77; background: rgba(245,106,119,0.1); border: 1px solid rgba(245,106,119,0.4); }"
     },
     {
       "name": "Status Chip",
       "kind": "chip",
-      "description": "Estado operacional com texto e cor semântica.",
-      "html": "<span class=\"ds-chip-warning\">Atenção</span>",
-      "css": ".ds-chip-warning{display:inline-flex;align-items:center;border:1px solid rgba(231,171,78,.45);border-radius:999px;background:rgba(231,171,78,.1);color:#efbf67;padding:3px 8px;font:650 .68rem ui-sans-serif,system-ui}.ds-chip-warning:focus-visible{outline:2px solid #78a8ff;outline-offset:2px}"
+      "refersTo": "chip-status",
+      "description": "Estado operacional curto; cor semântica sempre com texto.",
+      "html": "<span class=\"ds-status ds-status--ok\">Em dia</span> <span class=\"ds-status ds-status--warn\">Backup pendente</span>",
+      "css": ".ds-status { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font: 650 0.65rem ui-sans-serif, system-ui, sans-serif; } .ds-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; } .ds-status--ok { color: #4ec995; background: rgba(78,201,149,0.1); border: 1px solid rgba(78,201,149,0.35); } .ds-status--warn { color: #e7ab4e; background: rgba(231,171,78,0.1); border: 1px solid rgba(231,171,78,0.35); }"
+    },
+    {
+      "name": "Console Navigation",
+      "kind": "nav",
+      "refersTo": "sidebar-console",
+      "description": "Sidebar flutuante com faixa ativa deslizante e pílula azul na borda.",
+      "html": "<nav class=\"ds-console\"><ul style=\"--active-row: 1\"><li class=\"ds-indicator\" aria-hidden=\"true\"></li><li><button><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"9\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"5\"/><rect x=\"14\" y=\"12\" width=\"7\" height=\"9\"/><rect x=\"3\" y=\"16\" width=\"7\" height=\"5\"/></svg>Painel geral</button></li><li><button class=\"active\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M4.9 19.1C1 15.2 1 8.8 4.9 4.9\"/><path d=\"M19.1 4.9C23 8.8 23 15.1 19.1 19\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/></svg>Inteligência de IPs</button></li><li><button><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"/><path d=\"M3 3v5h5\"/><path d=\"M12 7v5l4 2\"/></svg>Histórico semanal</button></li></ul></nav>",
+      "css": ".ds-console { width: 280px; padding: 16px 0; border-radius: 24px; background: var(--sidebar, #101319); box-shadow: 0 0 0 1px var(--line, #29313d), 0 12px 40px rgba(0,0,0,0.35); font-family: ui-sans-serif, system-ui, sans-serif; } .ds-console ul { position: relative; list-style: none; margin: 0; padding: 0; } .ds-indicator { position: absolute; inset: 0; height: 46px; translate: 0 calc(var(--active-row) * 46px); background: var(--accent-soft, rgba(87,145,255,0.12)); transition: translate 0.38s cubic-bezier(0.34, 1.16, 0.42, 1); } .ds-indicator::after { content: ''; position: absolute; top: 50%; right: 0; translate: 0 -50%; width: 8px; height: 16px; border-radius: 12px 0 0 12px; background: var(--accent, #5791ff); } .ds-console button { position: relative; display: flex; align-items: center; gap: 16px; width: 100%; height: 46px; padding: 0 24px; border: 0; background: transparent; color: var(--muted, #8e9aaa); font-size: 0.86rem; font-weight: 600; text-align: left; cursor: pointer; transition: color 0.25s; } .ds-console button:hover { color: var(--text, #f2f5f8); } .ds-console button.active { color: var(--accent, #5791ff); } .ds-console button:focus-visible { outline: 2px solid var(--accent, #5791ff); outline-offset: -2px; }"
+    },
+    {
+      "name": "Theme Switch",
+      "kind": "custom",
+      "refersTo": "theme-switch",
+      "description": "Interruptor de modo escuro na base do console.",
+      "html": "<button class=\"ds-switch-row\" aria-pressed=\"true\">Modo escuro<span class=\"ds-switch on\"><span></span></span></button>",
+      "css": ".ds-switch-row { display: flex; align-items: center; gap: 16px; width: 280px; height: 46px; padding: 0 24px; border: 0; background: transparent; color: var(--muted, #8e9aaa); font: 600 0.86rem ui-sans-serif, system-ui, sans-serif; cursor: pointer; } .ds-switch { margin-left: auto; position: relative; width: 36px; height: 20px; border-radius: 20px; background: var(--surface-subtle, #0f1319); box-shadow: inset 0 0 0 1px var(--line, #29313d); transition: background 0.3s; } .ds-switch span { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: translate 0.3s ease; } .ds-switch.on { background: var(--accent, #5791ff); box-shadow: none; } .ds-switch.on span { translate: 16px 0; } .ds-switch-row:focus-visible { outline: 2px solid var(--accent, #5791ff); outline-offset: -2px; }"
+    },
+    {
+      "name": "Vault Door Submit",
+      "kind": "button",
+      "refersTo": "login-submit",
+      "description": "Botão Entrar da tela de login: única pílula de ação do sistema.",
+      "html": "<button class=\"ds-door-submit\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4\"/><path d=\"m10 17 5-5-5-5\"/><path d=\"M15 12H3\"/></svg>Entrar</button>",
+      "css": ".ds-door-submit { display: flex; align-items: center; justify-content: center; gap: 8px; width: 260px; height: 44px; border: 0; border-radius: 50px; background: var(--accent, #5791ff); color: #fff; font: 700 0.875rem ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: filter 0.3s; } .ds-door-submit:hover { filter: brightness(1.1); } .ds-door-submit:focus-visible { outline: 3px solid var(--accent-soft, rgba(87,145,255,0.12)); outline-offset: 2px; }"
     }
   ],
   "narrative": {
-    "northStar": "Laboratory Chain-of-Custody Worksheet",
-    "overview": "O GuardList é uma bancada operacional digital: sóbria, precisa e orientada a evidências. A interface deve parecer uma ferramenta usada continuamente por analistas de segurança, com alta densidade informacional, hierarquia curta e ações inequívocas.\n\nSuperfícies carvão, divisórias finas e numerais tabulares dão ritmo de registro técnico sem simular papel ou terminal. O sistema rejeita composição de campanha, slogans, métricas gigantes, brilhos e qualquer decoração que concorra com estado, urgência ou procedência dos dados.",
+    "northStar": "The Perimeter Vault",
+    "overview": "O GuardList é um cofre de perímetros. Cada cliente é um compartimento isolado, e a interface existe para guardar essa separação com calma: nada vaza de um cofre para outro, nada grita, tudo tem lugar e estado. O tom é sóbrio e firme. A interface guarda, não assusta.\n\nO trabalho acontece sobre aço escuro (ou papel bancário no tema claro), em superfícies planas separadas por tom e por costuras de 1px. Acima delas flutua um único console, a sidebar, que acompanha o operador por todas as salas do cofre. A entrada é uma porta: a tela de login, o único lugar onde a marca ganha um painel próprio, com degradê de aço azulado e grade de cofre. Dentro, a densidade é de bancada técnica: rótulos curtos, números tabulares e um só azul para agir.",
     "keyCharacteristics": [
-      "Navegação persistente e compacta.",
-      "Um único azul para ações; cores semânticas apenas para estado.",
-      "Superfícies planas separadas por tom e linha, não por sombra ornamental.",
-      "Dados numéricos alinhados e legíveis em varredura rápida.",
-      "Mesma linguagem visual em painel, importação, listas, histórico, clientes e ajustes."
+      "Um console flutuante (sidebar) acima de uma bancada plana.",
+      "Isolamento visível: cada cliente em sua própria superfície, sem misturar estados.",
+      "Um único azul de ação; verde, amarelo e vermelho apenas para estado.",
+      "Profundidade em camadas suaves: o conteúdo é plano, o que flutua tem sombra ambiente.",
+      "Dois turnos com o mesmo sistema: aço (escuro) e papel bancário (claro).",
+      "Dados técnicos sempre em monoespaçado com numerais tabulares."
     ],
     "rules": [
-      { "name": "The One Action Voice Rule", "body": "Azul representa interação; roxo e ciano não formam famílias paralelas de ação.", "section": "colors" },
-      { "name": "The Semantic Reserve Rule", "body": "Verde, amarelo e vermelho só comunicam sucesso, atenção e risco.", "section": "colors" },
-      { "name": "The Evidence Type Rule", "body": "Valores técnicos e identificadores usam monoespaçado; explicações e comandos usam sans-serif.", "section": "typography" },
-      { "name": "The Flat-by-Default Rule", "body": "Uma superfície precisa justificar seu nível por função e agrupamento, não por brilho ou elevação decorativa.", "section": "elevation" }
+      { "name": "The One Key Rule", "body": "Só existe uma chave: o azul. Roxo, ciano ou verde nunca formam uma família paralela de ação.", "section": "colors" },
+      { "name": "The Semantic Reserve Rule", "body": "Verde, amarelo e vermelho comunicam estado e mais nada. Sempre acompanhados de texto ou ícone.", "section": "colors" },
+      { "name": "The Two Shifts Rule", "body": "Todo componente novo precisa existir nos dois temas, aço e papel bancário, usando os tokens de tema, nunca hex fixo no componente.", "section": "colors" },
+      { "name": "The Evidence Type Rule", "body": "Valor técnico ou identificador usa monoespaçado; explicação e comando usam sans-serif.", "section": "typography" },
+      { "name": "The Floating Layer Rule", "body": "Só ganha sombra o que flutua sobre a bancada. Card, tabela, campo e botão ficam planos; botões nunca têm sombra.", "section": "elevation" },
+      { "name": "The Brand Panel Rule", "body": "Degradê só em painel de marca dedicado, como a porta do login. Nunca em botões, cards de dados ou estados.", "section": "elevation" },
+      { "name": "The Float-Is-Round Rule", "body": "Quanto mais um elemento flutua, mais arredondado ele é: bancada com 8–12px, console e porta com 24px.", "section": "shapes" }
     ],
     "dos": [
-      "Do priorize o próximo trabalho operacional e o estado do dado.",
-      "Do use azul para ações e foco em todas as páginas.",
-      "Do mantenha numerais, IPs, CIDRs e datas alinhados com fonte monoespaçada.",
+      "Do mantenha cada cliente em sua própria superfície e seu próprio estado. O isolamento é visível.",
+      "Do use Vault Blue para ação, foco e item ativo em todas as telas.",
+      "Do dê sombra ambiente apenas ao que flutua: console, modais, toasts e dicas.",
+      "Do mantenha IPs, CIDRs, datas e contagens em monoespaçado tabular.",
+      "Do construa nos dois temas com os tokens de tema (--accent, --surface, --line…).",
       "Do rebaixe diagnóstico e manutenção para seções recolhíveis."
     ],
     "donts": [
-      "Don't use slogans, heróis, métricas gigantes ou composição de landing page.",
+      "Don't use slogans, heróis, métricas gigantes ou composição de landing page dentro do app.",
       "Don't crie famílias roxa, ciano ou verde para ações comuns.",
-      "Don't use glow, gradientes decorativos ou sombras para simular importância.",
-      "Don't esconda diferenças de risco usando apenas cor; mantenha texto e ícone de estado."
+      "Don't coloque degradê em botões, cards de dados ou estados. Degradê é só para painel de marca.",
+      "Don't dê sombra a cards, tabelas, campos ou botões da bancada.",
+      "Don't comunique risco só por cor; mantenha texto e ícone de estado.",
+      "Don't ofereça autocadastro: a porta só abre para usuários concedidos."
     ]
   }
 }
