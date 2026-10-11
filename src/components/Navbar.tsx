@@ -14,12 +14,15 @@ import {
   Radio,
   Search,
   Sun,
+  KeyRound,
+  Users as UsersIcon,
   UploadCloud,
   X
 } from 'lucide-react';
+import { SessionUser } from '../types';
 import './Sidebar.css';
 
-type AppTab = 'dashboard' | 'import' | 'client-list' | 'intelligence' | 'history' | 'clients' | 'backup';
+export type AppTab = 'dashboard' | 'import' | 'client-list' | 'intelligence' | 'history' | 'clients' | 'users' | 'backup';
 
 interface NavbarProps {
   currentTab: AppTab;
@@ -31,8 +34,9 @@ interface NavbarProps {
   daysSinceBackup: number | null;
   collapsed: boolean;
   onToggleCollapsed: () => void;
-  currentUser?: string | null;
+  currentUser?: SessionUser | null;
   onLogout?: () => void;
+  onChangePassword?: () => void;
 }
 
 const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = [
@@ -44,6 +48,8 @@ const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = 
   { id: 'clients', label: 'Gerenciar clientes', icon: Building2 },
   { id: 'backup', label: 'Backup e ajustes', icon: HardDrive }
 ];
+
+const usersItem = { id: 'users' as AppTab, label: 'Usuários', icon: UsersIcon };
 
 function initials(name: string): string {
   const parts = name.split(/[\s._-]+/).filter(Boolean);
@@ -61,12 +67,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   collapsed,
   onToggleCollapsed,
   currentUser,
-  onLogout
+  onLogout,
+  onChangePassword
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
-  const activeRow = Math.max(0, navItems.findIndex((item) => item.id === currentTab));
-  const displayName = currentUser || 'Uso local';
+  // Usuários aparece só para administradores, antes de Backup e ajustes.
+  const visibleItems = currentUser?.role === 'admin' ? [...navItems.slice(0, -1), usersItem, navItems[navItems.length - 1]] : navItems;
+  const activeRow = Math.max(0, visibleItems.findIndex((item) => item.id === currentTab));
+  const displayName = currentUser?.displayName || 'Uso local';
+  const roleLabel = currentUser ? (currentUser.role === 'admin' ? 'Administrador' : 'Analista') : 'Sem login ativo';
   const themeTarget = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
   const backupLabel = isBackupOutdated
     ? 'Backup pendente'
@@ -150,13 +160,21 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <hr className="gl-divider" />
 
-          <div className="gl-profile" data-tip={displayName}>
+          <button
+            type="button"
+            className="gl-profile"
+            data-tip={`${displayName} · alterar senha`}
+            aria-label={`${displayName}, ${roleLabel}. Alterar senha`}
+            onClick={() => { setMobileOpen(false); onChangePassword?.(); }}
+            disabled={!onChangePassword}
+          >
             <span className="gl-avatar" aria-hidden="true">{initials(displayName)}</span>
             <span className="gl-profile-text label">
               <span className="gl-profile-name">{displayName}</span>
-              <span className="gl-profile-role">{currentUser ? 'Acesso autorizado' : 'Sem login ativo'}</span>
+              <span className="gl-profile-role">{roleLabel}</span>
             </span>
-          </div>
+            <KeyRound className="gl-profile-key label" aria-hidden="true" />
+          </button>
 
           <button type="button" className="gl-row gl-search" onClick={onOpenQuickSearch} data-tip="Consultar IP (Ctrl/⌘ K)" aria-label="Consultar IP">
             <Search aria-hidden="true" />
@@ -166,7 +184,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <ul className="gl-nav" style={{ '--active-row': activeRow } as React.CSSProperties}>
             <li className="gl-indicator" aria-hidden="true" />
-            {navItems.map(({ id, label, icon: Icon }) => (
+            {visibleItems.map(({ id, label, icon: Icon }) => (
               <li key={id}>
                 <button
                   type="button"

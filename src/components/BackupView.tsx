@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
-import { AlertTriangle, Check, HardDriveDownload, HardDriveUpload, Settings } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertTriangle, Check, CloudUpload, HardDriveDownload, HardDriveUpload, Settings } from 'lucide-react';
 import { AppSettings } from '../types';
 import { 
   exportFullBackupJSON, 
   restoreFullBackupJSON, 
   saveAppSettings 
-} from '../db/indexedDb';
+} from '../db/store';
 import { triggerDownload } from '../utils/exporter';
+import { readLegacyBrowserData, type LegacyBrowserData } from '../db/legacyBrowserStore';
 import { getDaysSince } from '../utils/validator';
 import { PageHeader } from './PageHeader';
 
@@ -15,17 +16,60 @@ interface BackupViewProps {
   onRefreshAll: () => void;
   onUpdateSettings: (newSettings: AppSettings) => void;
   onOpenTests: () => void;
+  isAdmin: boolean;
 }
+
+const LEGACY_DISMISSED_KEY = 'guardlist-legacy-migration-dismissed';
 
 export const BackupView: React.FC<BackupViewProps> = ({
   settings,
   onRefreshAll,
   onUpdateSettings,
-  onOpenTests
+  onOpenTests,
+  isAdmin
 }) => {
   const [slaDaysInput, setSlaDaysInput] = useState<number>(settings.slaDays || 7);
   const [sortNumeric, setSortNumeric] = useState<boolean>(settings.sortNumericallyByDefault ?? true);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const [legacy, setLegacy] = useState<LegacyBrowserData | null>(null);
+  const [migrating, setMigrating] = useState(false);
+
+  // Dados de versões anteriores que ficaram só neste navegador.
+  useEffect(() => {
+    if (!isAdmin) return;
+    try {
+      if (window.localStorage.getItem(LEGACY_DISMISSED_KEY) === '1') return;
+    } catch {
+      // Sem armazenamento local: segue mostrando a opção.
+    }
+    readLegacyBrowserData().then(setLegacy).catch(() => setLegacy(null));
+  }, [isAdmin]);
+
+  const dismissLegacy = () => {
+    try {
+      window.localStorage.setItem(LEGACY_DISMISSED_KEY, '1');
+    } catch {
+      // Preferência opcional.
+    }
+    setLegacy(null);
+  };
+
+  const handleMigrateLegacy = async () => {
+    if (!legacy) return;
+    if (!window.confirm(`Enviar ${legacy.clients.length} clientes e ${legacy.entries.length} entradas deste navegador para a base da equipe? Isso substitui todos os dados que estão no servidor hoje.`)) return;
+    setMigrating(true);
+    try {
+      const res = await restoreFullBackupJSON(JSON.stringify(legacy));
+      setStatusMessage({ text: `Dados enviados: ${res.clientsCount} clientes, ${res.entriesCount} entradas e ${res.historyCount} registros de histórico.`, type: 'success' });
+      dismissLegacy();
+      onRefreshAll();
+    } catch (err) {
+      setStatusMessage({ text: `Falha ao enviar: ${err instanceof Error ? err.message : 'erro desconhecido'}`, type: 'error' });
+    } finally {
+      setMigrating(false);
+    }
+  };
 
   const daysSinceBackup = getDaysSince(settings.lastBackupDate);
   const isBackupOutdated = daysSinceBackup === null || daysSinceBackup > 7;
@@ -48,7 +92,7 @@ export const BackupView: React.FC<BackupViewProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm('Atenção: A restauração substituirá todos os dados atuais pelo conteúdo do arquivo de backup. Deseja continuar?')) {
+    if (!window.confirm('A restauração substitui todos os dados da equipe pelo conteúdo do arquivo. Continuar?')) {
       return;
     }
 
@@ -86,7 +130,7 @@ export const BackupView: React.FC<BackupViewProps> = ({
     <div className="space-y-6">
       <PageHeader
         title="Backup e ajustes"
-        description="Os dados ficam salvos neste navegador. Baixe um backup com frequência para não depender de um único computador."
+        description="Os dados ficam no servidor e são compartilhados pela equipe. Baixe um backup de vez em quando para ter uma cópia fora dele."
         actions={
           <span className={isBackupOutdated ? 'chip chip--warn' : 'chip chip--ok'}>
             {daysSinceBackup === null
@@ -126,15 +170,38 @@ export const BackupView: React.FC<BackupViewProps> = ({
             Restaurar backup
           </h2>
           <p className="text-xs text-slate-400 leading-relaxed flex-1">
-            Substitui todos os dados deste navegador pelo conteúdo do arquivo. Antes de restaurar, baixe um backup do estado atual.
+            Substitui todos os dados da equipe pelo conteúdo do arquivo. Antes de restaurar, baixe um backup do estado atual.
           </p>
-          <label className="btn self-start">
-            <HardDriveUpload aria-hidden="true" />
-            Escolher arquivo .json
-            <input type="file" accept=".json" className="hidden" onChange={handleRestoreBackup} />
-          </label>
+          {isAdmin ? (
+            <label className="btn self-start">
+              <HardDriveUpload aria-hidden="true" />
+              Escolher arquivo .json
+              <input type="file" accept=".json" className="hidden" onChange={handleRestoreBackup} />
+            </label>
+          ) : (
+            <p className="text-[11px] text-slate-500">Só administradores podem restaurar backups.</p>
+          )}
         </section>
       </div>
+
+      {legacy && (
+        <section className="data-panel p-5 flex flex-col sm:flex-row sm:items-center gap-4" aria-labelledby="legacy-title">
+          <CloudUpload className="w-5 h-5 text-slate-400 shrink-0" aria-hidden="true" />
+          <div className="flex-1">
+            <h2 id="legacy-title" className="text-sm font-bold text-white">Dados antigos neste navegador</h2>
+            <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+              Antes da base compartilhada, o GuardList guardava os dados em cada navegador. Este tem {legacy.clients.length} clientes
+              e {legacy.entries.length} entradas que podem ir para a base da equipe. O envio substitui o que está no servidor.
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button type="button" className="btn btn--quiet" onClick={dismissLegacy}>Ignorar</button>
+            <button type="button" className="btn btn--primary" onClick={handleMigrateLegacy} disabled={migrating}>
+              {migrating ? 'Enviando…' : 'Enviar para a equipe'}
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="data-panel p-5" aria-labelledby="settings-title">
         <h2 id="settings-title" className="text-sm font-bold text-white flex items-center gap-2 mb-4">

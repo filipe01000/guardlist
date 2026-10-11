@@ -454,3 +454,52 @@
     animation: none;
   }
 }
+
+/* Perfil clicável: abre a troca de senha. */
+button.gl-profile {
+  width: calc(100% - 12px);
+  margin-left: 6px;
+  margin-right: 6px;
+  padding: 6px;
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-quick, 160ms) ease;
+}
+
+button.gl-profile:hover {
+  background: var(--sb-surface);
+}
+
+button.gl-profile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+button.gl-profile:disabled {
+  cursor: default;
+  background: transparent;
+}
+
+.gl-profile-key {
+  margin-left: auto;
+  width: 15px !important;
+  height: 15px !important;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity var(--dur-quick, 160ms) ease;
+}
+
+button.gl-profile:hover .gl-profile-key,
+button.gl-profile:focus-visible .gl-profile-key {
+  opacity: 1;
+}
+
+@media (min-width: 1024px) {
+  .gl-sidebar.collapsed button.gl-profile {
+    width: 58px;
+    margin-left: 6px;
+    padding: 6px 0;
+    justify-content: center;
+  }
+}

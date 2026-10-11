@@ -10,7 +10,13 @@ services:
       - key: NODE_VERSION
         value: "22"
       # Defina os valores no painel do Render (sync: false = não ficam no repositório).
-      # Usuários do login, gerados com `npm run user:add -- <usuario>`.
+      # Banco Postgres da equipe (Neon): cole a connection string completa.
+      - key: DATABASE_URL
+        sync: false
+      # Primeiro administrador: usuário "admin" com esta senha provisória (trocada no 1º acesso).
+      # Opcional se APP_USERS já tiver usuários; ambos só são lidos com o banco vazio.
+      - key: ADMIN_INITIAL_PASSWORD
+        sync: false
       - key: APP_USERS
         sync: false
       - key: SESSION_SECRET

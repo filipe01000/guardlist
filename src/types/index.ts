@@ -132,6 +132,7 @@ export interface ImportHistoryRecord {
   invalidsDiscarded: number;
   totalAfter: number;
   notes?: string;
+  importedBy?: string; // Nome de quem gravou a importação (preenchido pelo servidor)
 }
 
 export interface AppSettings {
@@ -148,4 +149,15 @@ export interface ClientSnapshot {
   label: string; // Ex: "Antes da Importação 2026-W41"
   entriesCount: number;
   entries: BlocklistEntry[];
+}
+
+export interface SessionUser {
+  id: number;
+  username: string;
+  displayName: string;
+  role: 'admin' | 'analyst';
+  active: boolean;
+  mustChangePassword: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
 }

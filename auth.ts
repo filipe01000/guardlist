@@ -1,8 +1,8 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 
-// Usuários vêm de APP_USERS no formato "usuario:scrypt:<salt>:<hash>", separados por vírgula.
-// Gere cada linha com `npm run user:add -- <usuario>`.
+// Senhas (scrypt) e cookie de sessão assinado. Os usuários ficam no banco (server/users.ts);
+// APP_USERS ("usuario:scrypt:<salt>:<hash>", separados por vírgula) só é lido na primeira subida.
 
 const SCRYPT_KEYLEN = 64;
 export const SESSION_COOKIE = 'gl_session';
@@ -14,7 +14,7 @@ export function hashPassword(password: string): string {
   return `scrypt:${salt.toString('hex')}:${hash.toString('hex')}`;
 }
 
-function verifyPassword(password: string, stored: string): boolean {
+export function verifyPassword(password: string, stored: string): boolean {
   const [scheme, saltHex, hashHex] = stored.split(':');
   if (scheme !== 'scrypt' || !saltHex || !hashHex) return false;
   const expected = Buffer.from(hashHex, 'hex');
@@ -33,26 +33,19 @@ export function parseUsers(raw: string | undefined): Map<string, string> {
   return users;
 }
 
-// Hash fictício para que usuário inexistente custe o mesmo tempo que senha errada.
-const dummyHash = hashPassword(randomBytes(16).toString('hex'));
-
-export function checkCredentials(users: Map<string, string>, username: string, password: string): string | null {
-  const normalized = username.trim().toLowerCase();
-  const stored = users.get(normalized);
-  const valid = verifyPassword(password, stored || dummyHash);
-  return stored && valid ? normalized : null;
-}
-
 function sign(secret: string, payload: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
-export function createSessionToken(secret: string, username: string): string {
-  const payload = Buffer.from(JSON.stringify({ u: username, exp: Date.now() + SESSION_TTL_MS })).toString('base64url');
+export function createSessionToken(secret: string, userId: number, sessionVersion: number): string {
+  const payload = Buffer.from(
+    JSON.stringify({ uid: userId, v: sessionVersion, exp: Date.now() + SESSION_TTL_MS })
+  ).toString('base64url');
   return `${payload}.${sign(secret, payload)}`;
 }
 
-export function readSession(secret: string, users: Map<string, string>, req: Request): string | null {
+// Valida assinatura e validade; quem chama confere no banco se o usuário segue ativo e na mesma versão.
+export function readSession(secret: string, req: Request): { userId: number; version: number } | null {
   const token = readCookie(req, SESSION_COOKIE);
   if (!token) return null;
   const [payload, signature] = token.split('.');
@@ -61,10 +54,9 @@ export function readSession(secret: string, users: Map<string, string>, req: Req
   const received = Buffer.from(signature);
   if (expected.length !== received.length || !timingSafeEqual(expected, received)) return null;
   try {
-    const { u, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    // Remover o usuário de APP_USERS invalida as sessões dele.
-    if (typeof u !== 'string' || typeof exp !== 'number' || exp < Date.now() || !users.has(u)) return null;
-    return u;
+    const { uid, v, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (typeof uid !== 'number' || typeof v !== 'number' || typeof exp !== 'number' || exp < Date.now()) return null;
+    return { userId: uid, version: v };
   } catch {
     return null;
   }

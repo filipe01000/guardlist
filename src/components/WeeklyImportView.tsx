@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileText, AlertTriangle, XCircle, RotateCcw, Check, Trash2, Eye, ListChecks } from 'lucide-react';
 import { Client, ImportPreviewSummary, BlocklistEntry, ImportHistoryRecord, ImportPreviewItem } from '../types';
 import { analyzeImportBatch, extractValidIndicatorsFromText } from '../utils/importer';
-import { getClientActiveIndicatorsSet } from '../db/indexedDb';
+import { getClientActiveIndicatorsSet } from '../db/store';
 import { getIsoWeek, ipv4ToNumber, isValidIPv4 } from '../utils/validator';
 import { PageHeader } from './PageHeader';
 

@@ -13,7 +13,7 @@ import {
   restoreClientSnapshot,
   deleteClientEntriesAll,
   deleteSnapshot
-} from '../db/indexedDb';
+} from '../db/store';
 import { 
   generateFirewallTxt, 
   generateNanoFormattedTxt,

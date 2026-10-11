@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { History, Upload } from 'lucide-react';
 import { Client, ImportHistoryRecord } from '../types';
-import { getHistoryRecords } from '../db/indexedDb';
+import { getHistoryRecords } from '../db/store';
 import { PageHeader } from './PageHeader';
 
 interface HistoryViewProps {
@@ -115,15 +115,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
 
           <section className="data-panel">
             <div className="overflow-x-auto">
-              <table className="data-table">
+              <table className="data-table" style={{ minWidth: 980 }}>
                 <colgroup>
-                  <col style={{ width: '16%' }} />
-                  <col style={{ width: '9%' }} />
-                  <col style={{ width: '14%' }} />
-                  <col style={{ width: '8%' }} />
-                  <col style={{ width: '11%' }} />
-                  <col style={{ width: '8%' }} />
-                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '136px' }} />
+                  <col style={{ width: '92px' }} />
+                  <col style={{ width: '120px' }} />
+                  <col style={{ width: '130px' }} />
+                  <col style={{ width: '70px' }} />
+                  <col style={{ width: '104px' }} />
+                  <col style={{ width: '84px' }} />
+                  <col style={{ width: '110px' }} />
                   <col />
                 </colgroup>
                 <thead>
@@ -131,6 +132,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
                     <th>Data</th>
                     <th>Semana</th>
                     <th>Cliente</th>
+                    <th>Por</th>
                     <th className="text-right">Novos</th>
                     <th className="text-right">Descartados</th>
                     <th className="text-right">Inválidos</th>
@@ -144,6 +146,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
                       <td className="font-mono whitespace-nowrap">{new Date(r.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td>
                       <td><span className="data-tag">{r.isoWeek}</span></td>
                       <td className="font-mono font-semibold text-white">{r.clientName}</td>
+                      <td className="truncate" title={r.importedBy}>{r.importedBy || '—'}</td>
                       <td className="text-right font-mono tabular-nums text-emerald-400">+{r.addedCount}</td>
                       <td className="text-right font-mono tabular-nums">{r.duplicatesDiscarded + (r.coveredByCidrDiscarded || 0)}</td>
                       <td className="text-right font-mono tabular-nums">{r.invalidsDiscarded}</td>

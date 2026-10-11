@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Archive, ArchiveRestore, Check, X } from 'lucide-react';
 import { Client } from '../types';
-import { saveClient, renameClient, archiveClient } from '../db/indexedDb';
+import { saveClient, renameClient, archiveClient } from '../db/store';
 import { PageHeader } from './PageHeader';
 
 interface ClientManagerViewProps {
@@ -63,7 +63,7 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
   const handleToggleArchive = async (client: Client) => {
     const next = !client.isArchived;
     const msg = next
-      ? `Deseja arquivar o cliente ${client.name}? Ele sai do painel, mas os dados continuam salvos neste navegador.`
+      ? `Deseja arquivar o cliente ${client.name}? Ele sai do painel para toda a equipe, mas os dados continuam guardados.`
       : `Deseja desarquivar o cliente ${client.name}?`;
 
     if (window.confirm(msg)) {

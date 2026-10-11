@@ -3,7 +3,7 @@
  * Isolado e testável, sem dependências externas.
  */
 
-import { IndicatorType } from '../types';
+import type { IndicatorType } from '../types';
 
 /**
  * Normaliza um indicador bruto:

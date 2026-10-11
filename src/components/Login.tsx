@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Eye, EyeOff, Loader2, LogIn, ShieldCheck } from 'lucide-react';
+import { SessionUser } from '../types';
 import './Login.css';
 
 interface LoginProps {
-  onLogin: (user: string) => void;
+  onLogin: (user: SessionUser) => void;
 }
 
 const Hero: React.FC = () => (

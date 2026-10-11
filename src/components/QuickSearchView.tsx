@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Calendar, Tag, CheckCircle2 } from 'lucide-react';
 import { Client, BlocklistEntry } from '../types';
-import { searchIndicatorAcrossClients } from '../db/indexedDb';
+import { searchIndicatorAcrossClients } from '../db/store';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 
 interface QuickSearchModalProps {

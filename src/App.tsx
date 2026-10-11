@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
-import { Navbar } from './components/Navbar';
+import { Navbar, type AppTab } from './components/Navbar';
+import { UsersView } from './components/UsersView';
+import { ChangePasswordForm } from './components/ChangePasswordForm';
 import { DashboardView } from './components/DashboardView';
 import { WeeklyImportView } from './components/WeeklyImportView';
 import { ClientListView } from './components/ClientListView';
@@ -10,9 +12,8 @@ import { ClientManagerView } from './components/ClientManagerView';
 import { BackupView } from './components/BackupView';
 import { QuickSearchModal } from './components/QuickSearchView';
 import { TestRunnerModal } from './components/TestRunnerModal';
-import { Client, AppSettings, BlocklistEntry, ImportHistoryRecord } from './types';
+import { Client, AppSettings, BlocklistEntry, ImportHistoryRecord, SessionUser } from './types';
 import { 
-  initializeDatabaseIfEmpty, 
   getAllClients, 
   getDashboardStats, 
   getAppSettings,
@@ -21,17 +22,20 @@ import {
   addHistoryRecord,
   getClientEntries,
   getAllActiveEntries
-} from './db/indexedDb';
+} from './db/store';
 import { generateFirewallTxt, generateNanoFormattedTxt, triggerDownload } from './utils/exporter';
 import { getDaysSince } from './utils/validator';
 import { CheckCircle2 } from 'lucide-react';
 
 interface AppProps {
-  currentUser?: string | null;
-  onLogout?: () => void;
+  currentUser: SessionUser;
+  onLogout: () => void;
+  onUserChange: (user: SessionUser) => void;
 }
 
-export default function App({ currentUser = null, onLogout }: AppProps) {
+const LIVE_REFRESH_MS = 60_000;
+
+export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = window.localStorage.getItem('guardlist-theme');
     if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
@@ -44,9 +48,8 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
       return false;
     }
   });
-  const [currentTab, setCurrentTab] = useState<
-    'dashboard' | 'import' | 'client-list' | 'intelligence' | 'history' | 'clients' | 'backup'
-  >('dashboard');
+  const [currentTab, setCurrentTab] = useState<AppTab>('dashboard');
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
 
   const [clients, setClients] = useState<Client[]>([]);
   const [activeCounts, setActiveCounts] = useState<Record<string, number>>({});
@@ -92,14 +95,15 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Carregar dados do IndexedDB
+  // Carrega a base compartilhada da equipe.
   const refreshAllData = useCallback(async () => {
     try {
-      await initializeDatabaseIfEmpty();
-      const loadedClients = await getAllClients();
-      const stats = await getDashboardStats();
-      const loadedSettings = await getAppSettings();
-      const entries = await getAllActiveEntries();
+      const [loadedClients, stats, loadedSettings, entries] = await Promise.all([
+        getAllClients(),
+        getDashboardStats(),
+        getAppSettings(),
+        getAllActiveEntries()
+      ]);
 
       setClients(loadedClients);
       setActiveCounts(stats.activeCounts);
@@ -113,16 +117,29 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
       setAllActiveEntries(entries);
       setSettings(loadedSettings);
 
-      if (!selectedClientId && loadedClients.length > 0) {
-        setSelectedClientId(loadedClients[0].id);
-      }
+      setSelectedClientId((current) => current || loadedClients.find((c) => !c.isArchived)?.id || '');
     } catch (err) {
-      console.error('Erro ao inicializar dados do IndexedDB:', err);
+      console.error('Erro ao carregar os dados da equipe:', err);
     }
-  }, [selectedClientId]);
+  }, []);
 
   useEffect(() => {
     refreshAllData();
+  }, [refreshAllData]);
+
+  // Mantém a tela em dia com o que os colegas alteram: ao voltar para a aba e a cada minuto.
+  useEffect(() => {
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') refreshAllData();
+    };
+    const timer = window.setInterval(refreshIfVisible, LIVE_REFRESH_MS);
+    window.addEventListener('focus', refreshIfVisible);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshIfVisible);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
   }, [refreshAllData]);
 
   useEffect(() => {
@@ -256,6 +273,7 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
         onToggleCollapsed={() => setSidebarCollapsed(value => !value)}
         currentUser={currentUser}
         onLogout={onLogout}
+        onChangePassword={() => setIsPasswordOpen(true)}
       />
 
       {/* Conteúdo Principal */}
@@ -321,16 +339,45 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
           />
         )}
 
+        {currentTab === 'users' && currentUser.role === 'admin' && (
+          <UsersView currentUser={currentUser} />
+        )}
+
         {currentTab === 'backup' && (
           <BackupView
             settings={settings}
             onRefreshAll={refreshAllData}
             onUpdateSettings={setSettings}
             onOpenTests={() => setIsTestsOpen(true)}
+            isAdmin={currentUser.role === 'admin'}
           />
         )}
         </div>
       </main>
+
+      {isPasswordOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" onClick={() => setIsPasswordOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="change-password-title"
+            className="data-panel w-full max-w-md p-6"
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.key === 'Escape' && setIsPasswordOpen(false)}
+          >
+            <h2 id="change-password-title" className="text-base font-bold text-white">Alterar senha</h2>
+            <p className="text-xs text-slate-400 mt-1 mb-5">{currentUser.displayName} · {currentUser.username}</p>
+            <ChangePasswordForm
+              onCancel={() => setIsPasswordOpen(false)}
+              onDone={(user) => {
+                setIsPasswordOpen(false);
+                onUserChange(user);
+                showToast('Senha alterada.');
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Modal de Consulta Rápida (Sem misturar dados) */}
       <QuickSearchModal

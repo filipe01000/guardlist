@@ -1,6 +1,6 @@
 # GuardList
 
-Aplicação React + TypeScript para administrar listas de bloqueio, importar e validar indicadores, identificar ocorrências entre clientes e exportar dados. A persistência desta versão é local, no IndexedDB do navegador.
+Aplicação React + TypeScript para administrar listas de bloqueio, importar e validar indicadores, identificar ocorrências entre clientes e exportar dados. Os dados ficam num banco Postgres compartilhado pela equipe (Neon em produção), e cada alteração registra quem a fez.
 
 ## Executar localmente
 
@@ -38,24 +38,31 @@ O repositório já inclui `render.yaml`. No Render, use **New → Blueprint** ap
 
 Variáveis de ambiente (definidas no painel, nunca no repositório):
 
-- `APP_USERS`: usuários que podem entrar. Sem ela, qualquer pessoa com a URL acessa o app e consome a cota das APIs.
+- `DATABASE_URL`: connection string do Postgres da equipe (Neon). Sem ela, o servidor usa um banco local temporário que se perde a cada deploy.
+- `ADMIN_INITIAL_PASSWORD`: senha provisória do primeiro administrador (usuário `admin`), trocada no primeiro acesso. Só é lida com o banco sem usuários.
+- `APP_USERS` (opcional): usuários antigos no formato `usuario:scrypt:...`; com o banco vazio, viram administradores na primeira subida.
 - `SESSION_SECRET`: assina as sessões de login. O `render.yaml` já gera um valor aleatório.
 - `ABUSEIPDB_API_KEY`, `GREYNOISE_API_KEY`, `OTX_API_KEY`: integrações CTI (opcionais).
 - `CTI_RATE_LIMIT_PER_MIN` (padrão 30) e `ABUSE_SUMMARY_RATE_LIMIT_PER_MIN` (padrão 120): limites por IP.
 
-### Usuários
-
-Para criar um usuário, rode localmente:
-
-```bash
-npm run user:add -- maria
-```
-
-O comando pede a senha (mínimo de 10 caracteres) sem mostrá-la e imprime uma linha como `maria:scrypt:...`. Cole essa linha em `APP_USERS` no Render; para vários usuários, separe as linhas por vírgula. Para tirar o acesso de alguém, remova a entrada dessa pessoa: as sessões dela deixam de valer quando o serviço reinicia com a nova variável.
-
 Não defina `HOST` no Render; em produção o servidor já escuta em `0.0.0.0` e usa a `PORT` fornecida pela plataforma.
 
-Os dados ficam no IndexedDB de cada navegador, não no servidor: cada máquina tem sua própria base. Use o backup JSON para transferir ou guardar os dados.
+### Banco de dados (Neon)
+
+1. Crie uma conta em neon.tech e um projeto Postgres (região mais próxima da do Render, por exemplo US East).
+2. Copie a connection string (`postgresql://...?sslmode=require`) e cole em `DATABASE_URL` no Render.
+3. No primeiro deploy, o servidor cria as tabelas sozinho. Não há dados de demonstração em produção.
+
+### Usuários e permissões
+
+- **Administrador:** tudo, mais a tela Usuários (criar contas, mudar papel, desativar, gerar nova senha) e restaurar backups.
+- **Analista:** importa, edita e exporta as listas de todos os clientes.
+
+Contas novas e senhas redefinidas recebem uma senha provisória, trocada obrigatoriamente no primeiro acesso. Desativar alguém, mudar o papel ou redefinir a senha encerra na hora as sessões abertas dessa pessoa. Cada pessoa troca a própria senha clicando no seu nome na barra lateral.
+
+### Migrar os dados de antes
+
+Versões anteriores guardavam os dados no navegador de cada pessoa. Um administrador que abrir **Backup e ajustes** no navegador onde estavam esses dados vê a opção **Enviar para a equipe**. Outra forma é baixar o backup .json na versão antiga e usar **Restaurar backup**.
 
 ## Limitações das integrações CTI
 

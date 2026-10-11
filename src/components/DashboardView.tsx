@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { BlocklistEntry, Client, ImportHistoryRecord } from '../types';
 import { getDaysSince } from '../utils/validator';
-import { getHistoryRecords } from '../db/indexedDb';
+import { getHistoryRecords } from '../db/store';
 import { PageHeader } from './PageHeader';
 
 interface DashboardViewProps {
@@ -419,7 +419,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <p className="flex items-center gap-1.5 text-[11px] text-slate-500 px-1">
             <History className="w-3.5 h-3.5" aria-hidden="true" />
-            Dados salvos neste navegador. Faça backup em Backup e ajustes.
+            Base compartilhada da equipe, atualizada a cada minuto.
           </p>
         </aside>
       </div>
