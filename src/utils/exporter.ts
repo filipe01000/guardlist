@@ -6,6 +6,7 @@
 import { BlocklistEntry } from '../types';
 import { ipv4ToNumber, isValidIPv4 } from './validator';
 import { neutralize } from './csv';
+import { withoutRedundant } from './redundancy';
 
 export function sortEntriesNumerically(entries: BlocklistEntry[]): BlocklistEntry[] {
   return [...entries].sort((a, b) => {
@@ -25,8 +26,14 @@ export function sortEntriesNumerically(entries: BlocklistEntry[]): BlocklistEntr
   });
 }
 
+// Lista que vai para o firewall: só ativos, sem repetidos e sem IPs ou redes já contidos em um CIDR da lista.
+export function firewallEntries(entries: BlocklistEntry[]): BlocklistEntry[] {
+  return withoutRedundant(entries.filter(e => e.status === 'active'), e => e.indicator);
+}
+
 export function generateFirewallTxt(entries: BlocklistEntry[], sortNumeric: boolean = true): string {
-  const list = sortNumeric ? sortEntriesNumerically(entries) : entries;
+  const clean = firewallEntries(entries);
+  const list = sortNumeric ? sortEntriesNumerically(clean) : clean;
   return list.map(e => e.indicator).join('\r\n');
 }
 
@@ -40,7 +47,7 @@ export function generateFirewallTxt(entries: BlocklistEntry[], sortNumeric: bool
  * 10.0.0.0/24
  */
 export function generateNanoFormattedTxt(entries: BlocklistEntry[], sortNumeric: boolean = true): string {
-  const activeEntries = entries.filter(e => e.status === 'active');
+  const activeEntries = firewallEntries(entries);
   const sorted = sortNumeric ? sortEntriesNumerically(activeEntries) : activeEntries;
 
   const uniqueIps: string[] = [];

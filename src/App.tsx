@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { Navbar, type AppTab } from './components/Navbar';
 import { UsersView } from './components/UsersView';
@@ -50,6 +50,14 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     }
   });
   const [currentTab, setCurrentTab] = useState<AppTab>('dashboard');
+  // Tela anterior, para o botão Voltar da importação.
+  const [previousTab, setPreviousTab] = useState<AppTab>('dashboard');
+  const tabRef = useRef<AppTab>('dashboard');
+  useEffect(() => {
+    if (tabRef.current === currentTab) return;
+    setPreviousTab(tabRef.current);
+    tabRef.current = currentTab;
+  }, [currentTab]);
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
 
   const [clients, setClients] = useState<Client[]>([]);
@@ -200,27 +208,38 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     historyRecord: ImportHistoryRecord,
     todayStr: string,
     mode: 'append' | 'replace' = 'append'
-  ) => {
+  ): Promise<number> => {
     const currentActiveEntries = await getClientEntries(clientId, 'active');
     historyRecord.totalBefore = currentActiveEntries.length;
+    const appendNote = (text: string) => {
+      historyRecord.notes = (historyRecord.notes ? historyRecord.notes + ' • ' : '') + text;
+    };
 
+    let retired = 0;
     if (mode === 'replace') {
       const res = await replaceClientEntries(entries, clientId, todayStr);
-      historyRecord.totalAfter = entries.length;
+      retired = res.retired;
       historyRecord.addedCount = res.added;
-      historyRecord.notes = (historyRecord.notes ? historyRecord.notes + ' • ' : '') + `Modo Substituir (-${res.removed} itens arquivados)`;
+      historyRecord.totalAfter = res.previousTotal + res.added - res.removed;
+      appendNote(`Modo Substituir (-${res.removed} itens arquivados)`);
     } else {
-      historyRecord.totalAfter = currentActiveEntries.length + entries.length;
-      await bulkInsertEntries(entries, clientId, todayStr);
+      const res = await bulkInsertEntries(entries, clientId, todayStr);
+      retired = res.retired;
+      historyRecord.totalAfter = currentActiveEntries.length + entries.length - retired;
+      if (retired > 0) appendNote(`${retired} já na lista retirados por repetição ou cobertura de CIDR`);
     }
 
     await addHistoryRecord(historyRecord);
     await refreshAllData();
+    return retired;
   };
 
-  const handleImportSuccess = (clientId: string, addedCount: number) => {
+  const handleImportSuccess = (clientId: string, addedCount: number, retiredCount = 0) => {
     setSelectedClientId(clientId);
-    showToast(`${addedCount} indicadores gravados na lista do cliente.`);
+    const retiredText = retiredCount > 0
+      ? ` ${retiredCount} ${retiredCount === 1 ? 'item ficou coberto e foi retirado' : 'itens ficaram cobertos e foram retirados'}.`
+      : '';
+    showToast(`${addedCount} indicadores gravados na lista do cliente.${retiredText}`);
     setCurrentTab('client-list');
   };
 
@@ -316,6 +335,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             initialClientId={importTargetClientId || selectedClientId}
             onImportSuccess={handleImportSuccess}
             onSaveBatch={handleSaveImportBatch}
+            onBack={() => setCurrentTab(previousTab === 'import' ? 'dashboard' : previousTab)}
           />
         )}
 
@@ -325,6 +345,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             selectedClientId={selectedClientId}
             onSelectClient={setSelectedClientId}
             onRefreshStats={refreshAllData}
+            onAddIndicators={handleNavigateToImport}
           />
         )}
 

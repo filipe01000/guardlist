@@ -6,13 +6,8 @@
  */
 
 import { ImportPreviewItem, ImportPreviewSummary } from '../types';
-import { 
-  normalizeIndicator, 
-  classifyIndicator, 
-  isIpv4InCidr, 
-  isCidrInCidr, 
-  checkReservedRange 
-} from './validator';
+import { normalizeIndicator, classifyIndicator, checkReservedRange } from './validator';
+import { findRedundant } from './redundancy';
 
 /**
  * Remove cabeçalhos NANO e divide qualquer texto em tokens individuais
@@ -78,30 +73,30 @@ export function extractValidIndicatorsFromText(rawText: string): string[] {
   return validList;
 }
 
+/**
+ * Analisa um lote contra a lista ativa do cliente.
+ * - append: o lote se soma à lista; algo coberto por um CIDR da lista ou do próprio lote não entra, e itens
+ *   da lista que um CIDR novo passa a cobrir aparecem em `superseded` (o servidor os retira ao gravar).
+ * - replace: a lista passa a ser o lote; só o próprio lote serve de referência de cobertura.
+ */
 export function analyzeImportBatch(
   rawInput: string,
   existingActiveSet: Set<string>,
-  existingActiveCidrs: string[]
+  _existingActiveCidrs: string[] = [],
+  mode: 'append' | 'replace' = 'append'
 ): ImportPreviewSummary {
   const tokens = extractTokensFromRawInput(rawInput);
-  
+
   const seenInThisBatch = new Set<string>();
   const items: ImportPreviewItem[] = [];
-
-  let newCount = 0;
-  let dupInFileCount = 0;
-  let alreadyExistsCount = 0;
-  let coveredByCidrCount = 0;
-  let invalidCount = 0;
-  let reservedWarningCount = 0;
+  const existingLower = new Set([...existingActiveSet].map((indicator) => indicator.toLowerCase()));
 
   for (const { token, original } of tokens) {
     const normalized = normalizeIndicator(token);
     const classification = classifyIndicator(normalized);
 
-    // 1. Sintaxe Inválida (palavras, erros, etc.)
+    // 1. Sintaxe inválida (palavras, erros etc.)
     if (!classification.isValid) {
-      invalidCount++;
       items.push({
         indicator: normalized || token,
         original,
@@ -112,93 +107,60 @@ export function analyzeImportBatch(
       continue;
     }
 
-    // 2. Duplicado dentro do próprio arquivo/texto importado
+    // 2. Repetido dentro do próprio arquivo/texto
     if (seenInThisBatch.has(normalized)) {
-      dupInFileCount++;
-      items.push({
-        indicator: normalized,
-        original,
-        type: classification.type,
-        category: 'dup_in_file'
-      });
+      items.push({ indicator: normalized, original, type: classification.type, category: 'dup_in_file' });
       continue;
     }
     seenInThisBatch.add(normalized);
 
-    // 3. Já existente na lista ativa do cliente
-    if (existingActiveSet.has(normalized)) {
-      alreadyExistsCount++;
-      items.push({
-        indicator: normalized,
-        original,
-        type: classification.type,
-        category: 'already_exists'
-      });
+    // 3. Já está na lista ativa do cliente
+    if (existingLower.has(normalized)) {
+      items.push({ indicator: normalized, original, type: classification.type, category: 'already_exists' });
       continue;
     }
 
-    // 4. Já coberto por um CIDR existente do cliente (ex: 10.0.0.5 dentro de 10.0.0.0/24)
-    let coveringCidr: string | null = null;
-    if (classification.type === 'IPv4') {
-      for (const cidr of existingActiveCidrs) {
-        if (isIpv4InCidr(normalized, cidr)) {
-          coveringCidr = cidr;
-          break;
-        }
-      }
-    } else if (classification.type === 'CIDR_v4') {
-      for (const cidr of existingActiveCidrs) {
-        if (isCidrInCidr(normalized, cidr)) {
-          coveringCidr = cidr;
-          break;
-        }
-      }
-    }
-
-    if (coveringCidr) {
-      coveredByCidrCount++;
-      items.push({
-        indicator: normalized,
-        original,
-        type: classification.type,
-        category: 'covered_by_cidr',
-        coveredByCidr: coveringCidr
-      });
-      continue;
-    }
-
-    // 5. Verificação de Alertas: Faixas Reservadas / Privadas (RFC1918)
-    const reserved = checkReservedRange(normalized);
-    if (reserved.isReserved) {
-      reservedWarningCount++;
-      items.push({
-        indicator: normalized,
-        original,
-        type: classification.type,
-        category: 'reserved_warning',
-        reservedReason: reserved.reason
-      });
-      continue;
-    }
-
-    // 6. Novo válido pronto para inclusão
-    newCount++;
-    items.push({
-      indicator: normalized,
-      original,
-      type: classification.type,
-      category: 'new'
-    });
+    items.push({ indicator: normalized, original, type: classification.type, category: 'new' });
   }
 
+  // 4. Cobertura por CIDR (e repetições equivalentes, como 1.2.3.4 e 1.2.3.4/32).
+  //    A lista atual vem primeiro, para que em empate o item já gravado seja o mantido.
+  type Ref = { indicator: string; item?: ImportPreviewItem };
+  const batchRefs: Ref[] = items
+    .filter((item) => item.category === 'new' || (mode === 'replace' && item.category === 'already_exists'))
+    .map((item) => ({ indicator: item.indicator, item }));
+  const existingRefs: Ref[] = mode === 'append' ? [...existingActiveSet].map((indicator) => ({ indicator })) : [];
+  const superseded: ImportPreviewSummary['superseded'] = [];
+
+  for (const match of findRedundant([...existingRefs, ...batchRefs], (ref) => ref.indicator)) {
+    if (match.item.item) {
+      match.item.item.category = 'covered_by_cidr';
+      match.item.item.coveredByCidr = match.coveredBy;
+    } else {
+      superseded.push({ indicator: match.item.indicator, coveredBy: match.coveredBy });
+    }
+  }
+
+  // 5. Faixas reservadas/privadas (RFC 1918 etc.) ficam como alerta, fora da gravação por padrão.
+  for (const item of items) {
+    if (item.category !== 'new') continue;
+    const reserved = checkReservedRange(item.indicator);
+    if (reserved.isReserved) {
+      item.category = 'reserved_warning';
+      item.reservedReason = reserved.reason;
+    }
+  }
+
+  const count = (category: ImportPreviewItem['category']) => items.filter((item) => item.category === category).length;
   return {
     totalLines: items.length,
-    newCount,
-    dupInFileCount,
-    alreadyExistsCount,
-    coveredByCidrCount,
-    invalidCount,
-    reservedWarningCount,
-    items
+    newCount: count('new'),
+    dupInFileCount: count('dup_in_file'),
+    alreadyExistsCount: count('already_exists'),
+    coveredByCidrCount: count('covered_by_cidr'),
+    invalidCount: count('invalid'),
+    reservedWarningCount: count('reserved_warning'),
+    items,
+    superseded
   };
 }

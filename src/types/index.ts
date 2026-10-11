@@ -102,7 +102,7 @@ export interface ImportPreviewItem {
     | 'new' // Novo, será importado
     | 'dup_in_file' // Duplicado no próprio arquivo/texto importado
     | 'already_exists' // Já existe na lista ativa do cliente
-    | 'covered_by_cidr' // Já coberto por um CIDR existente do cliente
+    | 'covered_by_cidr' // Coberto por um CIDR da lista do cliente ou do próprio lote
     | 'invalid' // Formato inválido
     | 'reserved_warning'; // IP privado/reservado com alerta
   coveredByCidr?: string;
@@ -119,6 +119,8 @@ export interface ImportPreviewSummary {
   invalidCount: number;
   reservedWarningCount: number;
   items: ImportPreviewItem[];
+  // Itens que já estão na lista e passam a ficar cobertos por um CIDR novo deste lote (retirados ao gravar).
+  superseded: Array<{ indicator: string; coveredBy: string }>;
 }
 
 export interface ImportHistoryRecord {

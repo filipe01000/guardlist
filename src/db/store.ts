@@ -40,10 +40,13 @@ export async function getClientActiveIndicatorsSet(clientId: string): Promise<{ 
 }
 
 export const bulkInsertEntries = (entries: BlocklistEntry[], clientId: string, lastUpdateDateStr: string) =>
-  call<null>('bulkInsertEntries', entries, clientId, lastUpdateDateStr);
+  call<{ retired: number }>('bulkInsertEntries', entries, clientId, lastUpdateDateStr);
 
 export const replaceClientEntries = (newEntries: BlocklistEntry[], clientId: string, lastUpdateDateStr: string) =>
-  call<{ added: number; removed: number; previousTotal: number }>('replaceClientEntries', newEntries, clientId, lastUpdateDateStr);
+  call<{ added: number; removed: number; previousTotal: number; retired: number }>('replaceClientEntries', newEntries, clientId, lastUpdateDateStr);
+
+// Retira repetidos e itens cobertos por CIDR da lista ativa (com versão salva antes).
+export const cleanRedundantEntries = (clientId: string) => call<{ retired: number }>('cleanRedundantEntries', clientId);
 
 export const updateEntryStatus = (id: string, status: 'active' | 'removed') => call<null>('updateEntryStatus', id, status);
 export const updateEntryNotes = (id: string, notes: string) => call<null>('updateEntryNotes', id, notes);

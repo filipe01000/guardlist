@@ -6,6 +6,7 @@ import type {
   ClientSnapshot,
   ImportHistoryRecord
 } from '../src/types/index.ts';
+import { findRedundant } from '../src/utils/redundancy.ts';
 
 // Operações da base compartilhada da equipe. Espelham as funções que o app usava no IndexedDB,
 // agora no Postgres, registrando quem fez cada alteração.
@@ -95,6 +96,29 @@ async function snapshot(q: Query, clientId: string, label: string, actor: Actor)
     [clientId, SNAPSHOTS_PER_CLIENT]
   );
   return snap;
+}
+
+// Retira da lista ativa o que está repetido ou contido em um CIDR maior da mesma lista.
+// Fica o item mais abrangente; entre iguais, o mais antigo. O retirado vira 'removido' com o motivo na observação.
+async function retireRedundant(q: Query, clientId: string, actor: Actor): Promise<number> {
+  const active = (await entriesOf(q, clientId, 'active')).sort(
+    (a, b) => String(a.addedDate || '').localeCompare(String(b.addedDate || '')) || a.id.localeCompare(b.id)
+  );
+  const matches = findRedundant(active, (e) => e.indicator);
+  if (matches.length === 0) return 0;
+  const now = new Date().toISOString();
+  const retired = matches.map(({ item, coveredBy, reason }) => ({
+    ...item,
+    status: 'removed' as const,
+    removedAt: now,
+    removedBy: actor.displayName,
+    notes:
+      (item.notes ? `${item.notes} • ` : '') +
+      (reason === 'duplicate' ? `Repetido de ${coveredBy}` : `Coberto pelo CIDR ${coveredBy}`)
+  }));
+  await upsertEntries(q, retired, actor);
+  await audit(q, actor, 'entries.dedupe', { clientId, removed: retired.length });
+  return retired.length;
 }
 
 function requireAdmin(actor: Actor) {
@@ -218,24 +242,25 @@ export function createStore(db: Database) {
 
     async bulkInsertEntries(actor: Actor, entries: BlocklistEntry[], clientId: string, lastUpdateDateStr: string) {
       const list = asArray<BlocklistEntry>(entries, 'entries').map((e) => ({ ...e, clientId, addedBy: actor.displayName }));
-      await db.tx(async (q) => {
+      return db.tx(async (q) => {
         const client = await getClient(q, clientId);
         if (!client) throw new StoreError('Cliente não encontrado.', 404);
         await snapshot(q, clientId, `Antes da importação de ${list.length} novos itens (${lastUpdateDateStr})`, actor);
         await upsertEntries(q, list, actor);
+        const retired = await retireRedundant(q, clientId, actor);
         await putClient(
           q,
           {
             ...client,
-            lastVariation: { added: list.length, removed: 0, previousTotal: client.lastVariation?.previousTotal || 0 },
+            lastVariation: { added: list.length, removed: retired, previousTotal: client.lastVariation?.previousTotal || 0 },
             lastUpdateDate: lastUpdateDateStr,
             updatedAt: new Date().toISOString()
           },
           actor
         );
-        await audit(q, actor, 'entries.import', { clientId, name: client.name, added: list.length, mode: 'append' });
+        await audit(q, actor, 'entries.import', { clientId, name: client.name, added: list.length, removed: retired, mode: 'append' });
+        return { retired };
       });
-      return null;
     },
 
     async replaceClientEntries(actor: Actor, newEntries: BlocklistEntry[], clientId: string, lastUpdateDateStr: string) {
@@ -272,13 +297,27 @@ export function createStore(db: Database) {
           }
         }
         await upsertEntries(q, changed, actor);
+        const retired = await retireRedundant(q, clientId, actor);
+        removed += retired;
         await putClient(
           q,
           { ...client, lastVariation: { added, removed, previousTotal }, lastUpdateDate: lastUpdateDateStr, updatedAt: new Date().toISOString() },
           actor
         );
         await audit(q, actor, 'entries.import', { clientId, name: client.name, added, removed, mode: 'replace' });
-        return { added, removed, previousTotal };
+        return { added, removed, previousTotal, retired };
+      });
+    },
+
+    // Limpeza manual: retira repetidos e itens cobertos por CIDR da lista ativa, com versão salva antes.
+    async cleanRedundantEntries(actor: Actor, clientId: string) {
+      return db.tx(async (q) => {
+        const client = await getClient(q, asString(clientId, 'clientId'));
+        if (!client) throw new StoreError('Cliente não encontrado.', 404);
+        const active = await entriesOf(q, clientId, 'active');
+        if (findRedundant(active, (e) => e.indicator).length === 0) return { retired: 0 };
+        await snapshot(q, clientId, 'Antes de retirar repetidos e itens cobertos por CIDR', actor);
+        return { retired: await retireRedundant(q, clientId, actor) };
       });
     },
 
@@ -659,6 +698,7 @@ export const PUBLIC_OPS = [
   'getClientActiveIndicatorsSet',
   'bulkInsertEntries',
   'replaceClientEntries',
+  'cleanRedundantEntries',
   'updateEntryStatus',
   'updateEntryNotes',
   'bulkDeleteEntries',

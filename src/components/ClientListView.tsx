@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw } from 'lucide-react';
+import { Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus } from 'lucide-react';
 import { Client, BlocklistEntry, IndicatorType, IndicatorStatus, ClientSnapshot } from '../types';
 import { IpDossierModal } from './IpDossierModal';
 import { PageHeader } from './PageHeader';
@@ -12,8 +12,10 @@ import {
   getClientSnapshots,
   restoreClientSnapshot,
   deleteClientEntriesAll,
-  deleteSnapshot
+  deleteSnapshot,
+  cleanRedundantEntries
 } from '../db/store';
+import { findRedundant, type RedundantMatch } from '../utils/redundancy';
 import { 
   generateFirewallTxt, 
   generateNanoFormattedTxt,
@@ -36,13 +38,15 @@ interface ClientListViewProps {
   selectedClientId: string;
   onSelectClient: (clientId: string) => void;
   onRefreshStats: () => void;
+  onAddIndicators: (clientId: string) => void;
 }
 
 export const ClientListView: React.FC<ClientListViewProps> = ({
   clients,
   selectedClientId,
   onSelectClient,
-  onRefreshStats
+  onRefreshStats,
+  onAddIndicators
 }) => {
   const activeClients = clients.filter(c => !c.isArchived);
   const currentClient = activeClients.find(c => c.id === selectedClientId) || activeClients[0];
@@ -91,7 +95,8 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
   // Verificação de Duplicatas
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
-  const [duplicateGroups, setDuplicateGroups] = useState<Array<{ indicator: string; items: BlocklistEntry[] }>>([]);
+  const [redundantMatches, setRedundantMatches] = useState<RedundantMatch<BlocklistEntry>[]>([]);
+  const [isCleaningRedundant, setIsCleaningRedundant] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
   // Modal de Exportação / Pré-visualização NANO
@@ -484,50 +489,29 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     setTimeout(() => setCopiedIndicator(null), 2000);
   };
 
-  // Verificar Duplicatas na Lista Inteira
+  // Repetidos e itens já cobertos por um CIDR da lista ativa (mesma regra do servidor: fica o mais antigo/abrangente)
   const handleCheckDuplicates = () => {
     setIsCheckingDuplicates(true);
-    const activeEntries = entries.filter(e => e.status === 'active');
-    const map = new Map<string, BlocklistEntry[]>();
-
-    for (const e of activeEntries) {
-      if (!map.has(e.indicator)) {
-        map.set(e.indicator, []);
-      }
-      map.get(e.indicator)!.push(e);
-    }
-
-    const groups: Array<{ indicator: string; items: BlocklistEntry[] }> = [];
-    for (const [ind, items] of map.entries()) {
-      if (items.length > 1) {
-        groups.push({ indicator: ind, items });
-      }
-    }
-
-    setDuplicateGroups(groups);
+    const activeEntries = entries
+      .filter(e => e.status === 'active')
+      .sort((a, b) => String(a.addedDate || '').localeCompare(String(b.addedDate || '')) || a.id.localeCompare(b.id));
+    setRedundantMatches(findRedundant(activeEntries, e => e.indicator));
     setShowDuplicateModal(true);
     setIsCheckingDuplicates(false);
   };
 
-  // Limpar Duplicatas em Lote
+  // Retira os redundantes (ficam como removidos, com o motivo na observação; uma versão é salva antes)
   const handleCleanDuplicatesBatch = async () => {
-    const idsToDelete: string[] = [];
-
-    for (const group of duplicateGroups) {
-      const sorted = [...group.items].sort((a, b) => new Date(b.addedDate).getTime() - new Date(a.addedDate).getTime());
-      for (let i = 1; i < sorted.length; i++) {
-        idsToDelete.push(sorted[i].id);
-      }
-    }
-
-    if (idsToDelete.length > 0) {
-      // Snapshot automático antes da limpeza
-      await createClientSnapshot(currentClient.id, `Antes de limpar ${idsToDelete.length} duplicatas`);
-      await bulkDeleteEntries(idsToDelete);
+    if (!currentClient || redundantMatches.length === 0) return;
+    setIsCleaningRedundant(true);
+    try {
+      await cleanRedundantEntries(currentClient.id);
       await loadClientData();
       await loadSnapshots();
       onRefreshStats();
       setShowDuplicateModal(false);
+    } finally {
+      setIsCleaningRedundant(false);
     }
   };
 
@@ -539,16 +523,24 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
         title="Listas dos clientes"
         description="Cada lista é isolada: buscas, marcações e exportações valem só para o cliente selecionado."
         actions={
-          <select
-            value={currentClient?.id}
-            onChange={(e) => onSelectClient(e.target.value)}
-            className="field font-mono font-bold text-[0.9rem] min-w-[180px]"
-            aria-label="Cliente"
-          >
-            {activeClients.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          <>
+            <select
+              value={currentClient?.id}
+              onChange={(e) => onSelectClient(e.target.value)}
+              className="field font-mono font-bold text-[0.9rem] min-w-[180px]"
+              aria-label="Cliente"
+            >
+              {activeClients.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {currentClient && (
+              <button type="button" className="btn" onClick={() => onAddIndicators(currentClient.id)}>
+                <Plus aria-hidden="true" />
+                Adicionar indicadores
+              </button>
+            )}
+          </>
         }
       />
 
@@ -598,10 +590,10 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
             type="button"
             onClick={handleCheckDuplicates}
             className="btn"
-            title="Procurar indicadores repetidos na lista ativa"
+            title="Procurar indicadores repetidos e IPs já cobertos por um CIDR da lista ativa"
           >
             <ScanSearch aria-hidden="true" />
-            Verificar repetidos
+            Validar lista
           </button>
           <button
             type="button"
@@ -1290,7 +1282,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               <div className="flex items-center gap-2">
                 <ScanSearch className="w-5 h-5 text-slate-400" />
                 <h3 className="text-base font-bold text-white">
-                  Repetidos em {currentClient?.name}
+                  Validação da lista · {currentClient?.name}
                 </h3>
               </div>
               <button
@@ -1301,47 +1293,47 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               </button>
             </div>
 
-            {duplicateGroups.length === 0 ? (
+            {redundantMatches.length === 0 ? (
               <div className="py-10 text-center space-y-2">
                 <ShieldCheck className="w-10 h-10 text-emerald-400 mx-auto" />
-                <h4 className="text-sm font-bold text-white">Nenhum repetido encontrado</h4>
+                <h4 className="text-sm font-bold text-white">Nada repetido ou coberto</h4>
                 <p className="text-xs text-slate-400">
-                  Nenhum IP duplicado foi encontrado na blocklist ativa de {currentClient?.name}.
+                  A lista ativa de {currentClient?.name} não tem indicadores repetidos nem IPs dentro de um CIDR da própria lista.
                 </p>
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="p-3 bg-amber-950/40 border border-amber-800 rounded-xl text-xs text-amber-200 flex items-center justify-between">
-                  <div>
-                    Foram encontrados <strong>{duplicateGroups.length}</strong> IPs repetidos.
-                  </div>
+                <div className="notice notice--warn">
+                  <AlertTriangle aria-hidden="true" />
+                  <p>
+                    <strong>{redundantMatches.length}</strong>{' '}
+                    {redundantMatches.length === 1 ? 'item sobra' : 'itens sobram'} na lista ativa
+                    {' '}({redundantMatches.filter(m => m.reason === 'duplicate').length} repetido(s),{' '}
+                    {redundantMatches.filter(m => m.reason === 'cidr').length} dentro de CIDR).
+                    Ao retirar, eles ficam como removidos, com o motivo na observação, e uma versão é salva antes.
+                  </p>
                   <button
+                    type="button"
                     onClick={handleCleanDuplicatesBatch}
-                    className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1.5 rounded-lg transition"
+                    disabled={isCleaningRedundant}
+                    className="btn btn--sm btn--primary whitespace-nowrap"
                   >
-                    Remover repetidos (mantém o mais recente)
+                    {isCleaningRedundant ? 'Retirando…' : `Retirar ${redundantMatches.length}`}
                   </button>
                 </div>
 
-                <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
-                  {duplicateGroups.map((group, idx) => (
-                    <div key={idx} className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-mono font-bold text-white text-sm">
-                          {group.indicator}
-                        </span>
-                        <span className="text-rose-400 font-semibold">
-                          {group.items.length} repetições
-                        </span>
+                <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-800 p-1.5 font-mono text-xs">
+                  {redundantMatches.map(match => (
+                    <div key={match.item.id} className="preview-row">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="font-semibold text-white truncate">{match.item.indicator}</span>
+                        <span className="data-tag">{match.item.type.replace('_', ' ')}</span>
+                        <span className="text-[11px] text-slate-500 font-sans truncate">{match.item.addedDate}</span>
                       </div>
-                      <div className="space-y-1 text-[11px] text-slate-400 font-sans">
-                        {group.items.map((item, i) => (
-                          <div key={item.id} className="flex items-center justify-between bg-slate-900/60 p-1.5 rounded">
-                            <span>Data: {item.addedDate} | Ticket: {item.sourceTicket || 'S/N'}</span>
-                            {i === 0 && <span className="text-emerald-400 font-bold">(Será mantido)</span>}
-                          </div>
-                        ))}
-                      </div>
+                      <span className="font-sans text-slate-400 shrink-0">
+                        {match.reason === 'duplicate' ? 'Repetido de ' : 'Coberto por '}
+                        <span className="font-mono text-slate-300">{match.coveredBy}</span>
+                      </span>
                     </div>
                   ))}
                 </div>

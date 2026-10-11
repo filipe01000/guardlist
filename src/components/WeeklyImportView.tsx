@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, AlertTriangle, XCircle, RotateCcw, Check, Trash2, Eye, ListChecks } from 'lucide-react';
+import { FileText, AlertTriangle, XCircle, RotateCcw, Check, Trash2, Eye, ListChecks, ArrowLeft, Info } from 'lucide-react';
 import { Client, ImportPreviewSummary, BlocklistEntry, ImportHistoryRecord, ImportPreviewItem } from '../types';
 import { analyzeImportBatch, extractValidIndicatorsFromText } from '../utils/importer';
 import { getClientActiveIndicatorsSet } from '../db/store';
@@ -9,21 +9,23 @@ import { PageHeader } from './PageHeader';
 interface WeeklyImportViewProps {
   clients: Client[];
   initialClientId?: string;
-  onImportSuccess: (clientId: string, addedCount: number) => void;
+  onImportSuccess: (clientId: string, addedCount: number, retiredCount?: number) => void;
+  onBack: () => void;
   onSaveBatch: (
     entries: BlocklistEntry[],
     clientId: string,
     historyRecord: ImportHistoryRecord,
     todayStr: string,
     mode?: 'append' | 'replace'
-  ) => Promise<void>;
+  ) => Promise<number>;
 }
 
 export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
   clients,
   initialClientId,
   onImportSuccess,
-  onSaveBatch
+  onSaveBatch,
+  onBack
 }) => {
   const activeClients = clients.filter(c => !c.isArchived);
   const [selectedClientId, setSelectedClientId] = useState<string>(
@@ -92,9 +94,9 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
   };
 
   // Remover um item inválido específico
-  const handleRemoveInvalidItem = (idxToRemove: number) => {
+  const handleRemoveInvalidItem = (itemToRemove: ImportPreviewItem) => {
     if (!preview) return;
-    const filteredItems = preview.items.filter((_, idx) => idx !== idxToRemove);
+    const filteredItems = preview.items.filter(item => item !== itemToRemove);
     const newInvalidCount = filteredItems.filter(i => i.category === 'invalid').length;
     setPreview({
       ...preview,
@@ -112,7 +114,7 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
     try {
       // Obter indicadores e CIDRs ativos exclusivos deste cliente
       const { activeSet, activeCidrs } = await getClientActiveIndicatorsSet(selectedClientId);
-      const summary = analyzeImportBatch(rawText, activeSet, activeCidrs);
+      const summary = analyzeImportBatch(rawText, activeSet, activeCidrs, importMode);
       setPreview(summary);
 
       // Posicionar na primeira aba com itens
@@ -147,6 +149,8 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
     // Itens que serão gravados
     const itemsToSave = preview.items.filter(item => {
       if (item.category === 'new') return true;
+      // Ao substituir, os que já estão na lista também seguem no lote, senão seriam arquivados.
+      if (importMode === 'replace' && item.category === 'already_exists') return true;
       if (includeReservedAlerts && item.category === 'reserved_warning') return true;
       return false;
     });
@@ -186,8 +190,9 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
     };
 
     try {
-      await onSaveBatch(entriesToSave, selectedClient.id, historyRecord, today, importMode);
-      onImportSuccess(selectedClient.id, entriesToSave.length);
+      const retired = await onSaveBatch(entriesToSave, selectedClient.id, historyRecord, today, importMode);
+      const added = importMode === 'replace' ? historyRecord.addedCount : entriesToSave.length;
+      onImportSuccess(selectedClient.id, added, retired);
       // Resetar form
       setPreview(null);
       setRawText('');
@@ -201,6 +206,12 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
     }
   };
 
+  // Novos (e alertas incluídos) que serão gravados; ao substituir, a lista final soma os que já estavam nela.
+  const toSaveCount = preview
+    ? preview.newCount + (includeReservedAlerts ? preview.reservedWarningCount : 0)
+    : 0;
+  const finalCount = preview && importMode === 'replace' ? toSaveCount + preview.alreadyExistsCount : toSaveCount;
+
   const handleResetPreview = () => {
     setPreview(null);
   };
@@ -210,6 +221,12 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
       <PageHeader
         title="Importação semanal"
         description="Cole os indicadores da semana ou carregue o arquivo. Nada é gravado antes da pré-visualização, e a deduplicação considera só o cliente escolhido."
+        actions={
+          <button type="button" onClick={onBack} className="btn">
+            <ArrowLeft aria-hidden="true" />
+            Voltar
+          </button>
+        }
       />
 
       {!preview ? (
@@ -363,7 +380,7 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
               <p className={`text-xs mt-1.5 ${importMode === 'replace' ? 'text-amber-300' : 'text-slate-400'}`}>
                 {importMode === 'replace'
                   ? 'A lista ativa vai ficar igual a este lote. O que estiver fora dele será arquivado, com uma versão salva para desfazer.'
-                  : `${preview.totalLines} linhas lidas. Só os indicadores novos entram; os existentes não mudam.`}
+                  : `${preview.totalLines} linhas lidas. Só os indicadores novos entram.`}
               </p>
             </div>
 
@@ -374,12 +391,14 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
               </button>
               <button
                 type="button"
-                disabled={(preview.newCount === 0 && (!includeReservedAlerts || preview.reservedWarningCount === 0)) || isSubmitting}
+                disabled={finalCount === 0 || isSubmitting}
                 onClick={handleConfirmImport}
                 className="btn btn--primary"
               >
                 <Check aria-hidden="true" />
-                {importMode === 'replace' ? 'Substituir' : 'Gravar'} {includeReservedAlerts ? preview.newCount + preview.reservedWarningCount : preview.newCount} itens
+                {importMode === 'replace'
+                  ? `Substituir pela lista de ${finalCount} ${finalCount === 1 ? 'item' : 'itens'}`
+                  : `Gravar ${toSaveCount} ${toSaveCount === 1 ? 'item' : 'itens'}`}
               </button>
             </div>
           </div>
@@ -406,6 +425,22 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
               </button>
             ))}
           </div>
+
+          {preview.superseded.length > 0 && (
+            <div className="notice">
+              <Info aria-hidden="true" />
+              <p>
+                {preview.superseded.length === 1
+                  ? '1 item que já está na lista fica coberto e será retirado ao gravar'
+                  : `${preview.superseded.length} itens que já estão na lista ficam cobertos e serão retirados ao gravar`}
+                {': '}
+                <span className="font-mono">
+                  {preview.superseded.slice(0, 6).map(s => `${s.indicator} → ${s.coveredBy}`).join(', ')}
+                  {preview.superseded.length > 6 ? ' …' : ''}
+                </span>
+              </p>
+            </div>
+          )}
 
           {activeTab === 'reserved_warning' && preview.reservedWarningCount > 0 && (
             <div className="notice notice--warn">
@@ -468,7 +503,7 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
                           <span className="text-rose-400">{item.error}</span>
                           <button
                             type="button"
-                            onClick={() => handleRemoveInvalidItem(idx)}
+                            onClick={() => handleRemoveInvalidItem(item)}
                             className="btn btn--sm btn--icon btn--quiet"
                             title="Remover esta linha"
                             aria-label={`Remover ${item.indicator}`}
