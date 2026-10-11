@@ -89,6 +89,9 @@ export interface BlocklistEntry {
   isReservedAlert?: boolean; // Se for IP privado/reservado (RFC1918, loopback, etc.)
   reservedReason?: string;
   numericValue?: number; // Para ordenação numérica de IPv4
+  addedBy?: string; // Quem incluiu (preenchido pelo servidor)
+  removedAt?: string; // Quando foi marcado como removido (ISO)
+  removedBy?: string; // Quem removeu
 }
 
 export interface ImportPreviewItem {

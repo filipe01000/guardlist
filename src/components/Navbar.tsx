@@ -14,6 +14,7 @@ import {
   Radio,
   Search,
   Sun,
+  FileSpreadsheet,
   KeyRound,
   Users as UsersIcon,
   UploadCloud,
@@ -22,7 +23,7 @@ import {
 import { SessionUser } from '../types';
 import './Sidebar.css';
 
-export type AppTab = 'dashboard' | 'import' | 'client-list' | 'intelligence' | 'history' | 'clients' | 'users' | 'backup';
+export type AppTab = 'dashboard' | 'import' | 'client-list' | 'intelligence' | 'history' | 'reports' | 'clients' | 'users' | 'backup';
 
 interface NavbarProps {
   currentTab: AppTab;
@@ -45,6 +46,7 @@ const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = 
   { id: 'import', label: 'Importação semanal', icon: UploadCloud },
   { id: 'client-list', label: 'Listas dos clientes', icon: ListFilter },
   { id: 'history', label: 'Histórico semanal', icon: History },
+  { id: 'reports', label: 'Relatórios', icon: FileSpreadsheet },
   { id: 'clients', label: 'Gerenciar clientes', icon: Building2 },
   { id: 'backup', label: 'Backup e ajustes', icon: HardDrive }
 ];

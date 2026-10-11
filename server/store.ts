@@ -195,7 +195,7 @@ export function createStore(db: Database) {
     },
 
     async bulkInsertEntries(actor: Actor, entries: BlocklistEntry[], clientId: string, lastUpdateDateStr: string) {
-      const list = asArray<BlocklistEntry>(entries, 'entries').map((e) => ({ ...e, clientId }));
+      const list = asArray<BlocklistEntry>(entries, 'entries').map((e) => ({ ...e, clientId, addedBy: actor.displayName }));
       await db.tx(async (q) => {
         const client = await getClient(q, clientId);
         if (!client) throw new StoreError('Cliente não encontrado.', 404);
@@ -217,7 +217,7 @@ export function createStore(db: Database) {
     },
 
     async replaceClientEntries(actor: Actor, newEntries: BlocklistEntry[], clientId: string, lastUpdateDateStr: string) {
-      const list = asArray<BlocklistEntry>(newEntries, 'entries').map((e) => ({ ...e, clientId }));
+      const list = asArray<BlocklistEntry>(newEntries, 'entries').map((e) => ({ ...e, clientId, addedBy: actor.displayName }));
       return db.tx(async (q) => {
         const client = await getClient(q, clientId);
         if (!client) throw new StoreError('Cliente não encontrado.', 404);
@@ -236,6 +236,8 @@ export function createStore(db: Database) {
             changed.push({
               ...old,
               status: 'removed',
+              removedAt: new Date().toISOString(),
+              removedBy: actor.displayName,
               notes: (old.notes ? `${old.notes} • ` : '') + `Removido na sincronização semanal (${lastUpdateDateStr})`
             });
             removed++;
@@ -262,9 +264,12 @@ export function createStore(db: Database) {
       if (status !== 'active' && status !== 'removed') throw new StoreError('Situação inválida.');
       await db.tx(async (q) => {
         await q(
-          `UPDATE entries SET status = $2, data = jsonb_set(data, '{status}', to_jsonb($2::text)),
+          `UPDATE entries SET status = $2,
+             data = CASE WHEN $2 = 'removed'
+               THEN data || jsonb_build_object('status', $2::text, 'removedAt', to_jsonb(now()), 'removedBy', $4::text)
+               ELSE (data - 'removedAt' - 'removedBy') || jsonb_build_object('status', $2::text) END,
              updated_at = now(), updated_by = $3 WHERE id = $1`,
-          [id, status, actor.username]
+          [id, status, actor.username, actor.displayName]
         );
         await audit(q, actor, 'entry.status', { id, status });
       });
@@ -483,6 +488,132 @@ export function createStore(db: Database) {
       return { clientsCount: clients.length, entriesCount: entries.length, historyCount: history.length };
     },
 
+    // Relatório de um período: geral (todos os clientes) ou de um cliente.
+    // from/to são datas locais (YYYY-MM-DD, inclusivas); startIso/endIso delimitam o mesmo intervalo em instantes.
+    async getReport(actor: Actor, params: { from?: unknown; to?: unknown; startIso?: unknown; endIso?: unknown; clientId?: unknown }) {
+      const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+      const from = String(params?.from ?? '');
+      const to = String(params?.to ?? '');
+      if (!dateRe.test(from) || !dateRe.test(to) || from > to) throw new StoreError('Período inválido.');
+      const startIso = new Date(String(params?.startIso ?? `${from}T00:00:00`)).toISOString();
+      const endIso = new Date(String(params?.endIso ?? `${to}T23:59:59.999`)).toISOString();
+      const clientId = typeof params?.clientId === 'string' && params.clientId ? params.clientId : null;
+
+      const [clients, settings, activeRows, addedRows, removedRows, historyRows, auditRows] = await Promise.all([
+        ops.getAllClients(),
+        ops.getAppSettings(),
+        db.query<{ client_id: string; n: number }>("SELECT client_id, count(*)::int AS n FROM entries WHERE status = 'active' GROUP BY client_id"),
+        db.query<{ data: BlocklistEntry }>(
+          `SELECT data FROM entries WHERE data->>'addedDate' >= $1 AND data->>'addedDate' <= $2 ${clientId ? 'AND client_id = $3' : ''}`,
+          clientId ? [from, to, clientId] : [from, to]
+        ),
+        db.query<{ data: BlocklistEntry; updated_at: string; updated_by: string | null }>(
+          `SELECT data, updated_at, updated_by FROM entries
+           WHERE status = 'removed' AND coalesce((data->>'removedAt')::timestamptz, updated_at) >= $1
+             AND coalesce((data->>'removedAt')::timestamptz, updated_at) <= $2 ${clientId ? 'AND client_id = $3' : ''}`,
+          clientId ? [startIso, endIso, clientId] : [startIso, endIso]
+        ),
+        db.query<{ data: ImportHistoryRecord }>(
+          `SELECT data FROM history WHERE happened_at >= $1 AND happened_at <= $2 ${clientId ? 'AND client_id = $3' : ''} ORDER BY happened_at DESC`,
+          clientId ? [startIso, endIso, clientId] : [startIso, endIso]
+        ),
+        db.query<{ username: string; action: string; detail: Record<string, unknown> }>(
+          `SELECT a.username, a.action, a.detail FROM audit_log a WHERE a.at >= $1 AND a.at <= $2 AND a.action LIKE 'entr%'`,
+          [startIso, endIso]
+        )
+      ]);
+
+      const names = new Map((await db.query<{ username: string; display_name: string | null }>('SELECT username, display_name FROM users')).map((u) => [u.username, u.display_name || u.username]));
+      const activeByClient = new Map(activeRows.map((r) => [r.client_id, r.n]));
+      const sla = settings.slaDays || 7;
+      const today = new Date();
+      const daysSince = (date: string | null) => (date ? Math.floor((today.getTime() - new Date(`${date}T00:00:00`).getTime()) / 86_400_000) : null);
+
+      const perClient = clients
+        .filter((c) => (clientId ? c.id === clientId : !c.isArchived))
+        .map((c) => {
+          const added = addedRows.filter((r) => r.data.clientId === c.id);
+          const removed = removedRows.filter((r) => r.data.clientId === c.id);
+          const imports = historyRows.filter((r) => r.data.clientId === c.id);
+          const importers = [...new Set(imports.map((r) => r.data.importedBy).filter(Boolean))] as string[];
+          const since = daysSince(c.lastUpdateDate);
+          return {
+            clientId: c.id,
+            name: c.name,
+            notes: c.notes || '',
+            lastUpdateDate: c.lastUpdateDate,
+            status: since === null ? 'sem_importacao' : since > sla ? 'atrasado' : 'em_dia',
+            activeNow: activeByClient.get(c.id) || 0,
+            addedInPeriod: added.length,
+            removedInPeriod: removed.length,
+            importsInPeriod: imports.length,
+            importers
+          };
+        });
+
+      const changes = clientId
+        ? [
+            ...addedRows.map((r) => ({
+              action: 'incluido' as const,
+              date: r.data.addedDate,
+              indicator: r.data.indicator,
+              type: r.data.type,
+              ticket: r.data.sourceTicket || '',
+              notes: r.data.notes || '',
+              by: r.data.addedBy || '',
+              currentStatus: r.data.status
+            })),
+            ...removedRows.map((r) => ({
+              action: 'removido' as const,
+              date: (r.data.removedAt || r.updated_at).toString().slice(0, 10),
+              indicator: r.data.indicator,
+              type: r.data.type,
+              ticket: r.data.sourceTicket || '',
+              notes: r.data.notes || '',
+              by: r.data.removedBy || (r.updated_by ? names.get(r.updated_by) || r.updated_by : ''),
+              currentStatus: r.data.status
+            }))
+          ].sort((a, b) => b.date.localeCompare(a.date) || a.indicator.localeCompare(b.indicator))
+        : [];
+
+      // Atividade por pessoa no período (importações, inclusões e remoções registradas na auditoria).
+      const byUser = new Map<string, { name: string; imports: number; added: number; removed: number }>();
+      for (const row of auditRows) {
+        const detail = row.detail || {};
+        if (clientId && detail.clientId !== clientId) continue;
+        const entry = byUser.get(row.username) ?? { name: names.get(row.username) || row.username, imports: 0, added: 0, removed: 0 };
+        if (row.action === 'entries.import') {
+          entry.imports++;
+          entry.added += Number(detail.added || 0);
+          entry.removed += Number(detail.removed || 0);
+        } else if (row.action === 'entry.status' && detail.status === 'removed') {
+          entry.removed++;
+        }
+        byUser.set(row.username, entry);
+      }
+
+      return {
+        from,
+        to,
+        clientId,
+        generatedAt: new Date().toISOString(),
+        generatedBy: actor.displayName,
+        slaDays: sla,
+        totals: {
+          clients: perClient.length,
+          added: perClient.reduce((n, c) => n + c.addedInPeriod, 0),
+          removed: perClient.reduce((n, c) => n + c.removedInPeriod, 0),
+          imports: perClient.reduce((n, c) => n + c.importsInPeriod, 0),
+          late: perClient.filter((c) => c.status !== 'em_dia').length,
+          activeNow: perClient.reduce((n, c) => n + c.activeNow, 0)
+        },
+        clients: perClient,
+        changes,
+        imports: historyRows.map((r) => r.data),
+        activity: [...byUser.values()].sort((a, b) => b.imports - a.imports || b.added - a.added)
+      };
+    },
+
     async isEmpty() {
       const rows = await db.query<{ n: number }>('SELECT count(*)::int AS n FROM clients');
       return (rows[0]?.n ?? 0) === 0;
@@ -517,6 +648,7 @@ export const PUBLIC_OPS = [
   'searchIndicatorAcrossClients',
   'addHistoryRecord',
   'getHistoryRecords',
+  'getReport',
   'getAllActiveEntries',
   'getAppSettings',
   'saveAppSettings',

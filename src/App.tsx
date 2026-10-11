@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { flushSync } from 'react-dom';
 import { Navbar, type AppTab } from './components/Navbar';
 import { UsersView } from './components/UsersView';
+import { ReportsView } from './components/ReportsView';
 import { ChangePasswordForm } from './components/ChangePasswordForm';
 import { DashboardView } from './components/DashboardView';
 import { WeeklyImportView } from './components/WeeklyImportView';
@@ -338,6 +339,8 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             onRefreshClients={refreshAllData}
           />
         )}
+
+        {currentTab === 'reports' && <ReportsView clients={clients} />}
 
         {currentTab === 'users' && currentUser.role === 'admin' && (
           <UsersView currentUser={currentUser} />

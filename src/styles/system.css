@@ -1254,3 +1254,45 @@ select.field {
   color: var(--accent);
   text-decoration-color: currentColor;
 }
+
+/* ---------- Filtros de relatório ---------- */
+
+.report-filters {
+  display: grid;
+  gap: 14px 18px;
+  align-items: end;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+@media (min-width: 1100px) {
+  .report-filters {
+    grid-template-columns: 240px minmax(0, 1fr) auto;
+  }
+}
+
+.report-filters__dates {
+  display: flex;
+  gap: 10px;
+}
+
+.report-filters__dates .field {
+  font-family: var(--font-mono);
+}
+
+.segmented--wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+input[type="date"].field::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+:root:not([data-theme="light"]) input[type="date"].field::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}

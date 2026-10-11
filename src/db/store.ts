@@ -78,3 +78,44 @@ export const saveAppSettings = (settings: AppSettings) => call<null>('saveAppSet
 export const exportFullBackupJSON = () => call<string>('exportFullBackupJSON');
 export const restoreFullBackupJSON = (jsonStr: string) =>
   call<{ clientsCount: number; entriesCount: number; historyCount: number }>('restoreFullBackupJSON', jsonStr);
+
+export interface ReportClientRow {
+  clientId: string;
+  name: string;
+  notes: string;
+  lastUpdateDate: string | null;
+  status: 'em_dia' | 'atrasado' | 'sem_importacao';
+  activeNow: number;
+  addedInPeriod: number;
+  removedInPeriod: number;
+  importsInPeriod: number;
+  importers: string[];
+}
+
+export interface ReportChangeRow {
+  action: 'incluido' | 'removido';
+  date: string;
+  indicator: string;
+  type: string;
+  ticket: string;
+  notes: string;
+  by: string;
+  currentStatus: 'active' | 'removed';
+}
+
+export interface ReportData {
+  from: string;
+  to: string;
+  clientId: string | null;
+  generatedAt: string;
+  generatedBy: string;
+  slaDays: number;
+  totals: { clients: number; added: number; removed: number; imports: number; late: number; activeNow: number };
+  clients: ReportClientRow[];
+  changes: ReportChangeRow[];
+  imports: ImportHistoryRecord[];
+  activity: Array<{ name: string; imports: number; added: number; removed: number }>;
+}
+
+export const getReport = (params: { from: string; to: string; startIso: string; endIso: string; clientId?: string }) =>
+  call<ReportData>('getReport', params);
