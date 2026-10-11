@@ -13,6 +13,7 @@ import {
   PanelLeft,
   Radio,
   Search,
+  Sun,
   UploadCloud,
   X
 } from 'lucide-react';
@@ -25,7 +26,7 @@ interface NavbarProps {
   setCurrentTab: (tab: AppTab) => void;
   onOpenQuickSearch: () => void;
   theme: 'dark' | 'light';
-  onToggleTheme: () => void;
+  onToggleTheme: (origin?: { x: number; y: number }) => void;
   isBackupOutdated: boolean;
   daysSinceBackup: number | null;
   collapsed: boolean;
@@ -66,6 +67,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
   const activeRow = Math.max(0, navItems.findIndex((item) => item.id === currentTab));
   const displayName = currentUser || 'Uso local';
+  const themeTarget = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
   const backupLabel = isBackupOutdated
     ? 'Backup pendente'
     : `Backup há ${daysSinceBackup} ${daysSinceBackup === 1 ? 'dia' : 'dias'}`;
@@ -194,20 +196,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="label">{backupLabel}</span>
           </button>
 
+          {/* O rótulo mostra o tema de destino: no escuro oferece "Modo claro" e vice-versa. */}
           <button
             type="button"
             className="gl-row gl-theme-toggle"
-            onClick={onToggleTheme}
-            aria-pressed={theme === 'dark'}
-            data-tip="Modo escuro"
-            aria-label="Modo escuro"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              onToggleTheme({ x: rect.left + 36, y: rect.top + rect.height / 2 });
+            }}
+            data-tip={themeTarget}
+            aria-label={`Mudar para ${themeTarget.toLowerCase()}`}
           >
-            <Moon aria-hidden="true" />
-            <span className="label">Modo escuro</span>
-            <span className={`gl-switch label ${theme === 'dark' ? 'on' : ''}`}>
-              <span />
+            <span className="gl-theme-icon" aria-hidden="true">
+              {theme === 'dark' ? <Sun /> : <Moon />}
             </span>
+            <span className="label">{themeTarget}</span>
           </button>
+
+          {onLogout && <hr className="gl-divider gl-divider--tight" />}
 
           {onLogout && (
             <button type="button" className="gl-row gl-logout" onClick={onLogout} data-tip="Sair" aria-label="Sair">

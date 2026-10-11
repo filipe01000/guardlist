@@ -40,14 +40,14 @@ export const TestRunnerModal: React.FC<TestRunnerModalProps> = ({ isOpen, onClos
   const allPassed = suiteResults.failed === 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="test-runner-title" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="test-runner-title" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden modal-panel">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/70">
           <div className="flex items-center gap-2">
             <TestTube2 className="w-5 h-5 text-emerald-400" />
             <h3 id="test-runner-title" className="text-base font-bold text-white">
-              Bateria de Testes Unitários: Validação &amp; Normalização
+              Testes de validação e normalização
             </h3>
           </div>
           <button
@@ -70,10 +70,10 @@ export const TestRunnerModal: React.FC<TestRunnerModalProps> = ({ isOpen, onClos
               </div>
               <div>
                 <span className="text-sm font-bold text-white block">
-                  {allPassed ? 'Todos os testes unitários passaram com sucesso!' : 'Foram encontrados erros nos testes.'}
+                  {allPassed ? 'Todos os testes passaram.' : 'Foram encontrados erros nos testes.'}
                 </span>
                 <span className="text-xs text-slate-400">
-                  {suiteResults.passed} de {suiteResults.total} asserções validadas (100% de cobertura dos requisitos).
+                  {suiteResults.passed} de {suiteResults.total} verificações aprovadas.
                 </span>
               </div>
             </div>
@@ -91,7 +91,7 @@ export const TestRunnerModal: React.FC<TestRunnerModalProps> = ({ isOpen, onClos
           <div className="max-h-[380px] overflow-y-auto space-y-4 pr-1">
             {Object.entries(grouped).map(([suiteName, tests]) => (
               <div key={suiteName} className="space-y-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                <h4 className="text-xs font-bold text-slate-400">
                   {suiteName} ({tests.length})
                 </h4>
                 <div className="space-y-1.5">

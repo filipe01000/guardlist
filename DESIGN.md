@@ -28,28 +28,28 @@ colors:
   success: "#4ec995"
 typography:
   headline:
-    fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
-    fontSize: "1.35rem"
-    fontWeight: 710
-    lineHeight: 1.25
+    fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, Segoe UI, sans-serif"
+    fontSize: "1.45rem"
+    fontWeight: 700
+    lineHeight: 1.2
     letterSpacing: "-0.025em"
   title:
-    fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, Segoe UI, sans-serif"
     fontSize: "0.9rem"
     fontWeight: 700
     lineHeight: 1.3
   body:
-    fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, Segoe UI, sans-serif"
     fontSize: "0.78rem"
     fontWeight: 400
     lineHeight: 1.5
   label:
-    fontFamily: "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+    fontFamily: "IBM Plex Sans, ui-sans-serif, system-ui, Segoe UI, sans-serif"
     fontSize: "0.68rem"
     fontWeight: 620
     lineHeight: 1.3
   data:
-    fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+    fontFamily: "IBM Plex Mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
     fontSize: "1.45rem"
     fontWeight: 650
     lineHeight: 1.2
@@ -168,15 +168,15 @@ Aço quase preto ou papel bancário frio, um azul de cofre para tudo o que se ac
 
 ## Typography
 
-**Display Font:** System UI sans-serif (ui-sans-serif, Segoe UI)
-**Body Font:** System UI sans-serif
-**Label/Mono Font:** SFMono-compatible monospace (SFMono-Regular, Menlo, Consolas)
+**Display Font:** IBM Plex Sans (auto-hospedada via @fontsource; pesos 400–700, latin + latin-ext)
+**Body Font:** IBM Plex Sans
+**Label/Mono Font:** IBM Plex Mono (400–600)
 
-**Character:** compacta, neutra e confiável. O sans conduz instruções e controles; o monoespaçado identifica o que é evidência (IPs, CIDRs, datas, contagens).
+**Character:** técnica, sóbria e institucional, com cara de ferramenta de segurança e não de produto genérico. O sans conduz instruções e controles; o monoespaçado identifica o que é evidência (IPs, CIDRs, datas, contagens). Fontes vêm do próprio bundle, nunca de CDN.
 
 ### Hierarchy
 
-- **Headline** (710, 1.35rem, 1.25): título da página, uma vez por tela.
+- **Headline** (700, 1.45rem, 1.2): título da página no componente PageHeader, uma vez por tela, sempre em sentence case e igual ao rótulo da navegação.
 - **Title** (700, 0.9rem, 1.3): nome de cliente, título de seção e nome no perfil da sidebar.
 - **Body** (400, 0.78rem, 1.5): texto operacional, até cerca de 70 caracteres por linha.
 - **Label** (620, 0.68rem): metadados, cabeçalhos de coluna e rótulos de resumo.
@@ -188,7 +188,9 @@ Aço quase preto ou papel bancário frio, um azul de cofre para tudo o que se ac
 
 ## Layout
 
-No desktop (a partir de 1024px), o console flutua a 24px das bordas superior, esquerda e inferior, com 280px aberto ou 70px recolhido. A escolha fica salva por navegador. O conteúdo reserva o espaço do console mais as duas margens de 24px e desliza junto quando ele recolhe (0.35s). A bancada usa padding fluido (16 a 42px), resumos em quatro colunas e tabelas com rolagem só quando a densidade exige.
+No desktop (a partir de 1024px), o console flutua a 24px das bordas superior, esquerda e inferior, com 280px aberto ou 70px recolhido. A escolha fica salva por navegador. O conteúdo reserva o espaço do console mais as duas margens de 24px e desliza junto quando ele recolhe (0.35s). A bancada usa padding fluido (16 a 42px), resumos em quatro colunas e tabelas com rolagem só quando a densidade exige. Toda página começa com o PageHeader (título, uma frase de contexto e ações à direita). Não há rodapé.
+
+O painel geral usa duas colunas a partir de 1280px: a fila de manutenção e uma coluna lateral fixa de 300px com Esta semana (prazos por urgência), Mais recorrentes (indicadores em vários clientes, com barra proporcional) e Últimas importações. Abaixo de 1280px a coluna desce para depois da fila.
 
 Abaixo de 1024px, o console vira gaveta. Uma barra superior fixa traz menu, marca e busca; a gaveta abre sobre um véu escuro e fecha por X, Escape ou toque fora. Em telas estreitas, os resumos ficam em grade 2×2 e o conteúdo usa margens de 14px. A ordem responsiva preserva título, estado, ação principal e dados antes de opções secundárias.
 
@@ -221,10 +223,10 @@ Precisos e contidos na bancada, generosos no que flutua. Controles usam 8px; car
 
 ### Buttons
 
-- **Shape:** cantos de controle (8px), altura compacta, área de toque preservada.
-- **Primary:** Vault Blue com texto claro.
-- **Hover / Focus:** mudança tonal discreta e contorno azul visível; sem deslocamento e sem sombra.
-- **Secondary / Ghost:** superfície, costura neutra e texto secundário.
+- **Shape:** cantos de controle (8px), 34px de altura (30px no tamanho sm), área de toque preservada.
+- **Variantes (classe .btn):** neutro (padrão), --primary (Vault Blue), --quiet (sem borda, para ações de ícone) e --danger (texto vermelho, fundo só no hover). Não existem outras cores de botão.
+- **Um azul por região:** só a ação principal de cada área é primária. Na fila de manutenção, Importar fica azul apenas nos clientes atrasados ou com prazo próximo.
+- **Hover / Focus:** mudança tonal discreta, 1px de afundamento ao clicar e contorno azul visível; sem sombra.
 - **Exceção da porta:** no login, o botão Entrar é pílula (44px de altura), com ícone e estado de carregamento.
 
 ### Chips
@@ -245,6 +247,14 @@ Precisos e contidos na bancada, generosos no que flutua. Controles usam 8px; car
 - **Style:** fundo de recesso, costura forte e raio de controle (8px). No login, 42px de altura e raio de 12px.
 - **Focus:** borda azul com anel Vault Blue Soft de 3px.
 - **Error / Disabled:** mensagem em Danger abaixo do campo com `role="alert"`; desabilitado em tom rebaixado, sempre com contraste suficiente.
+
+### Motion
+
+- **Troca de tela:** cada página entra subindo 8px a partir de quase visível (320ms, ease-out exponencial).
+- **Troca de tema:** o novo tema se revela em círculo a partir do botão (View Transitions API); o ícone sol/lua gira ao trocar. Sem a API ou com reduced-motion, a troca é imediata.
+- **Diálogos e avisos:** véu em fade e painel subindo com leve escala (360ms); o toast entra de baixo.
+- **Dados:** barras de recorrência e de volume semanal crescem uma vez ao aparecer.
+- Tudo respeita prefers-reduced-motion.
 
 ### Navigation
 
@@ -267,6 +277,10 @@ Têm nome acessível, foco inicial, contenção de Tab, fechamento por Escape e 
 
 ### Do:
 
+- **Do** comece toda página com o PageHeader e o mesmo título do item de navegação.
+- **Do** mostre no botão de tema o tema de destino ("Modo claro" no escuro, "Modo escuro" no claro).
+- **Do** dê a todo estado vazio uma frase do que vai aparecer ali e, quando houver, o botão para chegar lá.
+
 - **Do** mantenha cada cliente em sua própria superfície e seu próprio estado. O isolamento é visível.
 - **Do** use Vault Blue para ação, foco e item ativo em todas as telas.
 - **Do** dê sombra ambiente apenas ao que flutua: console, modais, toasts e dicas.
@@ -282,3 +296,7 @@ Têm nome acessível, foco inicial, contenção de Tab, fechamento por Escape e 
 - **Don't** dê sombra a cards, tabelas, campos ou botões da bancada.
 - **Don't** comunique risco só por cor; mantenha texto e ícone de estado.
 - **Don't** ofereça autocadastro: a porta só abre para usuários concedidos.
+- **Don't** use marcas de interface gerada: ícones de brilho ou varinha mágica, emojis, selos decorativos ("100%", "seguro", "regra crítica"), tabelas de arquitetura ou textos de marketing dentro do app.
+- **Don't** escreva "com sucesso!" nem use exclamações; confirme o fato ("Backup baixado.").
+- **Don't** use Formato De Título ou CAIXA ALTA em títulos, abas e cabeçalhos de tabela; sempre sentence case.
+- **Don't** coloque ícone colorido em caixa ao lado do título da página.

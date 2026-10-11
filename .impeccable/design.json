@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-10T21:50:00-03:00",
+  "generatedAt": "2026-10-10T23:30:00-03:00",
   "title": "Design System: GuardList",
   "extensions": {
     "colorMeta": {
@@ -8,76 +8,230 @@
         "role": "primary",
         "displayName": "Vault Blue",
         "canonical": "#5791ff",
-        "tonalRamp": ["#07152f", "#0c2552", "#173a75", "#27569f", "#3d73cc", "#5791ff", "#93b8ff", "#dce8ff"]
+        "tonalRamp": [
+          "#07152f",
+          "#0c2552",
+          "#173a75",
+          "#27569f",
+          "#3d73cc",
+          "#5791ff",
+          "#93b8ff",
+          "#dce8ff"
+        ]
       },
       "vault-blue-day": {
         "role": "primary",
         "displayName": "Vault Blue Day",
         "canonical": "#2f6fdf",
-        "tonalRamp": ["#081a3d", "#0f2c63", "#18408c", "#2256b5", "#2f6fdf", "#5b8ff0", "#9dbcf7", "#e1ebfd"]
+        "tonalRamp": [
+          "#081a3d",
+          "#0f2c63",
+          "#18408c",
+          "#2256b5",
+          "#2f6fdf",
+          "#5b8ff0",
+          "#9dbcf7",
+          "#e1ebfd"
+        ]
       },
       "vault-blue-deep": {
         "role": "primary",
         "displayName": "Vault Blue Deep",
         "canonical": "#1d3f8f",
-        "tonalRamp": ["#060f24", "#0d1830", "#14295c", "#1d3f8f", "#3b6fd8", "#6d97e8", "#a8c2f3", "#e3ecfc"]
+        "tonalRamp": [
+          "#060f24",
+          "#0d1830",
+          "#14295c",
+          "#1d3f8f",
+          "#3b6fd8",
+          "#6d97e8",
+          "#a8c2f3",
+          "#e3ecfc"
+        ]
       },
       "vault-steel": {
         "role": "neutral",
         "displayName": "Vault Steel",
         "canonical": "#0a0c10",
-        "tonalRamp": ["#08090c", "#101319", "#181e27", "#29313d", "#3a4554", "#667385", "#aab3bf", "#eef1f5"]
+        "tonalRamp": [
+          "#08090c",
+          "#101319",
+          "#181e27",
+          "#29313d",
+          "#3a4554",
+          "#667385",
+          "#aab3bf",
+          "#eef1f5"
+        ]
       },
       "bank-paper": {
         "role": "neutral",
         "displayName": "Bank Paper",
         "canonical": "#f3f5f8",
-        "tonalRamp": ["#17202b", "#344154", "#667489", "#b9c3cf", "#d9e0e8", "#edf1f5", "#f3f5f8", "#ffffff"]
+        "tonalRamp": [
+          "#17202b",
+          "#344154",
+          "#667489",
+          "#b9c3cf",
+          "#d9e0e8",
+          "#edf1f5",
+          "#f3f5f8",
+          "#ffffff"
+        ]
       },
       "danger": {
         "role": "semantic",
         "displayName": "Breach Red",
         "canonical": "#f56a77",
-        "tonalRamp": ["#2c0a0e", "#56131b", "#7f202c", "#ac3442", "#d94d5b", "#f56a77", "#ff9da6", "#ffe1e4"]
+        "tonalRamp": [
+          "#2c0a0e",
+          "#56131b",
+          "#7f202c",
+          "#ac3442",
+          "#d94d5b",
+          "#f56a77",
+          "#ff9da6",
+          "#ffe1e4"
+        ]
       },
       "warning": {
         "role": "semantic",
         "displayName": "Deadline Amber",
         "canonical": "#e7ab4e",
-        "tonalRamp": ["#271904", "#493006", "#6f4a0d", "#986817", "#c0862c", "#e7ab4e", "#f3ca86", "#fbe9c5"]
+        "tonalRamp": [
+          "#271904",
+          "#493006",
+          "#6f4a0d",
+          "#986817",
+          "#c0862c",
+          "#e7ab4e",
+          "#f3ca86",
+          "#fbe9c5"
+        ]
       },
       "success": {
         "role": "semantic",
         "displayName": "Sealed Green",
         "canonical": "#4ec995",
-        "tonalRamp": ["#05231a", "#0a4432", "#12654b", "#218766", "#34a97f", "#4ec995", "#88dfba", "#d2f3e5"]
+        "tonalRamp": [
+          "#05231a",
+          "#0a4432",
+          "#12654b",
+          "#218766",
+          "#34a97f",
+          "#4ec995",
+          "#88dfba",
+          "#d2f3e5"
+        ]
       }
     },
     "typographyMeta": {
-      "headline": { "displayName": "Page Headline", "purpose": "Título da página, uma vez por tela." },
-      "title": { "displayName": "Compartment Title", "purpose": "Nome de cliente, título de seção e nome no perfil." },
-      "body": { "displayName": "Operational Body", "purpose": "Instruções e descrições, até ~70 caracteres por linha." },
-      "label": { "displayName": "Ledger Label", "purpose": "Metadados, cabeçalhos de coluna e rótulos de resumo." },
-      "data": { "displayName": "Evidence Data", "purpose": "Valores tabulares em monoespaçado: contagens, IPs, CIDRs, datas." }
+      "headline": {
+        "displayName": "Page Headline",
+        "purpose": "Título do PageHeader, uma vez por tela, igual ao rótulo da navegação."
+      },
+      "title": {
+        "displayName": "Compartment Title",
+        "purpose": "Nome de cliente, título de seção e nome no perfil."
+      },
+      "body": {
+        "displayName": "Operational Body",
+        "purpose": "Instruções e descrições, até ~70 caracteres por linha."
+      },
+      "label": {
+        "displayName": "Ledger Label",
+        "purpose": "Metadados, cabeçalhos de coluna e rótulos de resumo."
+      },
+      "data": {
+        "displayName": "Evidence Data",
+        "purpose": "Valores tabulares em monoespaçado: contagens, IPs, CIDRs, datas."
+      }
     },
     "shadows": [
-      { "name": "console-float", "value": "0 0 0 1px #29313d, 0 12px 40px rgba(0, 0, 0, 0.35)", "purpose": "Sidebar flutuante no tema escuro." },
-      { "name": "console-float-day", "value": "0 0 0 1px #edeef2, 0 12px 40px rgba(31, 26, 74, 0.08)", "purpose": "Sidebar flutuante no tema claro." },
-      { "name": "door-float", "value": "0 0 0 1px #29313d, 0 12px 80px rgba(41, 30, 113, 0.12)", "purpose": "Cartão da tela de login." },
-      { "name": "tip-lift", "value": "0 6px 18px rgba(0, 0, 0, 0.2)", "purpose": "Dicas flutuantes, toasts e diálogos." },
-      { "name": "avatar-lift", "value": "0 6px 16px rgba(31, 26, 74, 0.16)", "purpose": "Avatar do perfil na sidebar." }
+      {
+        "name": "console-float",
+        "value": "0 0 0 1px #29313d, 0 12px 40px rgba(0, 0, 0, 0.35)",
+        "purpose": "Sidebar flutuante no tema escuro."
+      },
+      {
+        "name": "console-float-day",
+        "value": "0 0 0 1px #edeef2, 0 12px 40px rgba(31, 26, 74, 0.08)",
+        "purpose": "Sidebar flutuante no tema claro."
+      },
+      {
+        "name": "door-float",
+        "value": "0 0 0 1px #29313d, 0 12px 80px rgba(41, 30, 113, 0.12)",
+        "purpose": "Cartão da tela de login."
+      },
+      {
+        "name": "tip-lift",
+        "value": "0 6px 18px rgba(0, 0, 0, 0.2)",
+        "purpose": "Dicas flutuantes, toasts e diálogos."
+      },
+      {
+        "name": "avatar-lift",
+        "value": "0 6px 16px rgba(31, 26, 74, 0.16)",
+        "purpose": "Avatar do perfil na sidebar."
+      }
     ],
     "motion": [
-      { "name": "latch-spring", "value": "0.38s cubic-bezier(0.34, 1.16, 0.42, 1)", "purpose": "Faixa do item ativo deslizando entre destinos da navegação." },
-      { "name": "console-resize", "value": "0.35s ease", "purpose": "Sidebar recolhendo/expandindo e o conteúdo acompanhando." },
-      { "name": "door-close", "value": "0.65s ease-in-out", "purpose": "Painel de marca do login deslizando na entrada." },
-      { "name": "vault-loop", "value": "9s linear loop, 1s crossfade", "purpose": "Vídeo silencioso do mecanismo da porta no painel do login; desligado com reduced-motion e save-data." },
-      { "name": "state-quick", "value": "0.25s", "purpose": "Hover e cor de linhas, botões e campos." }
+      {
+        "name": "latch-spring",
+        "value": "0.38s cubic-bezier(0.34, 1.16, 0.42, 1)",
+        "purpose": "Faixa do item ativo deslizando entre destinos da navegação."
+      },
+      {
+        "name": "console-resize",
+        "value": "0.35s ease",
+        "purpose": "Sidebar recolhendo/expandindo e o conteúdo acompanhando."
+      },
+      {
+        "name": "door-close",
+        "value": "0.65s ease-in-out",
+        "purpose": "Painel de marca do login deslizando na entrada."
+      },
+      {
+        "name": "vault-loop",
+        "value": "9s linear loop, 1s crossfade",
+        "purpose": "Vídeo silencioso do mecanismo da porta no painel do login; desligado com reduced-motion e save-data."
+      },
+      {
+        "name": "state-quick",
+        "value": "0.25s",
+        "purpose": "Hover e cor de linhas, botões e campos."
+      },
+      {
+        "name": "view-in",
+        "value": "320ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Entrada de cada página: sobe 8px a partir de quase visível."
+      },
+      {
+        "name": "theme-reveal",
+        "value": "520ms circle clip-path via View Transitions",
+        "purpose": "Novo tema se revela em círculo a partir do botão de tema."
+      },
+      {
+        "name": "modal-in",
+        "value": "360ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Diálogos sobem com leve escala sobre véu em fade."
+      }
     ],
     "breakpoints": [
-      { "name": "door-stack", "value": "680px", "purpose": "Login vira coluna." },
-      { "name": "summary-2x2", "value": "760px", "purpose": "Resumo operacional em grade 2×2." },
-      { "name": "console-drawer", "value": "1024px", "purpose": "Abaixo disso, a sidebar vira gaveta com barra superior." }
+      {
+        "name": "door-stack",
+        "value": "680px",
+        "purpose": "Login vira coluna."
+      },
+      {
+        "name": "summary-2x2",
+        "value": "760px",
+        "purpose": "Resumo operacional em grade 2×2."
+      },
+      {
+        "name": "console-drawer",
+        "value": "1024px",
+        "purpose": "Abaixo disso, a sidebar vira gaveta com barra superior."
+      }
     ]
   },
   "components": [
@@ -158,15 +312,45 @@
       "Dados técnicos sempre em monoespaçado com numerais tabulares."
     ],
     "rules": [
-      { "name": "The One Key Rule", "body": "Só existe uma chave: o azul. Roxo, ciano ou verde nunca formam uma família paralela de ação.", "section": "colors" },
-      { "name": "The Semantic Reserve Rule", "body": "Verde, amarelo e vermelho comunicam estado e mais nada. Sempre acompanhados de texto ou ícone.", "section": "colors" },
-      { "name": "The Two Shifts Rule", "body": "Todo componente novo precisa existir nos dois temas, aço e papel bancário, usando os tokens de tema, nunca hex fixo no componente.", "section": "colors" },
-      { "name": "The Evidence Type Rule", "body": "Valor técnico ou identificador usa monoespaçado; explicação e comando usam sans-serif.", "section": "typography" },
-      { "name": "The Floating Layer Rule", "body": "Só ganha sombra o que flutua sobre a bancada. Card, tabela, campo e botão ficam planos; botões nunca têm sombra.", "section": "elevation" },
-      { "name": "The Brand Panel Rule", "body": "Degradê e imagem de marca só em painel de marca dedicado, como a porta do login. Nunca em botões, cards de dados ou estados.", "section": "elevation" },
-      { "name": "The Float-Is-Round Rule", "body": "Quanto mais um elemento flutua, mais arredondado ele é: bancada com 8–12px, console e porta com 24px.", "section": "shapes" }
+      {
+        "name": "The One Key Rule",
+        "body": "Só existe uma chave: o azul. Roxo, ciano ou verde nunca formam uma família paralela de ação.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic Reserve Rule",
+        "body": "Verde, amarelo e vermelho comunicam estado e mais nada. Sempre acompanhados de texto ou ícone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two Shifts Rule",
+        "body": "Todo componente novo precisa existir nos dois temas, aço e papel bancário, usando os tokens de tema, nunca hex fixo no componente.",
+        "section": "colors"
+      },
+      {
+        "name": "The Evidence Type Rule",
+        "body": "Valor técnico ou identificador usa monoespaçado; explicação e comando usam sans-serif.",
+        "section": "typography"
+      },
+      {
+        "name": "The Floating Layer Rule",
+        "body": "Só ganha sombra o que flutua sobre a bancada. Card, tabela, campo e botão ficam planos; botões nunca têm sombra.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Brand Panel Rule",
+        "body": "Degradê e imagem de marca só em painel de marca dedicado, como a porta do login. Nunca em botões, cards de dados ou estados.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Float-Is-Round Rule",
+        "body": "Quanto mais um elemento flutua, mais arredondado ele é: bancada com 8–12px, console e porta com 24px.",
+        "section": "shapes"
+      }
     ],
     "dos": [
+      "Do comece toda página com o PageHeader e o mesmo título do item de navegação.",
+      "Do mostre no botão de tema o tema de destino.",
       "Do mantenha cada cliente em sua própria superfície e seu próprio estado. O isolamento é visível.",
       "Do use Vault Blue para ação, foco e item ativo em todas as telas.",
       "Do dê sombra ambiente apenas ao que flutua: console, modais, toasts e dicas.",
@@ -180,7 +364,10 @@
       "Don't coloque degradê em botões, cards de dados ou estados. Degradê é só para painel de marca.",
       "Don't dê sombra a cards, tabelas, campos ou botões da bancada.",
       "Don't comunique risco só por cor; mantenha texto e ícone de estado.",
-      "Don't ofereça autocadastro: a porta só abre para usuários concedidos."
+      "Don't ofereça autocadastro: a porta só abre para usuários concedidos.",
+      "Don't use marcas de interface gerada: ícones de brilho ou varinha mágica, emojis, selos decorativos, tabelas de arquitetura ou textos de marketing dentro do app.",
+      "Don't escreva \"com sucesso!\" nem use exclamações; confirme o fato.",
+      "Don't use Formato De Título ou CAIXA ALTA em títulos, abas e cabeçalhos de tabela."
     ]
   }
 }

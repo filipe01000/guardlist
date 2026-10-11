@@ -10,7 +10,7 @@ const Hero: React.FC = () => (
   <div className="gl-hero">
     <img src="/brand/guardlist-mark.png" alt="" className="gl-hero__mark" />
     <h2>GuardList</h2>
-    <p>Gestão semanal das blocklists de firewall dos clientes, em um só lugar.</p>
+    <p>Blocklists de firewall de cada cliente, revisadas toda semana.</p>
   </div>
 );
 

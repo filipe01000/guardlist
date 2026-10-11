@@ -1,8 +1,13 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 :root {
   color-scheme: dark;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --app-bg: #0a0c10;
@@ -150,7 +155,7 @@ a {
   border: 1px solid var(--line);
   border-radius: 7px;
   color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.61rem;
   white-space: nowrap;
 }
@@ -185,7 +190,7 @@ a {
   border: 1px solid var(--line);
   border-radius: 7px;
   color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.61rem;
   text-transform: uppercase;
 }
@@ -234,7 +239,7 @@ a {
 .workspace-summary__item strong {
   margin-top: 5px;
   color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 1.45rem;
   font-weight: 650;
   letter-spacing: -0.03em;
@@ -321,7 +326,7 @@ a {
   display: block;
   margin-top: 5px;
   color: var(--text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
 }
@@ -353,7 +358,7 @@ a {
   min-width: 0;
   flex-direction: column;
   align-items: flex-end;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: var(--font-mono);
   text-align: right;
 }
 

@@ -1,18 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  ShieldAlert, 
-  X, 
-  Globe, 
-  Server, 
-  ExternalLink, 
-  Copy, 
-  Check, 
-  Clock, 
-  Building2, 
-  Radio, 
-  Terminal, 
-  CheckCircle2
-} from 'lucide-react';
+import { ShieldAlert, X, ExternalLink, Copy, Check, Clock, Building2, Radio } from 'lucide-react';
 import { BlocklistEntry, Client, IpCtiRecord } from '../types';
 import { ExternalCtiResponse, fetchExternalCti, getIpCtiRecord, mergeExternalCti } from '../utils/ctiService';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -88,7 +75,7 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/90 backdrop-blur-sm animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 modal-backdrop">
       <div 
         ref={dialogRef}
         tabIndex={-1}
@@ -131,7 +118,7 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
               title="Copiar endereço"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
-              {copied ? 'Copiado!' : 'Copiar'}
+              {copied ? 'Copiado' : 'Copiar'}
             </button>
             <button
               onClick={onClose}
@@ -175,11 +162,11 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
           }`}>
             <div>
               <div className="flex items-center gap-2 font-semibold text-sm">
-                <Radio className="w-4 h-4 shrink-0 text-cyan-400 animate-pulse" />
+                <Radio className="w-4 h-4 shrink-0 text-blue-400" />
                 <span>
                   {ctiData.correlatedClients.length > 1
-                    ? `Indicador Compartilhado em ${ctiData.correlatedClients.length} Clientes Diferentes!`
-                    : 'Indicador Presente em Apenas 1 Cliente'}
+                    ? `Presente em ${ctiData.correlatedClients.length} clientes`
+                    : 'Presente em 1 cliente'}
                 </span>
               </div>
               <p className="text-xs opacity-90 mt-1">
@@ -237,17 +224,17 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
 
                 <div className="space-y-1.5 text-xs text-slate-400">
                   <div className="flex justify-between">
-                    <span>Total de Reports:</span>
+                    <span>Total de reports</span>
                     <strong className="text-slate-200 font-mono">{ctiData.abuseIpDb.totalReports}</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Último Reporte:</span>
+                    <span>Último report</span>
                     <span className="text-slate-300">{ctiData.abuseIpDb.lastReportedAt}</span>
                   </div>
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-slate-800">
-                  <span className="text-[11px] text-slate-500 block mb-1">Categorias de Ataque:</span>
+                  <span className="text-[11px] text-slate-500 block mb-1">Categorias de ataque</span>
                   <div className="flex flex-wrap gap-1">
                     {ctiData.abuseIpDb.categories.map((cat, i) => (
                       <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-300">
@@ -264,7 +251,7 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
                 rel="noopener noreferrer"
                 className="mt-4 inline-flex items-center justify-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition underline pt-2"
               >
-                Consultar no AbuseIPDB <ExternalLink className="w-3 h-3" />
+                Abrir no AbuseIPDB <ExternalLink className="w-3 h-3" />
               </a>
             </div>
 
@@ -288,24 +275,24 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
 
                 <div className="space-y-1.5 text-xs text-slate-400 my-2">
                   <div className="flex justify-between">
-                    <span>Ator / Botnet:</span>
+                    <span>Ator ou botnet</span>
                     <strong className="text-slate-200">{ctiData.greyNoise.actor}</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Noise (Varredura Global):</span>
+                    <span>Varredura global</span>
                     <span className="text-slate-300">{ctiData.greyNoise.noise ? 'Sim (Detectado)' : 'Não'}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Última Atividade:</span>
+                    <span>Última atividade</span>
                     <span className="text-slate-300">{ctiData.greyNoise.lastSeen}</span>
                   </div>
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-slate-800">
-                  <span className="text-[11px] text-slate-500 block mb-1">Tags do Scanner:</span>
+                  <span className="text-[11px] text-slate-500 block mb-1">Tags do scanner</span>
                   <div className="flex flex-wrap gap-1">
                     {ctiData.greyNoise.tags.map((t, i) => (
-                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-purple-300">
+                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-blue-300">
                         #{t}
                       </span>
                     ))}
@@ -317,9 +304,9 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
                 href={`https://viz.greynoise.io/ip/${indicator}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 inline-flex items-center justify-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition underline pt-2"
+                className="mt-4 inline-flex items-center justify-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition underline pt-2"
               >
-                Visualizar no GreyNoise <ExternalLink className="w-3 h-3" />
+                Abrir no GreyNoise <ExternalLink className="w-3 h-3" />
               </a>
             </div>
 
@@ -330,24 +317,24 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
                   <span className="text-xs font-semibold text-slate-300 uppercase tracking-wide">
                     AlienVault OTX
                   </span>
-                  <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-full border bg-cyan-950/80 text-cyan-300 border-cyan-800">
+                  <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-full border bg-blue-950/80 text-blue-300 border-blue-800">
                     {ctiData.alienVaultOtx.pulseCount} Pulses
                   </span>
                 </div>
 
                 <div className="space-y-1.5 text-xs text-slate-400 my-2">
                   <div className="flex justify-between">
-                    <span>Confiança do Threat Feed:</span>
+                    <span>Confiança do feed</span>
                     <strong className="text-slate-200 font-mono">{ctiData.alienVaultOtx.confidence}%</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Avaliação Técnica:</span>
+                    <span>Avaliação técnica</span>
                     <span className="text-slate-300">{ctiData.alienVaultOtx.lastEvaluated}</span>
                   </div>
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-slate-800">
-                  <span className="text-[11px] text-slate-500 block mb-1">Famílias de Malware / IoCs:</span>
+                  <span className="text-[11px] text-slate-500 block mb-1">Famílias de malware e IoCs</span>
                   <div className="flex flex-wrap gap-1">
                     {ctiData.alienVaultOtx.malwareFamilies.length > 0 ? (
                       ctiData.alienVaultOtx.malwareFamilies.map((m, i) => (
@@ -366,18 +353,18 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
                 href={`https://otx.alienvault.com/indicator/ip/${indicator}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-4 inline-flex items-center justify-center gap-1 text-xs text-cyan-400 hover:text-cyan-300 transition underline pt-2"
+                className="mt-4 inline-flex items-center justify-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition underline pt-2"
               >
-                Investigar no AlienVault OTX <ExternalLink className="w-3 h-3" />
+                Abrir no AlienVault OTX <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </div>
 
           {/* Seção de Evidências e Linha do Tempo */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
+            <h3 className="text-xs font-bold text-slate-400 mb-3 flex items-center gap-2">
               <Clock className="w-4 h-4 text-slate-500" />
-              Linha do Tempo de Aparições e Detecções (Timeline)
+              Linha do tempo
             </h3>
             <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 divide-y divide-slate-800/80">
               {ctiData.timeline.map((item, index) => (

@@ -1,37 +1,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  Building2, 
-  Search, 
-  Filter, 
-  ArrowUpDown, 
-  Trash2, 
-  Edit3, 
-  Copy, 
-  Check, 
-  Download, 
-  AlertTriangle, 
-  ShieldCheck, 
-  RotateCcw,
-  Sparkles,
-  ChevronLeft,
-  ChevronRight,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Layers,
-  Terminal,
-  History,
-  Undo2,
-  CheckSquare,
-  Square,
-  ListChecks,
-  Bookmark,
-  X,
-  Radio,
-  RefreshCw
-} from 'lucide-react';
+import { Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw } from 'lucide-react';
 import { Client, BlocklistEntry, IndicatorType, IndicatorStatus, ClientSnapshot } from '../types';
 import { IpDossierModal } from './IpDossierModal';
+import { PageHeader } from './PageHeader';
 import { 
   getClientEntries, 
   updateEntryStatus, 
@@ -392,7 +363,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
       return next;
     });
 
-    setMatchFeedback(`Foram localizados e marcados ${matchCount} indicadores na tabela!`);
+    setMatchFeedback(`${matchCount} indicadores localizados e marcados na tabela.`);
   };
 
   // Ações em Lote para Selecionados
@@ -449,7 +420,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
       await loadSnapshots();
       onRefreshStats();
       setShowSnapshotsModal(false);
-      alert('Versão restaurada com sucesso!');
+      alert('Versão restaurada.');
     } catch (err: any) {
       alert(`Erro ao restaurar versão: ${err.message}`);
     } finally {
@@ -497,7 +468,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     setEditingEntry(null);
   };
 
-  // Excluir Definitivamente Individual
+  // Excluir definitivamente Individual
   const handleConfirmDelete = async () => {
     if (!deleteConfirmId) return;
     await bulkDeleteEntries([deleteConfirmId]);
@@ -563,190 +534,157 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   const isAllVisibleSelected = paginatedEntries.length > 0 && paginatedEntries.every(e => selectedIds.has(e.id));
 
   return (
-    <div className="space-y-6">
-      {/* Barra Superior de Seleção de Cliente e Ações Principais */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Seletor de Cliente */}
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
-            <Building2 className="w-6 h-6" />
-          </div>
-          <div>
-            <label className="text-[11px] font-semibold text-slate-400 block uppercase">
-              Cliente Selecionado (Lista Isolada):
-            </label>
-            <select
-              value={currentClient?.id}
-              onChange={(e) => onSelectClient(e.target.value)}
-              className="bg-slate-950 text-white font-mono font-bold text-lg px-3 py-1 rounded-xl border border-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer mt-0.5"
-            >
-              {activeClients.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+    <div className="space-y-5">
+      <PageHeader
+        title="Listas dos clientes"
+        description="Cada lista é isolada: buscas, marcações e exportações valem só para o cliente selecionado."
+        actions={
+          <select
+            value={currentClient?.id}
+            onChange={(e) => onSelectClient(e.target.value)}
+            className="field font-mono font-bold text-[0.9rem] min-w-[180px]"
+            aria-label="Cliente"
+          >
+            {activeClients.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        }
+      />
+
+      <div className="action-bar">
+        <div className="action-bar__group">
+          <button
+            type="button"
+            onClick={handleExportNanoTxt}
+            className="btn btn--primary"
+            title="Baixar .txt no formato NANO, com as seções === IPS ÚNICOS === e === REDES CIDR ==="
+          >
+            <Download aria-hidden="true" />
+            Exportar NANO
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowNanoModal(true)}
+            className="btn"
+            title="Ver e copiar o texto NANO para colar no terminal"
+          >
+            <Terminal aria-hidden="true" />
+            Copiar NANO
+          </button>
+          <button type="button" onClick={handleExportTxt} className="btn" title="Baixar só os ativos, um por linha">
+            .txt
+          </button>
+          <button type="button" onClick={handleExportCsv} className="btn" title="Baixar todas as colunas e o histórico em CSV">
+            .csv
+          </button>
         </div>
 
-        {/* Botões de Ação da Lista */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Versões Anteriores / Desfazer */}
+        <div className="action-bar__group">
           <button
+            type="button"
             onClick={() => {
               loadSnapshots();
               setShowSnapshotsModal(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition shadow-sm cursor-pointer"
-            title="Ver pontos de restauração e desfazer importações/alterações incorretas"
+            className="btn"
+            title="Versões salvas desta lista; use para desfazer importações ou exclusões"
           >
-            <Undo2 className="w-4 h-4 text-indigo-400" />
-            Versões / Desfazer ({snapshots.length})
+            <Undo2 aria-hidden="true" />
+            Versões
+            <span className="tabs__count">{snapshots.length}</span>
           </button>
-
-          {/* Verificar Duplicatas */}
           <button
+            type="button"
             onClick={handleCheckDuplicates}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition shadow-sm cursor-pointer"
-            title="Escanear a lista ativa deste cliente em busca de IPs repetidos"
+            className="btn"
+            title="Procurar indicadores repetidos na lista ativa"
           >
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            Verificar Duplicatas
+            <ScanSearch aria-hidden="true" />
+            Verificar repetidos
           </button>
-
-          {/* Exportar .txt Formato NANO */}
           <button
-            onClick={handleExportNanoTxt}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/20 transition cursor-pointer"
-            title="Exportar arquivo .txt pronto para NANO (com seções === IPS ÚNICOS === e === REDES CIDR ===)"
-          >
-            <Terminal className="w-4 h-4 text-purple-200" />
-            Exportar .TXT (NANO)
-          </button>
-
-          {/* Pré-visualizar e Copiar p/ NANO */}
-          <button
-            onClick={() => setShowNanoModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl bg-slate-800 hover:bg-slate-700 text-purple-300 border border-purple-500/30 transition cursor-pointer"
-            title="Visualizar e copiar texto com as seções para colar diretamente no terminal"
-          >
-            <Terminal className="w-3.5 h-3.5 text-purple-400" />
-            Copiar p/ NANO
-          </button>
-
-          {/* Exportar .txt Simples (1 por linha) */}
-          <button
-            onClick={handleExportTxt}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
-            title="Exportar apenas a lista ATIVA em formato simples (1 por linha)"
-          >
-            <Download className="w-3.5 h-3.5 text-cyan-400" />
-            .TXT Simples
-          </button>
-
-          {/* Exportar .csv */}
-          <button
-            onClick={handleExportCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
-            title="Exportar todas as colunas com histórico em CSV"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-400" />
-            .CSV
-          </button>
-
-          {/* Limpar / Excluir Toda a Lista */}
-          <button
+            type="button"
             onClick={() => setShowClearAllModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/80 transition cursor-pointer"
-            title="Zerar e apagar toda a blocklist deste cliente (com snapshot de segurança antes)"
+            className="btn btn--quiet btn--danger"
+            title="Apagar toda a lista deste cliente (uma versão é salva antes)"
           >
-            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-            Zerar Lista
+            <Trash2 aria-hidden="true" />
+            Zerar lista
           </button>
         </div>
       </div>
 
-      {/* Controles de Filtros, Busca e Marcador em Lote */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Campo de Busca */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="toolbar">
+        <label className="field field--search">
+          <Search aria-hidden="true" />
           <input
-            type="text"
-            placeholder="Buscar por IP, CIDR, domínio, ticket ou observação..."
+            type="search"
+            placeholder="Buscar IP, CIDR, domínio, ticket ou observação"
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
               setPage(1);
             }}
-            className="w-full bg-slate-950 text-slate-100 placeholder-slate-500 text-xs sm:text-sm pl-9 pr-4 py-2 rounded-xl border border-slate-700 focus:outline-none focus:border-blue-500 font-mono"
+            aria-label="Buscar na lista"
           />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
-            >
-              Limpar
-            </button>
-          )}
-        </div>
+        </label>
 
-        {/* Filtros em Linha & Marcador por Lista */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          {/* Caixa para colocar e ir marcando */}
+        <div className="toolbar__group">
           <button
+            type="button"
             onClick={() => {
               setMatchFeedback(null);
               setShowBatchMatchModal(true);
             }}
-            className="px-3 py-1.5 rounded-lg border bg-blue-950/60 hover:bg-blue-900/60 text-blue-300 border-blue-800 flex items-center gap-1.5 transition font-semibold"
-            title="Colar uma lista de IPs para localizá-los e marcá-los automaticamente na tabela"
+            className="btn btn--sm"
+            title="Colar uma lista de IPs para localizar e marcar na tabela"
           >
-            <ListChecks className="w-3.5 h-3.5 text-blue-400" />
-            Marcar por Lista
+            <ListChecks aria-hidden="true" />
+            Marcar por lista
           </button>
 
           <button
             type="button"
             onClick={handleEnrichVisibleIps}
             disabled={Boolean(ctiProgress) || !paginatedEntries.some(item => item.type === 'IPv4' || item.type === 'IPv6')}
-            className="px-3 py-1.5 rounded-lg border bg-purple-950/60 hover:bg-purple-900/60 text-purple-200 border-purple-800 flex items-center gap-1.5 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Força uma nova consulta ao AbuseIPDB para atualizar hostnames e ocorrências dos IPs visíveis"
+            className="btn btn--sm"
+            title="Consultar de novo o AbuseIPDB para os IPs desta página"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-purple-400 ${ctiProgress ? 'animate-spin' : ''}`} />
-            {ctiProgress ? `Atualizando ${ctiProgress.done}/${ctiProgress.total}` : 'Atualizar hosts e ocorrências'}
+            <RefreshCw className={ctiProgress ? 'animate-spin' : ''} aria-hidden="true" />
+            {ctiProgress ? `Consultando ${ctiProgress.done}/${ctiProgress.total}` : 'Consultar AbuseIPDB'}
           </button>
 
           {lastCtiRefresh && !ctiProgress && (
-            <span className="text-[10px] text-emerald-400 tabular-nums" role="status">
-              {lastCtiRefresh.count} IPs · {lastCtiRefresh.at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} · {(lastCtiRefresh.elapsedMs / 1000).toFixed(1).replace('.', ',')}s
+            <span className="text-[11px] text-slate-400 tabular-nums" role="status">
+              {lastCtiRefresh.count} IPs às {lastCtiRefresh.at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
 
-          {/* Status */}
           <select
             value={statusFilter}
             onChange={(e) => {
-              setStatusFilter(e.target.value as any);
+              setStatusFilter(e.target.value as typeof statusFilter);
               setPage(1);
             }}
-            className="bg-slate-950 text-slate-200 rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none"
+            className="field"
+            aria-label="Filtrar por situação"
           >
-            <option value="active">Apenas Ativos</option>
-            <option value="removed">Apenas Removidos</option>
-            <option value="ALL">Todos os Status</option>
+            <option value="active">Ativos</option>
+            <option value="removed">Removidos</option>
+            <option value="ALL">Ativos e removidos</option>
           </select>
 
-          {/* Tipo */}
           <select
             value={typeFilter}
             onChange={(e) => {
               setTypeFilter(e.target.value);
               setPage(1);
             }}
-            className="bg-slate-950 text-slate-200 rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none"
+            className="field"
+            aria-label="Filtrar por tipo"
           >
-            <option value="ALL">Todos os Tipos</option>
+            <option value="ALL">Todos os tipos</option>
             <option value="IPv4">IPv4</option>
             <option value="CIDR_v4">CIDR v4</option>
             <option value="IPv6">IPv6</option>
@@ -754,91 +692,54 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
             <option value="Domain">Domínio</option>
           </select>
 
-          {/* Período */}
           <select
             value={periodFilter}
             onChange={(e) => {
-              setPeriodFilter(e.target.value as any);
+              setPeriodFilter(e.target.value as typeof periodFilter);
               setPage(1);
             }}
-            className="bg-slate-950 text-slate-200 rounded-lg px-2.5 py-1.5 border border-slate-700 focus:outline-none"
+            className="field"
+            aria-label="Filtrar por período"
           >
-            <option value="ALL">Qualquer Período</option>
+            <option value="ALL">Qualquer data</option>
             <option value="7d">Últimos 7 dias</option>
             <option value="30d">Últimos 30 dias</option>
-            <option value="year">Deste Ano</option>
+            <option value="year">Este ano</option>
           </select>
 
-          {/* Alternar Ordenação Numérica */}
           <button
+            type="button"
             onClick={() => setSortNumeric(!sortNumeric)}
-            className={`px-2.5 py-1.5 rounded-lg border flex items-center gap-1 transition ${
-              sortNumeric
-                ? 'bg-blue-950/80 text-blue-300 border-blue-800 font-semibold'
-                : 'bg-slate-950 text-slate-400 border-slate-700'
-            }`}
-            title="Ordenação numérica para IPv4 (10.2.0.1 antes de 10.10.0.1)"
+            className="btn btn--sm"
+            aria-pressed={sortNumeric}
+            title="Alternar entre ordem numérica de IP e ordem por data"
           >
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            {sortNumeric ? 'Ordem Numérica' : 'Ordem de Data'}
+            <ArrowUpDown aria-hidden="true" />
+            {sortNumeric ? 'Por IP' : 'Por data'}
           </button>
         </div>
       </div>
 
-      {/* BARRA FLUTUANTE DE AÇÕES EM LOTE (SELEÇÃO ATIVA) */}
       {selectedIds.size > 0 && (
-        <div className="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border border-blue-700/80 rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in slide-in-from-top-2 duration-150">
+        <div className="selection-bar" role="region" aria-label="Ações para os itens selecionados">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-white bg-blue-600 px-2.5 py-1 rounded-lg text-sm font-mono">
-              {selectedIds.size}
-            </span>
-            <span className="text-slate-200 font-medium">
-              indicador(es) selecionado(s) na tabela
-            </span>
-            <span className="text-slate-400 text-[11px] hidden md:inline">
-              (Dica: use Ctrl+Clique para alternar ou Shift+Clique para intervalo)
-            </span>
+            <span className="selection-bar__count">{selectedIds.size}</span>
+            <span className="text-slate-200">{selectedIds.size === 1 ? 'selecionado' : 'selecionados'}</span>
+            <span className="text-slate-500 text-[11px] hidden md:inline">Ctrl+clique alterna · Shift+clique seleciona um intervalo</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => handleBulkToggleStatus('removed')}
-              className="bg-slate-800 hover:bg-slate-700 text-amber-300 px-3 py-1.5 rounded-lg font-semibold transition"
-              title="Marcar todos os selecionados como Removido"
-            >
-              Marcar como Removido
-            </button>
-
-            <button
-              onClick={() => handleBulkToggleStatus('active')}
-              className="bg-slate-800 hover:bg-slate-700 text-emerald-300 px-3 py-1.5 rounded-lg font-semibold transition"
-              title="Reativar todos os selecionados"
-            >
-              Reativar Selecionados
-            </button>
-
-            <button
-              onClick={handleExportSelectedNano}
-              className="bg-purple-900/60 hover:bg-purple-800 text-purple-200 px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1"
-            >
-              <Terminal className="w-3.5 h-3.5" />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button type="button" onClick={() => handleBulkToggleStatus('removed')} className="btn btn--sm">Marcar como removido</button>
+            <button type="button" onClick={() => handleBulkToggleStatus('active')} className="btn btn--sm">Reativar</button>
+            <button type="button" onClick={handleExportSelectedNano} className="btn btn--sm">
+              <Download aria-hidden="true" />
               Exportar NANO
             </button>
-
-            <button
-              onClick={handleBulkDeleteSelected}
-              className="bg-rose-600 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              Excluir Selecionados
+            <button type="button" onClick={handleBulkDeleteSelected} className="btn btn--sm btn--danger">
+              <Trash2 aria-hidden="true" />
+              Excluir
             </button>
-
-            <button
-              onClick={() => setSelectedIds(new Set())}
-              className="text-slate-400 hover:text-white px-2 py-1.5 text-xs"
-            >
-              Desmarcar Todos
-            </button>
+            <button type="button" onClick={() => setSelectedIds(new Set())} className="btn btn--sm btn--quiet">Limpar seleção</button>
           </div>
         </div>
       )}
@@ -846,7 +747,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
       {/* Tabela de Entradas com Checkboxes e Suporte a Ctrl/Shift */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="list-table w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-semibold select-none">
                 {/* Checkbox de Selecionar Todos Visíveis */}
@@ -868,7 +769,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 <th className="py-3 px-3 w-56">Domínio / hostname</th>
                 <th className="py-3 px-3 w-32 text-center">Ocorrências · 90d</th>
                 <th className="py-3 px-3 w-24">Tipo</th>
-                <th className="py-3 px-3 w-28">Data Inclusão</th>
+                <th className="py-3 px-3 w-28">Incluído em</th>
                 <th className="py-3 px-3 w-36">Fonte / Ticket</th>
                 <th className="py-3 px-3 w-28">Status</th>
                 <th className="py-3 px-4">Observações</th>
@@ -932,7 +833,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                               e.stopPropagation();
                               setSelectedIpForDossier(item.indicator);
                             }}
-                            className={`text-xs font-bold hover:text-purple-300 hover:underline transition cursor-pointer text-left ${item.isReservedAlert ? 'text-amber-400' : 'text-white'}`}
+                            className={`text-xs font-bold hover:text-blue-300 hover:underline transition cursor-pointer text-left ${item.isReservedAlert ? 'text-amber-400' : 'text-white'}`}
                             title="Clique para abrir a Ficha Técnica / Dossiê CTI Completo"
                           >
                             {item.indicator}
@@ -943,10 +844,10 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                               e.stopPropagation();
                               setSelectedIpForDossier(item.indicator);
                             }}
-                            className="p-1 text-slate-500 hover:text-purple-300 rounded transition opacity-0 group-hover:opacity-100"
+                            className="p-1 text-slate-500 hover:text-blue-300 rounded transition opacity-0 group-hover:opacity-100"
                             title="Abrir Ficha de Inteligência CTI"
                           >
-                            <Radio className="w-3 h-3 text-purple-400" />
+                            <Radio className="w-3 h-3 text-blue-400" />
                           </button>
 
                           <button
@@ -982,8 +883,8 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                         ) : !isIp ? (
                           <span className="text-slate-600">—</span>
                         ) : intelligence?.status === 'loading' ? (
-                          <span className="inline-flex items-center gap-1.5 text-purple-300 text-[11px]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                          <span className="inline-flex items-center gap-1.5 text-blue-300 text-[11px]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
                             Consultando…
                           </span>
                         ) : intelligence?.status === 'ok' ? (
@@ -1020,7 +921,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                             {intelligence.data?.totalReports ?? 0}
                           </span>
                         ) : intelligence?.status === 'loading' ? (
-                          <span className="text-purple-300 animate-pulse">···</span>
+                          <span className="text-blue-300 animate-pulse">···</span>
                         ) : (
                           <span className="text-slate-600">—</span>
                         )}
@@ -1085,23 +986,23 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                             <RotateCcw className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Editar Observação */}
+                          {/* Editar observação */}
                           <button
                             onClick={() => {
                               setEditingEntry(item);
                               setEditNotesText(item.notes || '');
                             }}
                             className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded transition"
-                            title="Editar Observação"
+                            title="Editar observação"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
 
-                          {/* Excluir Definitivamente */}
+                          {/* Excluir definitivamente */}
                           <button
                             onClick={() => setDeleteConfirmId(item.id)}
                             className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded transition"
-                            title="Excluir Definitivamente"
+                            title="Excluir definitivamente"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1165,13 +1066,13 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
       {/* MODAL: "Caixa para colocar e ir marcando" (Marcador por Lista) */}
       {showBatchMatchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Seleção rápida por lista" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Seleção rápida por lista" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl p-6 space-y-4 modal-panel">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <ListChecks className="w-5 h-5 text-blue-400" />
                 <h3 className="text-base font-bold text-white">
-                  Caixa de Seleção Rápida por Lista
+                  Marcar por lista
                 </h3>
               </div>
               <button
@@ -1207,7 +1108,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 onClick={() => setBatchMatchInput('')}
                 className="text-xs text-slate-400 hover:text-white"
               >
-                Limpar Campo
+                Limpar
               </button>
 
               <div className="flex items-center gap-2">
@@ -1224,7 +1125,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                   disabled={!batchMatchInput.trim()}
                   className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow"
                 >
-                  Localizar e Marcar na Tabela
+                  Marcar na tabela
                 </button>
               </div>
             </div>
@@ -1234,13 +1135,13 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
       {/* MODAL: Versões Anteriores / Snapshots (Desfazer) */}
       {showSnapshotsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Versões anteriores da lista" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Versões anteriores da lista" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 modal-panel">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <History className="w-5 h-5 text-indigo-400" />
+                <History className="w-5 h-5 text-blue-400" />
                 <h3 className="text-base font-bold text-white">
-                  Versões Anteriores &amp; Desfazer: {currentClient?.name}
+                  Versões de {currentClient?.name}
                 </h3>
               </div>
               <button
@@ -1266,9 +1167,9 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               />
               <button
                 onClick={handleCreateManualSnapshot}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3 py-2 rounded-lg transition whitespace-nowrap"
+                className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2 rounded-lg transition whitespace-nowrap"
               >
-                Salvar Versão Atual
+                Salvar versão atual
               </button>
             </div>
 
@@ -1289,7 +1190,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                         <span className="font-bold text-white">
                           {snap.label}
                         </span>
-                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-950 text-indigo-300 border border-indigo-800 font-mono">
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-800 font-mono">
                           {snap.entriesCount} itens
                         </span>
                       </div>
@@ -1327,12 +1228,12 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
       {/* MODAL: Zerar / Excluir Toda a Lista */}
       {showClearAllModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Confirmar exclusão da lista" className="bg-slate-900 border border-rose-900/60 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Confirmar exclusão da lista" className="bg-slate-900 border border-rose-900/60 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4 modal-panel">
             <div className="flex items-center gap-2 text-rose-400">
               <AlertTriangle className="w-6 h-6" />
               <h3 className="text-base font-bold text-white">
-                Zerar Blocklist de {currentClient?.name}?
+                Zerar a lista de {currentClient?.name}?
               </h3>
             </div>
 
@@ -1341,7 +1242,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
             </p>
 
             <div className="p-3 bg-blue-950/40 border border-blue-800/60 rounded-xl text-xs text-blue-300">
-              🛡️ <strong>Segurança garantida:</strong> Um snapshot de segurança será gravado automaticamente antes da exclusão. Se você se arrepender, poderá restaurar a lista a qualquer momento pelo botão <em>Versões / Desfazer</em>.
+              Antes de apagar, uma versão da lista é salva. Para voltar atrás, use <strong>Versões</strong>.
             </div>
 
             <div>
@@ -1374,7 +1275,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 onClick={handleConfirmClearAll}
                 className="disabled-action bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow"
               >
-                Confirmar e Zerar Lista
+                Zerar lista
               </button>
             </div>
           </div>
@@ -1383,13 +1284,13 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
       {/* MODAL: Verificação de Duplicatas na Lista Inteira */}
       {showDuplicateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Verificação de duplicatas" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Verificação de duplicatas" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 modal-panel">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-400" />
+                <ScanSearch className="w-5 h-5 text-slate-400" />
                 <h3 className="text-base font-bold text-white">
-                  Verificação de Duplicatas: {currentClient?.name}
+                  Repetidos em {currentClient?.name}
                 </h3>
               </div>
               <button
@@ -1403,7 +1304,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
             {duplicateGroups.length === 0 ? (
               <div className="py-10 text-center space-y-2">
                 <ShieldCheck className="w-10 h-10 text-emerald-400 mx-auto" />
-                <h4 className="text-sm font-bold text-white">Lista 100% Higienizada!</h4>
+                <h4 className="text-sm font-bold text-white">Nenhum repetido encontrado</h4>
                 <p className="text-xs text-slate-400">
                   Nenhum IP duplicado foi encontrado na blocklist ativa de {currentClient?.name}.
                 </p>
@@ -1418,7 +1319,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                     onClick={handleCleanDuplicatesBatch}
                     className="bg-amber-500 hover:bg-amber-400 text-black font-bold px-3 py-1.5 rounded-lg transition"
                   >
-                    Remover Repetições em Lote (Manter Mais Recente)
+                    Remover repetidos (mantém o mais recente)
                   </button>
                 </div>
 
@@ -1452,11 +1353,11 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
       {/* MODAL: Visualizar & Copiar Formato NANO */}
       {showNanoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Visualização do formato NANO" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+          <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Visualização do formato NANO" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-4 modal-panel">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
-                <Terminal className="w-5 h-5 text-purple-400" />
+                <Terminal className="w-5 h-5 text-blue-400" />
                 <h3 className="text-base font-bold text-white">
                   Formato NANO (Linux Firewall): {currentClient?.name}
                 </h3>
@@ -1474,23 +1375,23 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
             </p>
 
             <div className="relative">
-              <pre className="w-full bg-slate-950 font-mono text-xs text-purple-300 p-4 rounded-xl border border-slate-800 overflow-x-auto max-h-80 select-all leading-relaxed whitespace-pre">
+              <pre className="w-full bg-slate-950 font-mono text-xs text-blue-300 p-4 rounded-xl border border-slate-800 overflow-x-auto max-h-80 select-all leading-relaxed whitespace-pre">
                 {generateNanoFormattedTxt(entries, sortNumeric)}
               </pre>
             </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-slate-800">
               <span className="text-[11px] text-slate-400">
-                Pressione Ctrl+C ou use o botão para copiar tudo para a área de transferência.
+                Use o botão ou Ctrl+C para copiar.
               </span>
 
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleCopyNanoText}
-                  className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow"
                 >
                   {copiedNano ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
-                  {copiedNano ? 'Copiado para a Área de Transferência!' : 'Copiar Texto NANO'}
+                  {copiedNano ? 'Copiado' : 'Copiar texto NANO'}
                 </button>
 
                 <button
@@ -1506,11 +1407,11 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
         </div>
       )}
 
-      {/* MODAL: Editar Observação */}
+      {/* MODAL: Editar observação */}
       {editingEntry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
           <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Editar observação" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
-            <h3 className="text-sm font-bold text-white">Editar Observação</h3>
+            <h3 className="text-sm font-bold text-white">Editar observação</h3>
             <p className="text-xs text-slate-400 font-mono">
               Indicador: <span className="text-white font-bold">{editingEntry.indicator}</span>
             </p>
@@ -1541,11 +1442,11 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
       {/* MODAL: Confirmação de Exclusão Definitiva Individual */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
           <div ref={internalDialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Confirmar exclusão definitiva" className="bg-slate-900 border border-rose-900/50 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
             <div className="flex items-center gap-2 text-rose-400">
               <AlertTriangle className="w-5 h-5" />
-              <h3 className="text-sm font-bold text-white">Excluir Definitivamente?</h3>
+              <h3 className="text-sm font-bold text-white">Excluir definitivamente?</h3>
             </div>
             <p className="text-xs text-slate-300">
               Esta ação removerá este indicador definitivamente do banco local (sem manter histórico). Se desejar apenas desativar, use a opção de marcar como "Removido".
@@ -1561,7 +1462,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 onClick={handleConfirmDelete}
                 className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold"
               >
-                Excluir Definitivamente
+                Excluir definitivamente
               </button>
             </div>
           </div>

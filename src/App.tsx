@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { flushSync } from 'react-dom';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { WeeklyImportView } from './components/WeeklyImportView';
@@ -156,7 +157,7 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
       const txt = generateFirewallTxt(entries, settings.sortNumericallyByDefault);
       const today = new Date().toISOString().split('T')[0];
       triggerDownload(`${client.name}_blocklist_${today}.txt`, txt, 'text/plain;charset=utf-8');
-      showToast(`Blocklist de ${client.name} exportada em .txt com sucesso!`);
+      showToast(`Lista de ${client.name} baixada em .txt.`);
     } catch (err) {
       console.error(err);
     }
@@ -168,7 +169,7 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
       const txt = generateNanoFormattedTxt(entries, settings.sortNumericallyByDefault);
       const today = new Date().toISOString().split('T')[0];
       triggerDownload(`${client.name}_blocklist_nano_${today}.txt`, txt, 'text/plain;charset=utf-8');
-      showToast(`Blocklist de ${client.name} exportada no formato NANO com sucesso!`);
+      showToast(`Lista de ${client.name} baixada no formato NANO.`);
     } catch (err) {
       console.error(err);
     }
@@ -201,8 +202,32 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
 
   const handleImportSuccess = (clientId: string, addedCount: number) => {
     setSelectedClientId(clientId);
-    showToast(`${addedCount} indicadores processados com sucesso na lista do cliente!`);
+    showToast(`${addedCount} indicadores gravados na lista do cliente.`);
     setCurrentTab('client-list');
+  };
+
+  // Troca de tema com revelação circular a partir do botão (View Transitions), quando disponível.
+  const handleToggleTheme = (origin?: { x: number; y: number }) => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    const apply = () => {
+      document.documentElement.dataset.theme = next;
+      document.documentElement.style.colorScheme = next;
+      flushSync(() => setTheme(next));
+    };
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const startViewTransition = (document as Document & { startViewTransition?: (cb: () => void) => unknown }).startViewTransition;
+    if (!startViewTransition || reduceMotion) {
+      apply();
+      return;
+    }
+    const x = origin?.x ?? window.innerWidth / 2;
+    const y = origin?.y ?? window.innerHeight / 2;
+    const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+    const root = document.documentElement.style;
+    root.setProperty('--reveal-x', `${x}px`);
+    root.setProperty('--reveal-y', `${y}px`);
+    root.setProperty('--reveal-r', `${radius}px`);
+    startViewTransition.call(document, apply);
   };
 
   const daysSinceBackup = getDaysSince(settings.lastBackupDate);
@@ -212,8 +237,8 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
     <div className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''} min-h-screen text-slate-100 flex flex-col font-sans`}>
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-slate-900 border border-emerald-500/80 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs animate-in slide-in-from-bottom-3 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="toast" role="status" aria-live="polite">
+          <CheckCircle2 aria-hidden="true" />
           <span>{toastMessage.text}</span>
         </div>
       )}
@@ -224,7 +249,7 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
         setCurrentTab={setCurrentTab}
         onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
         theme={theme}
-        onToggleTheme={() => setTheme(current => current === 'dark' ? 'light' : 'dark')}
+        onToggleTheme={handleToggleTheme}
         isBackupOutdated={isBackupOutdated}
         daysSinceBackup={daysSinceBackup}
         collapsed={sidebarCollapsed}
@@ -234,7 +259,8 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
       />
 
       {/* Conteúdo Principal */}
-      <main className="studio-main flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7">
+      <main className="studio-main flex-1">
+        <div key={currentTab} className="view-enter">
         {currentTab === 'dashboard' && (
           <DashboardView
             clients={clients}
@@ -246,9 +272,11 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
             totalCidrsAcrossAll={totalCidrsAcrossAll}
             totalCorrelatedIps={totalCorrelatedIps}
             addedThisWeekCount={addedThisWeekCount}
+            allActiveEntries={allActiveEntries}
             slaDays={settings.slaDays || 7}
             onNavigateToImport={handleNavigateToImport}
             onNavigateToList={handleNavigateToList}
+            onNavigateToHistory={() => setCurrentTab('history')}
             onQuickExportTxt={handleQuickExportTxt}
             onQuickExportNanoTxt={handleQuickExportNanoTxt}
             onOpenIntelligenceTab={() => setCurrentTab('intelligence')}
@@ -282,7 +310,7 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
         )}
 
         {currentTab === 'history' && (
-          <HistoryView clients={clients} />
+          <HistoryView clients={clients} onStartImport={() => setCurrentTab('import')} />
         )}
 
         {currentTab === 'clients' && (
@@ -301,19 +329,8 @@ export default function App({ currentUser = null, onLogout }: AppProps) {
             onOpenTests={() => setIsTestsOpen(true)}
           />
         )}
-      </main>
-
-      {/* Rodapé Informativo */}
-      <footer className="studio-footer border-t py-4 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>
-            GuardList • Rotina Semanal de Firewall • Armazenamento Local Seguro via IndexedDB
-          </span>
-          <span className="font-mono text-[11px] text-slate-400">
-            Regra Crítica: Listas 100% Independentes e Isoladas por Cliente
-          </span>
         </div>
-      </footer>
+      </main>
 
       {/* Modal de Consulta Rápida (Sem misturar dados) */}
       <QuickSearchModal

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Building2, Shield, Calendar, Tag, CheckCircle2 } from 'lucide-react';
+import { Search, X, Calendar, Tag, CheckCircle2 } from 'lucide-react';
 import { Client, BlocklistEntry } from '../types';
 import { searchIndicatorAcrossClients } from '../db/indexedDb';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -58,14 +58,14 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="quick-search-title" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="quick-search-title" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden modal-panel">
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/70">
           <div className="flex items-center gap-2">
             <Search className="w-5 h-5 text-blue-400" />
             <h3 id="quick-search-title" className="text-base font-bold text-white">
-              Consulta Rápida de Indicador
+              Consultar indicador
             </h3>
           </div>
           <button
@@ -85,7 +85,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
               type="text"
               autoFocus
               data-dialog-initial-focus
-              placeholder="Digite um IP, CIDR ou Domínio para consultar..."
+              placeholder="IP, CIDR ou domínio"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full bg-slate-950 font-mono text-sm text-white pl-10 pr-4 py-3 rounded-xl border border-slate-700 focus:outline-none focus:border-blue-500"
@@ -93,7 +93,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
           </div>
 
           <p className="text-[11px] text-slate-400">
-            Esta ferramenta realiza apenas leitura rápida para identificar presenças simultâneas, sem qualquer mesclagem entre as blocklists dos clientes.
+            Mostra em quais clientes o indicador aparece. Só leitura: nada é alterado nas listas.
           </p>
 
           {/* Resultados */}
@@ -152,7 +152,7 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
                     }}
                     className="text-xs text-blue-400 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-800 font-medium transition shrink-0"
                   >
-                    Ver na Lista
+                    Ver na lista
                   </button>
                 </div>
               ))

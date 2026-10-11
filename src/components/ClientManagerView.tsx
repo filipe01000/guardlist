@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Building2, Plus, Edit2, Archive, ArchiveRestore, Check, X, Shield } from 'lucide-react';
+import { Plus, Edit2, Archive, ArchiveRestore, Check, X } from 'lucide-react';
 import { Client } from '../types';
 import { saveClient, renameClient, archiveClient } from '../db/indexedDb';
+import { PageHeader } from './PageHeader';
 
 interface ClientManagerViewProps {
   clients: Client[];
@@ -62,7 +63,7 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
   const handleToggleArchive = async (client: Client) => {
     const next = !client.isArchived;
     const msg = next
-      ? `Deseja arquivar o cliente ${client.name}? Ele ficará oculto do painel ativo, mas seus dados permanecerão salvos no IndexedDB.`
+      ? `Deseja arquivar o cliente ${client.name}? Ele sai do painel, mas os dados continuam salvos neste navegador.`
       : `Deseja desarquivar o cliente ${client.name}?`;
 
     if (window.confirm(msg)) {
@@ -71,169 +72,125 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
     }
   };
 
+  const activeTotal = clients.filter(c => !c.isArchived).length;
+
   return (
     <div className="space-y-6">
-      {/* Cabeçalho */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
-            <Building2 className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-white">
-              Gerenciamento de Clientes
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Cadastre novos clientes, renomeie ou arquive contratos mantendo a integridade isolada de cada blocklist.
-            </p>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Gerenciar clientes"
+        description="Cadastre, renomeie ou arquive clientes. Cada cliente tem a própria lista, sem mistura com as outras."
+      />
 
-      {/* Formulário de Adicionar Cliente */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
-        <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-          <Plus className="w-4 h-4 text-blue-400" />
-          Cadastrar Novo Cliente
-        </h3>
-        <form onSubmit={handleAddClient} className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <section className="data-panel p-5" aria-labelledby="new-client-title">
+        <h2 id="new-client-title" className="text-sm font-bold text-white mb-4">Novo cliente</h2>
+        <form onSubmit={handleAddClient} className="grid grid-cols-1 md:grid-cols-[1fr_1.4fr_auto] gap-3 items-end">
           <div>
-            <label className="block text-xs text-slate-300 font-medium mb-1">
-              Nome do Cliente:
-            </label>
+            <label className="field-label" htmlFor="new-client-name">Nome</label>
             <input
+              id="new-client-name"
               type="text"
               required
-              placeholder="Ex: HOSPITAL SANTO ANTONIO"
+              placeholder="HOSPITAL SANTO ANTONIO"
               value={newClientName}
               onChange={(e) => setNewClientName(e.target.value)}
-              className="w-full bg-slate-950 text-white text-xs p-2.5 rounded-xl border border-slate-700 uppercase focus:outline-none focus:border-blue-500 font-semibold"
+              className="field w-full uppercase font-mono font-semibold"
             />
           </div>
-
           <div>
-            <label className="block text-xs text-slate-300 font-medium mb-1">
-              Observações / Tipo de Firewall:
-            </label>
+            <label className="field-label" htmlFor="new-client-notes">Firewall ou observação <span className="text-slate-500 font-normal">(opcional)</span></label>
             <input
+              id="new-client-notes"
               type="text"
-              placeholder="Ex: Firewall Fortigate 100F borda DMZ"
+              placeholder="FortiGate 100F na borda da DMZ"
               value={newClientNotes}
               onChange={(e) => setNewClientNotes(e.target.value)}
-              className="w-full bg-slate-950 text-white text-xs p-2.5 rounded-xl border border-slate-700 focus:outline-none focus:border-blue-500"
+              className="field w-full"
             />
           </div>
-
-          <div className="flex items-end">
-            <button
-              type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow transition cursor-pointer"
-            >
-              Adicionar Cliente
-            </button>
-          </div>
+          <button type="submit" className="btn btn--primary h-9">
+            <Plus aria-hidden="true" />
+            Adicionar
+          </button>
         </form>
-      </div>
+      </section>
 
-      {/* Lista de Clientes */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between text-xs text-slate-400">
-          <span className="font-semibold text-white">Clientes Cadastrados ({clients.length})</span>
-          <span>Regra estrita: blocklists nunca se misturam</span>
-        </div>
+      <section className="data-panel" aria-labelledby="client-list-title">
+        <header className="data-panel__header">
+          <h2 id="client-list-title">Clientes</h2>
+          <span>{activeTotal} ativos{clients.length > activeTotal ? ` · ${clients.length - activeTotal} arquivados` : ''}</span>
+        </header>
 
-        <div className="divide-y divide-slate-800/80">
+        <ul className="client-rows">
           {clients.map((client) => {
             const count = activeCounts[client.id] || 0;
             const isEditing = editingClientId === client.id;
 
             return (
-              <div
-                key={client.id}
-                className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
-                  client.isArchived ? 'opacity-50 bg-slate-950/40' : 'hover:bg-slate-800/30'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-800 text-slate-300 rounded-lg">
-                    <Shield className="w-5 h-5 text-blue-400" />
-                  </div>
-
+              <li key={client.id} className={`client-row ${client.isArchived ? 'is-archived' : ''}`}>
+                <div className="min-w-0">
                   {isEditing ? (
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
                         value={editNameText}
+                        autoFocus
                         onChange={(e) => setEditNameText(e.target.value)}
-                        className="bg-slate-950 text-white text-xs p-1.5 rounded-lg border border-blue-500 uppercase font-mono font-bold"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveRename(client.id);
+                          if (e.key === 'Escape') setEditingClientId(null);
+                        }}
+                        className="field uppercase font-mono font-bold"
+                        aria-label={`Novo nome para ${client.name}`}
                       />
-                      <button
-                        onClick={() => handleSaveRename(client.id)}
-                        className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-500"
-                        title="Salvar"
-                      >
-                        <Check className="w-3.5 h-3.5" />
+                      <button type="button" onClick={() => handleSaveRename(client.id)} className="btn btn--sm btn--primary btn--icon" title="Salvar" aria-label="Salvar nome">
+                        <Check aria-hidden="true" />
                       </button>
-                      <button
-                        onClick={() => setEditingClientId(null)}
-                        className="p-1.5 bg-slate-800 text-slate-400 rounded hover:text-white"
-                        title="Cancelar"
-                      >
-                        <X className="w-3.5 h-3.5" />
+                      <button type="button" onClick={() => setEditingClientId(null)} className="btn btn--sm btn--icon" title="Cancelar" aria-label="Cancelar">
+                        <X aria-hidden="true" />
                       </button>
                     </div>
                   ) : (
-                    <div>
+                    <>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white font-mono text-sm">
-                          {client.name}
-                        </span>
-                        {client.isArchived && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                            Arquivado
-                          </span>
-                        )}
+                        <span className="font-bold text-white font-mono text-sm">{client.name}</span>
+                        {client.isArchived && <span className="chip">Arquivado</span>}
                       </div>
-                      <span className="text-[11px] text-slate-400">
-                        {client.notes || 'Sem observações adicionais.'}
-                      </span>
-                    </div>
+                      <span className="block text-[12px] text-slate-400 mt-0.5 truncate">{client.notes || 'Sem observações'}</span>
+                    </>
                   )}
                 </div>
 
-                <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <span className="text-slate-400 block text-[10px]">Entradas Ativas</span>
-                    <strong className="text-white font-mono">{count}</strong>
+                    <strong className="block text-white font-mono tabular-nums">{count}</strong>
+                    <span className="text-slate-500 text-[11px]">ativos</span>
                   </div>
-
-                  <div className="flex items-center gap-1.5 border-l border-slate-800 pl-3">
+                  <div className="flex items-center gap-1">
                     <button
+                      type="button"
                       onClick={() => handleStartRename(client)}
-                      className="p-1.5 text-slate-400 hover:text-blue-400 rounded hover:bg-slate-800 transition"
-                      title="Renomear Cliente"
+                      className="btn btn--sm btn--icon btn--quiet"
+                      title="Renomear"
+                      aria-label={`Renomear ${client.name}`}
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 aria-hidden="true" />
                     </button>
-
                     <button
+                      type="button"
                       onClick={() => handleToggleArchive(client)}
-                      className={`p-1.5 rounded transition ${
-                        client.isArchived
-                          ? 'text-emerald-400 hover:bg-slate-800'
-                          : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
-                      }`}
-                      title={client.isArchived ? 'Desarquivar Cliente' : 'Arquivar Cliente'}
+                      className="btn btn--sm btn--icon btn--quiet"
+                      title={client.isArchived ? 'Desarquivar' : 'Arquivar'}
+                      aria-label={`${client.isArchived ? 'Desarquivar' : 'Arquivar'} ${client.name}`}
                     >
-                      {client.isArchived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                      {client.isArchived ? <ArchiveRestore aria-hidden="true" /> : <Archive aria-hidden="true" />}
                     </button>
                   </div>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
-      </div>
+        </ul>
+      </section>
     </div>
   );
 };
