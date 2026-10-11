@@ -147,7 +147,7 @@
   ],
   "narrative": {
     "northStar": "The Perimeter Vault",
-    "overview": "O GuardList é um cofre de perímetros. Cada cliente é um compartimento isolado, e a interface existe para guardar essa separação com calma: nada vaza de um cofre para outro, nada grita, tudo tem lugar e estado. O tom é sóbrio e firme. A interface guarda, não assusta.\n\nO trabalho acontece sobre aço escuro (ou papel bancário no tema claro), em superfícies planas separadas por tom e por costuras de 1px. Acima delas flutua um único console, a sidebar, que acompanha o operador por todas as salas do cofre. A entrada é uma porta: a tela de login, o único lugar onde a marca ganha um painel próprio, com degradê de aço azulado e grade de cofre. Dentro, a densidade é de bancada técnica: rótulos curtos, números tabulares e um só azul para agir.",
+    "overview": "O GuardList é um cofre de perímetros. Cada cliente é um compartimento isolado, e a interface existe para guardar essa separação com calma: nada vaza de um cofre para outro, nada grita, tudo tem lugar e estado. O tom é sóbrio e firme. A interface guarda, não assusta.\n\nO trabalho acontece sobre aço escuro (ou papel bancário no tema claro), em superfícies planas separadas por tom e por costuras de 1px. Acima delas flutua um único console, a sidebar, que acompanha o operador por todas as salas do cofre. A entrada é uma porta: a tela de login, o único lugar onde a marca ganha um painel próprio, com a imagem da porta do cofre em aço azulado. Dentro, a densidade é de bancada técnica: rótulos curtos, números tabulares e um só azul para agir.",
     "keyCharacteristics": [
       "Um console flutuante (sidebar) acima de uma bancada plana.",
       "Isolamento visível: cada cliente em sua própria superfície, sem misturar estados.",
@@ -162,7 +162,7 @@
       { "name": "The Two Shifts Rule", "body": "Todo componente novo precisa existir nos dois temas, aço e papel bancário, usando os tokens de tema, nunca hex fixo no componente.", "section": "colors" },
       { "name": "The Evidence Type Rule", "body": "Valor técnico ou identificador usa monoespaçado; explicação e comando usam sans-serif.", "section": "typography" },
       { "name": "The Floating Layer Rule", "body": "Só ganha sombra o que flutua sobre a bancada. Card, tabela, campo e botão ficam planos; botões nunca têm sombra.", "section": "elevation" },
-      { "name": "The Brand Panel Rule", "body": "Degradê só em painel de marca dedicado, como a porta do login. Nunca em botões, cards de dados ou estados.", "section": "elevation" },
+      { "name": "The Brand Panel Rule", "body": "Degradê e imagem de marca só em painel de marca dedicado, como a porta do login. Nunca em botões, cards de dados ou estados.", "section": "elevation" },
       { "name": "The Float-Is-Round Rule", "body": "Quanto mais um elemento flutua, mais arredondado ele é: bancada com 8–12px, console e porta com 24px.", "section": "shapes" }
     ],
     "dos": [

@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import express, { type RequestHandler } from 'express';
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -224,8 +225,21 @@ app.get('/api/abuse-summary/:indicator', abuseSummaryLimit, async (req, res) => 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota de API não encontrada.' }));
 
 if (production) {
-  app.use(express.static(path.join(rootDir, 'dist')));
-  app.get('*', (_req, res) => res.sendFile(path.join(rootDir, 'dist', 'index.html')));
+  // index.html recebe a origem pública para que og:image tenha URL absoluta (exigida pelas prévias de link).
+  const indexHtml = readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8');
+  const configuredOrigin = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
+  const originFor = (req: express.Request): string => {
+    if (/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin)) return configuredOrigin;
+    const hostHeader = req.get('host') || '';
+    return /^[a-z0-9.-]+(:\d+)?$/i.test(hostHeader) ? `${req.protocol}://${hostHeader}` : '';
+  };
+  const sendIndex: RequestHandler = (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.type('html').send(indexHtml.replaceAll('__APP_ORIGIN__', originFor(req)));
+  };
+
+  app.use(express.static(path.join(rootDir, 'dist'), { index: false }));
+  app.get('*', sendIndex);
 } else {
   const { createServer } = await import('vite');
   const vite = await createServer({ root: rootDir, server: { middlewareMode: true }, appType: 'spa' });
