@@ -4,6 +4,7 @@ import { BlocklistEntry, Client } from '../types';
 import { buildCorrelationMatrix } from '../utils/ctiService';
 import { IpDossierModal } from './IpDossierModal';
 import { PageHeader } from './PageHeader';
+import { EvolutionPanel } from './EvolutionPanel';
 
 interface IntelligenceViewProps {
   allEntries: BlocklistEntry[];
@@ -11,7 +12,7 @@ interface IntelligenceViewProps {
   onNavigateToClientList: (clientId: string) => void;
 }
 
-export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
+const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
   allEntries,
   clients,
   onNavigateToClientList
@@ -72,10 +73,6 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Inteligência de IPs"
-        description="Indicadores que aparecem em duas ou mais listas de clientes. Clique em uma linha para abrir o dossiê."
-      />
 
       <div className="workspace-summary intelligence-summary" aria-label="Resumo de correlação">
         <div className="workspace-summary__item">
@@ -248,6 +245,28 @@ export const IntelligenceView: React.FC<IntelligenceViewProps> = ({
           clients={clients}
         />
       )}
+    </div>
+  );
+};
+
+// Inteligência de IPs: correlação entre clientes e evolução (tamanho da lista, países e provedores).
+export const IntelligenceView: React.FC<IntelligenceViewProps> = (props) => {
+  const [view, setView] = useState<'correlation' | 'evolution'>('correlation');
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="Inteligência de IPs"
+        description={view === 'correlation'
+          ? 'Indicadores que aparecem em duas ou mais listas de clientes. Clique em uma linha para abrir o dossiê.'
+          : 'Como as listas cresceram, de onde vêm os IPs bloqueados e quais provedores mais aparecem.'}
+      />
+      <div className="page-tabs" role="tablist" aria-label="Visões">
+        <button type="button" role="tab" aria-selected={view === 'correlation'} onClick={() => setView('correlation')}>Correlação entre clientes</button>
+        <button type="button" role="tab" aria-selected={view === 'evolution'} onClick={() => setView('evolution')}>Evolução e origem</button>
+      </div>
+      <div key={view} className="view-enter">
+        {view === 'correlation' ? <CorrelationPanel {...props} /> : <EvolutionPanel clients={props.clients} />}
+      </div>
     </div>
   );
 };

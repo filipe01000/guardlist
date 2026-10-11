@@ -21,6 +21,15 @@ export interface Client {
     removed: number;
     previousTotal: number;
   };
+  // IPs, redes ou domínios que nunca podem ser bloqueados neste cliente (gateway, parceiros, a própria empresa).
+  exceptions?: ClientException[];
+}
+
+export interface ClientException {
+  indicator: string;
+  reason?: string;
+  addedBy?: string;
+  addedAt?: string;
 }
 
 export interface IpCtiRecord {
@@ -92,6 +101,9 @@ export interface BlocklistEntry {
   addedBy?: string; // Quem incluiu (preenchido pelo servidor)
   removedAt?: string; // Quando foi marcado como removido (ISO)
   removedBy?: string; // Quem removeu
+  lastSeenAt?: string; // Última vez que reapareceu numa importação (ISO)
+  reviewedAt?: string; // Última revisão manual (mantido na lista)
+  reviewedBy?: string;
 }
 
 export interface ImportPreviewItem {
@@ -104,7 +116,9 @@ export interface ImportPreviewItem {
     | 'already_exists' // Já existe na lista ativa do cliente
     | 'covered_by_cidr' // Coberto por um CIDR da lista do cliente ou do próprio lote
     | 'invalid' // Formato inválido
-    | 'reserved_warning'; // IP privado/reservado com alerta
+    | 'reserved_warning' // IP privado/reservado com alerta
+    | 'exception'; // Está nas exceções do cliente: nunca pode ser bloqueado
+  exceptionHit?: string;
   coveredByCidr?: string;
   reservedReason?: string;
   error?: string;
@@ -118,6 +132,7 @@ export interface ImportPreviewSummary {
   coveredByCidrCount: number;
   invalidCount: number;
   reservedWarningCount: number;
+  exceptionCount: number;
   items: ImportPreviewItem[];
   // Itens que já estão na lista e passam a ficar cobertos por um CIDR novo deste lote (retirados ao gravar).
   superseded: Array<{ indicator: string; coveredBy: string }>;
@@ -144,6 +159,70 @@ export interface AppSettings {
   slaDays: number; // Dias para considerar atualização atrasada (padrão: 7)
   lastBackupDate: string | null;
   sortNumericallyByDefault: boolean;
+  reviewDays?: number; // Dias sem reaparecer nem receber denúncias até ir para a fila de revisão (padrão: 90)
+  approvalThreshold?: number; // Importações de analistas acima deste total aguardam um admin (padrão: 500)
+  requireApprovalForReplace?: boolean; // "Substituir lista" de analistas aguarda um admin (padrão: sim)
+}
+
+// Reputação consolidada de um IP (AbuseIPDB, GreyNoise e OTX), guardada em cache no servidor.
+export type CtiVerdict = 'legit' | 'low' | 'medium' | 'high' | 'unknown';
+
+export interface CtiSummary {
+  indicator: string;
+  fetchedAt: string;
+  verdict: CtiVerdict;
+  verdictReason?: string;
+  score: number | null;
+  totalReports: number | null;
+  lastReportedAt: string | null;
+  domain: string | null;
+  isp: string | null;
+  asn: string | null;
+  countryCode: string | null;
+  usageType: string | null;
+  greyNoise: { classification: string | null; riot: boolean; name: string | null } | null;
+  otxPulses: number | null;
+  errors?: string[];
+}
+
+export interface EntryComment {
+  id: number;
+  entryId: string;
+  clientId: string;
+  indicator: string;
+  username: string;
+  displayName: string;
+  body: string;
+  at: string;
+}
+
+export interface PendingImport {
+  id: string;
+  clientId: string;
+  clientName: string;
+  mode: 'append' | 'replace';
+  itemCount: number;
+  requestedBy: string;
+  requestedByName: string;
+  requestedAt: string;
+  status: 'pending' | 'approved' | 'rejected';
+  decidedBy?: string | null;
+  decidedAt?: string | null;
+  decisionNote?: string | null;
+  sourceTicket?: string;
+  notes?: string;
+  sample: string[];
+}
+
+export interface ImportOutcome {
+  status: 'done' | 'pending';
+  pendingId?: string;
+  added: number;
+  retired: number;
+  removed: number;
+  blockedByException: number;
+  snapshotId?: string;
+  historyId?: string;
 }
 
 export interface ClientSnapshot {
@@ -165,4 +244,44 @@ export interface SessionUser {
   mustChangePassword: boolean;
   createdAt: string;
   lastLoginAt: string | null;
+  lockedUntil?: string | null;
+}
+
+// Relatório de um período (geral ou de um cliente), gerado no servidor.
+export interface ReportClientRow {
+  clientId: string;
+  name: string;
+  notes: string;
+  lastUpdateDate: string | null;
+  status: 'em_dia' | 'atrasado' | 'sem_importacao';
+  activeNow: number;
+  addedInPeriod: number;
+  removedInPeriod: number;
+  importsInPeriod: number;
+  importers: string[];
+}
+
+export interface ReportChangeRow {
+  action: 'incluido' | 'removido';
+  date: string;
+  indicator: string;
+  type: string;
+  ticket: string;
+  notes: string;
+  by: string;
+  currentStatus: 'active' | 'removed';
+}
+
+export interface ReportData {
+  from: string;
+  to: string;
+  clientId: string | null;
+  generatedAt: string;
+  generatedBy: string;
+  slaDays: number;
+  totals: { clients: number; added: number; removed: number; imports: number; late: number; activeNow: number };
+  clients: ReportClientRow[];
+  changes: ReportChangeRow[];
+  imports: ImportHistoryRecord[];
+  activity: Array<{ name: string; imports: number; added: number; removed: number }>;
 }

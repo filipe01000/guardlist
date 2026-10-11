@@ -6,9 +6,12 @@ import {
   History,
   LayoutGrid,
   List,
+  ShieldCheck,
   Table as TableIcon,
   Upload
 } from 'lucide-react';
+import { ValidateAllModal } from './ValidateAllModal';
+import type { ShowToast } from '../App';
 import { BlocklistEntry, Client, ImportHistoryRecord } from '../types';
 import { getDaysSince } from '../utils/validator';
 import { getHistoryRecords } from '../db/store';
@@ -32,6 +35,9 @@ interface DashboardViewProps {
   onQuickExportTxt: (client: Client) => void;
   onQuickExportNanoTxt: (client: Client) => void;
   onOpenIntelligenceTab: () => void;
+  onRefresh: () => void;
+  showToast: ShowToast;
+  onOpenReview: () => void;
 }
 
 const VIEW_MODE_KEY = 'guardlist-dashboard-view';
@@ -69,8 +75,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToHistory,
   onQuickExportTxt,
   onQuickExportNanoTxt,
-  onOpenIntelligenceTab
+  onOpenIntelligenceTab,
+  onRefresh,
+  showToast,
+  onOpenReview
 }) => {
+  const [isValidateOpen, setIsValidateOpen] = useState(false);
   const activeClients = useMemo(() => clients.filter((c) => !c.isArchived), [clients]);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
     try {
@@ -169,6 +179,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <PageHeader
         title="Painel geral"
         description="Situação da manutenção semanal de cada cliente, ordenada por urgência."
+        actions={
+          <button type="button" className="btn" onClick={() => setIsValidateOpen(true)} title="Procura repetidos, IPs dentro de CIDR e conflitos com exceções em todos os clientes">
+            <ShieldCheck aria-hidden="true" />
+            Validar todas as listas
+          </button>
+        }
+      />
+
+      <ValidateAllModal
+        open={isValidateOpen}
+        onClose={() => setIsValidateOpen(false)}
+        onDone={onRefresh}
+        onOpenList={onNavigateToList}
+        onOpenReview={onOpenReview}
+        showToast={showToast}
       />
 
       <div className="workspace-summary" aria-label="Resumo operacional">

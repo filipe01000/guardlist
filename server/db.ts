@@ -78,6 +78,69 @@ CREATE TABLE IF NOT EXISTS audit_log (
   detail JSONB
 );
 CREATE INDEX IF NOT EXISTS audit_log_at_idx ON audit_log (at DESC);
+
+-- Bloqueio temporário da conta após várias senhas erradas.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+
+-- Sessões abertas (uma por login), para listar e encerrar. O id guardado é o hash do token.
+CREATE TABLE IF NOT EXISTS sessions (
+  id TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  ip TEXT,
+  user_agent TEXT,
+  revoked_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions (user_id);
+
+-- Conversa curta em cada item da lista.
+CREATE TABLE IF NOT EXISTS comments (
+  id BIGSERIAL PRIMARY KEY,
+  entry_id TEXT NOT NULL,
+  client_id TEXT NOT NULL,
+  indicator TEXT NOT NULL,
+  username TEXT,
+  display_name TEXT,
+  body TEXT NOT NULL,
+  at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS comments_entry_idx ON comments (entry_id);
+CREATE INDEX IF NOT EXISTS comments_client_idx ON comments (client_id);
+
+-- Importações que aguardam um administrador.
+CREATE TABLE IF NOT EXISTS pending_imports (
+  id TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  mode TEXT NOT NULL,
+  data JSONB NOT NULL,
+  requested_by TEXT NOT NULL,
+  requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  status TEXT NOT NULL DEFAULT 'pending',
+  decided_by TEXT,
+  decided_at TIMESTAMPTZ,
+  decision_note TEXT
+);
+CREATE INDEX IF NOT EXISTS pending_imports_status_idx ON pending_imports (status, requested_at DESC);
+
+-- Reputação dos IPs (AbuseIPDB, GreyNoise, OTX), para triagem e gráficos.
+CREATE TABLE IF NOT EXISTS cti_cache (
+  indicator TEXT PRIMARY KEY,
+  data JSONB NOT NULL,
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Última execução das rotinas automáticas (backup diário, relatório mensal).
+CREATE TABLE IF NOT EXISTS job_runs (
+  job TEXT PRIMARY KEY,
+  last_run_at TIMESTAMPTZ,
+  last_ok_at TIMESTAMPTZ,
+  last_error TEXT,
+  detail JSONB
+);
 `;
 
 async function connectPostgres(url: string): Promise<Database> {

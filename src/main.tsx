@@ -13,5 +13,6 @@ import '@fontsource/ibm-plex-mono/latin-600.css';
 import AuthGate from './AuthGate.tsx';
 import './index.css';
 import './styles/system.css';
+import './styles/features.css';
 
 createRoot(document.getElementById('root')!).render(<AuthGate />);

@@ -19,6 +19,14 @@
   --sb-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
+/* Telas mais baixas: linhas mais compactas para todo o menu caber sem rolar. */
+@media (max-height: 940px) {
+  :root { --sb-row: 40px; --sb-avatar: 40px; }
+}
+@media (max-height: 820px) {
+  :root { --sb-row: 35px; --sb-avatar: 36px; }
+}
+
 :root[data-theme="light"] {
   --sb-card: #ffffff;
   --sb-band: #f0f5ff;

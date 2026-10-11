@@ -113,13 +113,20 @@ export const BackupView: React.FC<BackupViewProps> = ({
     reader.readAsText(file);
   };
 
+  const [reviewDaysInput, setReviewDaysInput] = useState<number>(settings.reviewDays ?? 90);
+  const [thresholdInput, setThresholdInput] = useState<number>(settings.approvalThreshold ?? 500);
+  const [replaceNeedsApproval, setReplaceNeedsApproval] = useState<boolean>(settings.requireApprovalForReplace !== false);
+
   // Salvar Ajustes
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     const updated: AppSettings = {
       ...settings,
       slaDays: Number(slaDaysInput) || 7,
-      sortNumericallyByDefault: sortNumeric
+      sortNumericallyByDefault: sortNumeric,
+      reviewDays: Number(reviewDaysInput) || 90,
+      approvalThreshold: Number(thresholdInput) || 500,
+      requireApprovalForReplace: replaceNeedsApproval
     };
     await saveAppSettings(updated);
     onUpdateSettings(updated);
@@ -239,11 +246,73 @@ export const BackupView: React.FC<BackupViewProps> = ({
             </label>
           </div>
 
+          <div>
+            <label className="field-label" htmlFor="review-days">Revisão de bloqueios (dias)</label>
+            <input
+              id="review-days"
+              type="number"
+              min={7}
+              max={3650}
+              value={reviewDaysInput}
+              onChange={(e) => setReviewDaysInput(Number(e.target.value))}
+              className="field w-32 font-mono"
+              disabled={!isAdmin}
+            />
+            <p className="text-[11px] text-slate-500 mt-1.5">
+              Bloqueios sem reaparecer nas importações, sem revisão e sem denúncias há mais de {reviewDaysInput} dias vão para a fila de revisão.
+            </p>
+          </div>
+
+          <div>
+            <label className="field-label" htmlFor="approval-threshold">Aprovação de importações</label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-300">Lotes de analistas acima de</span>
+              <input
+                id="approval-threshold"
+                type="number"
+                min={1}
+                value={thresholdInput}
+                onChange={(e) => setThresholdInput(Number(e.target.value))}
+                className="field w-28 font-mono"
+                disabled={!isAdmin}
+              />
+              <span className="text-xs text-slate-300">itens</span>
+            </div>
+            <label className="flex items-center gap-2 mt-2 cursor-pointer text-xs text-slate-300">
+              <input type="checkbox" checked={replaceNeedsApproval} onChange={(e) => setReplaceNeedsApproval(e.target.checked)} disabled={!isAdmin} className="accent-[var(--accent)]" />
+              "Substituir lista" de analistas sempre precisa de aprovação
+            </label>
+            <p className="text-[11px] text-slate-500 mt-1.5">
+              {isAdmin ? 'Pedidos aparecem em Administração → Aprovações.' : 'Só administradores mudam as regras de revisão e aprovação.'}
+            </p>
+          </div>
+
           <div className="md:col-span-2 flex justify-end">
             <button type="submit" className="btn btn--primary">Salvar ajustes</button>
           </div>
         </form>
       </section>
+
+      <details className="data-panel disclosure">
+        <summary>Backup automático e restauração no Neon</summary>
+        <div className="px-5 pb-5 space-y-3 text-xs text-slate-300 leading-relaxed max-w-3xl">
+          <p>
+            <strong className="text-white">Backup diário por e-mail.</strong> Com o SMTP configurado no Render (SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
+            SMTP_FROM e BACKUP_EMAILS), o servidor envia todo dia, a partir das 3h, um arquivo .json.gz com todos os dados. Se falhar, os administradores
+            veem um aviso no topo do app e recebem um e-mail. A situação fica em Administração → Status do sistema.
+          </p>
+          <p>
+            <strong className="text-white">Restauração por horário no Neon.</strong> O Neon guarda o histórico do banco e permite voltar a um momento
+            anterior. No painel do Neon: abra o projeto → <em>Branches</em> → escolha a branch principal → <em>Restore</em> (ou <em>Backup &amp; Restore</em>)
+            → escolha data e hora. A janela de tempo disponível depende do plano (no plano gratuito ela é curta, de horas; nos pagos, de dias):
+            confira em <em>Settings → Storage / History retention</em>.
+          </p>
+          <p>
+            Dica: antes de restaurar o banco inteiro, prefira criar uma branch nova a partir do horário desejado e conferir os dados nela. Para desfazer
+            só uma lista, use <em>Versões</em> na tela do cliente; para um erro de importação recente, o botão <em>Desfazer</em> que aparece depois de gravar.
+          </p>
+        </div>
+      </details>
 
       <details className="data-panel disclosure">
         <summary>Diagnóstico</summary>

@@ -55,10 +55,23 @@ Não defina `HOST` no Render; em produção o servidor já escuta em `0.0.0.0` e
 
 ### Usuários e permissões
 
-- **Administrador:** tudo, mais a tela Usuários (criar contas, mudar papel, desativar, gerar nova senha) e restaurar backups.
-- **Analista:** importa, edita e exporta as listas de todos os clientes.
+- **Administrador:** tudo, mais a área **Administração** (usuários e sessões, aprovações, auditoria, status do sistema), exceções dos clientes, regras de revisão e aprovação, e restaurar backups.
+- **Analista:** importa, edita e exporta as listas de todos os clientes. "Substituir lista" e lotes acima do limite (500 itens, ajustável) ficam aguardando um administrador.
 
-Contas novas e senhas redefinidas recebem uma senha provisória, trocada obrigatoriamente no primeiro acesso. Desativar alguém, mudar o papel ou redefinir a senha encerra na hora as sessões abertas dessa pessoa. Cada pessoa troca a própria senha clicando no seu nome na barra lateral.
+Contas novas e senhas redefinidas recebem uma senha provisória, trocada obrigatoriamente no primeiro acesso. Desativar alguém, mudar o papel ou redefinir a senha encerra na hora as sessões abertas dessa pessoa. Cada pessoa troca a própria senha e vê as próprias sessões clicando no seu nome na barra lateral. Depois de 5 senhas erradas seguidas, a conta trava por 15 minutos (um administrador pode liberar antes).
+
+### Rotina da operação
+
+- **Exceções por cliente:** IPs, redes ou domínios que nunca podem ser bloqueados (gateway, parceiros). A importação recusa o que bater com elas.
+- **Reputação na importação:** a pré-visualização consulta AbuseIPDB, GreyNoise e OTX (até 100 IPs por vez, com cache) e marca IPs de serviços legítimos (Google, Cloudflare, Microsoft…), que por padrão não são gravados.
+- **Validar lista / Validar todas as listas:** retira repetidos, IPs dentro de um CIDR da mesma lista e conflitos com exceções, sempre com uma versão salva antes.
+- **Revisão de bloqueios:** bloqueios sem reaparecer nas importações e sem denúncias há mais de 90 dias (ajustável) vão para uma fila para manter ou remover.
+- **Desfazer:** depois de importar, remover ou excluir, o aviso traz um botão Desfazer por alguns segundos.
+- **Atalhos:** `?` mostra a lista; `Ctrl+K` ou `/` consulta vários IPs em todas as listas.
+
+### E-mail: relatório mensal e backup diário
+
+Defina no Render `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `REPORT_EMAILS` e `BACKUP_EMAILS` (veja `.env.example`). Com isso o servidor envia, no dia 1º, o relatório geral do mês anterior (HTML com a marca + planilha CSV) e, todo dia, um backup compactado (.json.gz). Falhas aparecem em Administração → Status do sistema e num aviso para os administradores. O Neon também permite restaurar o banco para um horário anterior (Branches → Restore); a janela disponível depende do plano.
 
 ### Migrar os dados de antes
 

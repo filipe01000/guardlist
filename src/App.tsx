@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { Navbar, type AppTab } from './components/Navbar';
-import { UsersView } from './components/UsersView';
+import { AdminView } from './components/AdminView';
 import { ReportsView } from './components/ReportsView';
-import { ChangePasswordForm } from './components/ChangePasswordForm';
+import { AccountModal } from './components/AccountModal';
 import { DashboardView } from './components/DashboardView';
 import { WeeklyImportView } from './components/WeeklyImportView';
 import { ClientListView } from './components/ClientListView';
@@ -11,22 +11,25 @@ import { IntelligenceView } from './components/IntelligenceView';
 import { HistoryView } from './components/HistoryView';
 import { ClientManagerView } from './components/ClientManagerView';
 import { BackupView } from './components/BackupView';
+import { ReviewView } from './components/ReviewView';
 import { QuickSearchModal } from './components/QuickSearchView';
 import { TestRunnerModal } from './components/TestRunnerModal';
-import { Client, AppSettings, BlocklistEntry, ImportHistoryRecord, SessionUser } from './types';
-import { 
-  getAllClients, 
-  getDashboardStats, 
+import { ShortcutsModal } from './components/ShortcutsModal';
+import { Client, AppSettings, BlocklistEntry, ImportOutcome, SessionUser } from './types';
+import {
+  getAllClients,
+  getDashboardStats,
   getAppSettings,
-  bulkInsertEntries,
-  replaceClientEntries,
-  addHistoryRecord,
   getClientEntries,
-  getAllActiveEntries
+  getAllActiveEntries,
+  getNotifications,
+  importBatch,
+  undoImport,
+  type ImportBatchPayload
 } from './db/store';
 import { generateFirewallTxt, generateNanoFormattedTxt, triggerDownload } from './utils/exporter';
 import { getDaysSince } from './utils/validator';
-import { CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 
 interface AppProps {
   currentUser: SessionUser;
@@ -36,7 +39,32 @@ interface AppProps {
 
 const LIVE_REFRESH_MS = 60_000;
 
+export interface ToastOptions {
+  type?: 'success' | 'info' | 'warn';
+  action?: { label: string; onClick: () => void | Promise<void> };
+  durationMs?: number;
+}
+export type ShowToast = (text: string, options?: ToastOptions | 'success' | 'info' | 'warn') => void;
+
+// Atalhos de navegação (tecla única, fora de campos de texto).
+const NAV_SHORTCUTS: Record<string, AppTab> = {
+  d: 'dashboard',
+  i: 'import',
+  l: 'client-list',
+  r: 'review',
+  h: 'history',
+  t: 'intelligence',
+  p: 'reports'
+};
+
+function isTyping(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  return el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName);
+}
+
 export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
+  const isAdmin = currentUser.role === 'admin';
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = window.localStorage.getItem('guardlist-theme');
     if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
@@ -58,7 +86,8 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     setPreviousTab(tabRef.current);
     tabRef.current = currentTab;
   }, [currentTab]);
-  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState(false);
 
   const [clients, setClients] = useState<Client[]>([]);
   const [activeCounts, setActiveCounts] = useState<Record<string, number>>({});
@@ -70,6 +99,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   const [totalCorrelatedIps, setTotalCorrelatedIps] = useState<number>(0);
   const [addedThisWeekCount, setAddedThisWeekCount] = useState<number>(0);
   const [allActiveEntries, setAllActiveEntries] = useState<BlocklistEntry[]>([]);
+  const [notifications, setNotifications] = useState<{ pendingApprovals: number; failedJobs: string[] }>({ pendingApprovals: 0, failedJobs: [] });
 
   const [settings, setSettings] = useState<AppSettings>({
     slaDays: 7,
@@ -79,39 +109,32 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
 
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [importTargetClientId, setImportTargetClientId] = useState<string>('');
+  const [adminTab, setAdminTab] = useState<'users' | 'approvals' | 'audit' | 'status'>('users');
 
   // Modais globais
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
   const [isTestsOpen, setIsTestsOpen] = useState(false);
 
-  useEffect(() => {
-    const handleQuickSearchShortcut = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setIsQuickSearchOpen(true);
-      }
-    };
-
-    window.addEventListener('keydown', handleQuickSearchShortcut);
-    return () => window.removeEventListener('keydown', handleQuickSearchShortcut);
+  // Aviso (toast), com ação opcional como "Desfazer".
+  const [toast, setToast] = useState<{ id: number; text: string; type: 'success' | 'info' | 'warn'; action?: ToastOptions['action']; durationMs: number } | null>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
+  const showToast: ShowToast = useCallback((text, options) => {
+    const opts: ToastOptions = typeof options === 'string' ? { type: options } : options || {};
+    const durationMs = opts.durationMs ?? (opts.action ? 8000 : 3500);
+    window.clearTimeout(toastTimer.current);
+    setToast({ id: Date.now(), text, type: opts.type || 'success', action: opts.action, durationMs });
+    toastTimer.current = window.setTimeout(() => setToast(null), durationMs);
   }, []);
-
-  // Toast feedback
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
-
-  const showToast = (text: string, type: 'success' | 'info' = 'success') => {
-    setToastMessage({ text, type });
-    setTimeout(() => setToastMessage(null), 3500);
-  };
 
   // Carrega a base compartilhada da equipe.
   const refreshAllData = useCallback(async () => {
     try {
-      const [loadedClients, stats, loadedSettings, entries] = await Promise.all([
+      const [loadedClients, stats, loadedSettings, entries, notes] = await Promise.all([
         getAllClients(),
         getDashboardStats(),
         getAppSettings(),
-        getAllActiveEntries()
+        getAllActiveEntries(),
+        getNotifications().catch(() => null)
       ]);
 
       setClients(loadedClients);
@@ -125,6 +148,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       setAddedThisWeekCount(stats.addedThisWeekCount);
       setAllActiveEntries(entries);
       setSettings(loadedSettings);
+      if (notes) setNotifications(notes);
 
       setSelectedClientId((current) => current || loadedClients.find((c) => !c.isArchived)?.id || '');
     } catch (err) {
@@ -165,6 +189,31 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     }
   }, [sidebarCollapsed]);
 
+  // Atalhos globais: Ctrl/⌘ K ou / consulta; ? mostra a lista; letras navegam.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setIsQuickSearchOpen(true);
+        return;
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey || isTyping(event.target)) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      if (event.key === '/') {
+        event.preventDefault();
+        setIsQuickSearchOpen(true);
+      } else if (event.key === '?') {
+        setIsShortcutsOpen(true);
+      } else if (NAV_SHORTCUTS[event.key]) {
+        setCurrentTab(NAV_SHORTCUTS[event.key]);
+      } else if (event.key === 'a' && isAdmin) {
+        setCurrentTab('admin');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isAdmin]);
+
   // Navegações cruzadas
   const handleNavigateToImport = (clientId: string) => {
     setImportTargetClientId(clientId);
@@ -174,6 +223,11 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   const handleNavigateToList = (clientId: string) => {
     setSelectedClientId(clientId);
     setCurrentTab('client-list');
+  };
+
+  const openApprovals = () => {
+    setAdminTab('approvals');
+    setCurrentTab('admin');
   };
 
   // Exportação rápida de .txt direto do dashboard
@@ -201,45 +255,34 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     }
   };
 
-  // Salvar lote de importação com suporte a 'append' (adicionar) ou 'replace' (substituir)
-  const handleSaveImportBatch = async (
-    entries: BlocklistEntry[],
-    clientId: string,
-    historyRecord: ImportHistoryRecord,
-    todayStr: string,
-    mode: 'append' | 'replace' = 'append'
-  ): Promise<number> => {
-    const currentActiveEntries = await getClientEntries(clientId, 'active');
-    historyRecord.totalBefore = currentActiveEntries.length;
-    const appendNote = (text: string) => {
-      historyRecord.notes = (historyRecord.notes ? historyRecord.notes + ' • ' : '') + text;
-    };
-
-    let retired = 0;
-    if (mode === 'replace') {
-      const res = await replaceClientEntries(entries, clientId, todayStr);
-      retired = res.retired;
-      historyRecord.addedCount = res.added;
-      historyRecord.totalAfter = res.previousTotal + res.added - res.removed;
-      appendNote(`Modo Substituir (-${res.removed} itens arquivados)`);
-    } else {
-      const res = await bulkInsertEntries(entries, clientId, todayStr);
-      retired = res.retired;
-      historyRecord.totalAfter = currentActiveEntries.length + entries.length - retired;
-      if (retired > 0) appendNote(`${retired} já na lista retirados por repetição ou cobertura de CIDR`);
-    }
-
-    await addHistoryRecord(historyRecord);
+  // Grava o lote (ou envia para aprovação) e atualiza a tela.
+  const handleSaveImportBatch = async (payload: ImportBatchPayload): Promise<ImportOutcome> => {
+    const outcome = await importBatch(payload);
     await refreshAllData();
-    return retired;
+    return outcome;
   };
 
-  const handleImportSuccess = (clientId: string, addedCount: number, retiredCount = 0) => {
+  const handleImportSuccess = (clientId: string, outcome: ImportOutcome) => {
     setSelectedClientId(clientId);
-    const retiredText = retiredCount > 0
-      ? ` ${retiredCount} ${retiredCount === 1 ? 'item ficou coberto e foi retirado' : 'itens ficaram cobertos e foram retirados'}.`
-      : '';
-    showToast(`${addedCount} indicadores gravados na lista do cliente.${retiredText}`);
+    if (outcome.status === 'pending') {
+      showToast('Importação enviada para aprovação de um administrador. Você verá o resultado em Histórico quando for aprovada.', { type: 'info', durationMs: 6000 });
+      return;
+    }
+    const parts = [`${outcome.added} indicadores gravados.`];
+    if (outcome.retired > 0) parts.push(`${outcome.retired} retirados por repetição, CIDR ou exceção.`);
+    if (outcome.blockedByException > 0) parts.push(`${outcome.blockedByException} recusados pelas exceções.`);
+    showToast(parts.join(' '), {
+      action: outcome.snapshotId
+        ? {
+            label: 'Desfazer',
+            onClick: async () => {
+              await undoImport(outcome.snapshotId!, outcome.historyId);
+              await refreshAllData();
+              showToast('Importação desfeita. A lista voltou ao que era antes.', 'info');
+            }
+          }
+        : undefined
+    });
     setCurrentTab('client-list');
   };
 
@@ -269,14 +312,32 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
 
   const daysSinceBackup = getDaysSince(settings.lastBackupDate);
   const isBackupOutdated = daysSinceBackup === null || daysSinceBackup > 7;
+  const ToastIcon = toast?.type === 'warn' ? AlertTriangle : toast?.type === 'info' ? Info : CheckCircle2;
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''} min-h-screen text-slate-100 flex flex-col font-sans`}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="toast" role="status" aria-live="polite">
-          <CheckCircle2 aria-hidden="true" />
-          <span>{toastMessage.text}</span>
+      {toast && (
+        <div key={toast.id} className={`toast toast--${toast.type}`} role="status" aria-live="polite">
+          <ToastIcon aria-hidden="true" />
+          <span>{toast.text}</span>
+          {toast.action && (
+            <button
+              type="button"
+              className="toast__action"
+              onClick={async () => {
+                const action = toast.action!;
+                setToast(null);
+                try {
+                  await action.onClick();
+                } catch (err) {
+                  showToast(err instanceof Error ? err.message : 'Não foi possível desfazer.', 'info');
+                }
+              }}
+            >
+              {toast.action.label}
+            </button>
+          )}
+          {toast.action && <i className="toast__timer" style={{ animationDuration: `${toast.durationMs}ms` }} aria-hidden="true" />}
         </div>
       )}
 
@@ -293,11 +354,31 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
         onToggleCollapsed={() => setSidebarCollapsed(value => !value)}
         currentUser={currentUser}
         onLogout={onLogout}
-        onChangePassword={() => setIsPasswordOpen(true)}
+        onChangePassword={() => setIsAccountOpen(true)}
+        pendingApprovals={isAdmin ? notifications.pendingApprovals : 0}
       />
 
       {/* Conteúdo Principal */}
       <main className="studio-main flex-1">
+        {isAdmin && notifications.failedJobs.length > 0 && currentTab !== 'admin' && (
+          <div className="banner" role="alert">
+            <AlertTriangle aria-hidden="true" />
+            <span>
+              Uma rotina automática falhou ({notifications.failedJobs.map((j) => (j === 'backup' ? 'backup diário' : 'relatório mensal')).join(', ')}).
+            </span>
+            <button type="button" className="btn btn--sm" onClick={() => { setAdminTab('status'); setCurrentTab('admin'); }}>Ver status</button>
+          </div>
+        )}
+        {isAdmin && notifications.pendingApprovals > 0 && currentTab === 'dashboard' && (
+          <div className="banner" role="status">
+            <Info aria-hidden="true" />
+            <span>
+              {notifications.pendingApprovals === 1 ? '1 importação aguarda' : `${notifications.pendingApprovals} importações aguardam`} sua aprovação.
+            </span>
+            <button type="button" className="btn btn--sm" onClick={openApprovals}>Revisar</button>
+          </div>
+        )}
+
         <div key={currentTab} className="view-enter">
         {currentTab === 'dashboard' && (
           <DashboardView
@@ -318,6 +399,9 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             onQuickExportTxt={handleQuickExportTxt}
             onQuickExportNanoTxt={handleQuickExportNanoTxt}
             onOpenIntelligenceTab={() => setCurrentTab('intelligence')}
+            onRefresh={refreshAllData}
+            showToast={showToast}
+            onOpenReview={() => setCurrentTab('review')}
           />
         )}
 
@@ -336,6 +420,8 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             onImportSuccess={handleImportSuccess}
             onSaveBatch={handleSaveImportBatch}
             onBack={() => setCurrentTab(previousTab === 'import' ? 'dashboard' : previousTab)}
+            isAdmin={isAdmin}
+            settings={settings}
           />
         )}
 
@@ -346,7 +432,13 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             onSelectClient={setSelectedClientId}
             onRefreshStats={refreshAllData}
             onAddIndicators={handleNavigateToImport}
+            showToast={showToast}
+            isAdmin={isAdmin}
           />
+        )}
+
+        {currentTab === 'review' && (
+          <ReviewView clients={clients} showToast={showToast} onRefresh={refreshAllData} onOpenList={handleNavigateToList} />
         )}
 
         {currentTab === 'history' && (
@@ -358,14 +450,20 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             clients={clients}
             activeCounts={activeCounts}
             onRefreshClients={refreshAllData}
-            isAdmin={currentUser.role === 'admin'}
+            isAdmin={isAdmin}
           />
         )}
 
         {currentTab === 'reports' && <ReportsView clients={clients} />}
 
-        {currentTab === 'users' && currentUser.role === 'admin' && (
-          <UsersView currentUser={currentUser} />
+        {currentTab === 'admin' && isAdmin && (
+          <AdminView
+            currentUser={currentUser}
+            tab={adminTab}
+            onTabChange={setAdminTab}
+            onChanged={refreshAllData}
+            showToast={showToast}
+          />
         )}
 
         {currentTab === 'backup' && (
@@ -374,37 +472,26 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             onRefreshAll={refreshAllData}
             onUpdateSettings={setSettings}
             onOpenTests={() => setIsTestsOpen(true)}
-            isAdmin={currentUser.role === 'admin'}
+            isAdmin={isAdmin}
           />
         )}
         </div>
       </main>
 
-      {isPasswordOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" onClick={() => setIsPasswordOpen(false)}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="change-password-title"
-            className="data-panel w-full max-w-md p-6"
-            onClick={(event) => event.stopPropagation()}
-            onKeyDown={(event) => event.key === 'Escape' && setIsPasswordOpen(false)}
-          >
-            <h2 id="change-password-title" className="text-base font-bold text-white">Alterar senha</h2>
-            <p className="text-xs text-slate-400 mt-1 mb-5">{currentUser.displayName} · {currentUser.username}</p>
-            <ChangePasswordForm
-              onCancel={() => setIsPasswordOpen(false)}
-              onDone={(user) => {
-                setIsPasswordOpen(false);
-                onUserChange(user);
-                showToast('Senha alterada.');
-              }}
-            />
-          </div>
-        </div>
-      )}
+      <AccountModal
+        open={isAccountOpen}
+        currentUser={currentUser}
+        onClose={() => setIsAccountOpen(false)}
+        onPasswordChanged={(user) => {
+          setIsAccountOpen(false);
+          onUserChange(user);
+          showToast('Senha alterada. As outras sessões foram encerradas.');
+        }}
+      />
 
-      {/* Modal de Consulta Rápida (Sem misturar dados) */}
+      <ShortcutsModal open={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} isAdmin={isAdmin} />
+
+      {/* Consulta de um ou vários indicadores em todas as listas */}
       <QuickSearchModal
         isOpen={isQuickSearchOpen}
         onClose={() => setIsQuickSearchOpen(false)}

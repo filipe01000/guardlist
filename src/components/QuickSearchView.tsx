@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Search, X, Calendar, Tag, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, Copy, Loader2, Search } from 'lucide-react';
 import { Client, BlocklistEntry } from '../types';
-import { searchIndicatorAcrossClients } from '../db/store';
-import { useDialogFocus } from '../hooks/useDialogFocus';
+import { lookupIndicators, searchIndicatorAcrossClients, type LookupResult } from '../db/store';
+import { extractTokensFromRawInput } from '../utils/importer';
+import { Modal } from './Modal';
 
 interface QuickSearchModalProps {
   isOpen: boolean;
@@ -10,156 +11,175 @@ interface QuickSearchModalProps {
   onNavigateToClientList: (clientId: string) => void;
 }
 
-export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({
-  isOpen,
-  onClose,
-  onNavigateToClientList
-}) => {
+const MATCH_LABEL = { exact: 'Na lista', covered: 'Dentro de', inside: 'Contém' } as const;
+
+// Consulta em todas as listas. Um termo: busca parcial. Vários (um por linha, ou separados por espaço/vírgula):
+// mostra, para cada IP, em quais clientes ele está, se está dentro de um CIDR ou se já foi removido.
+export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, onClose, onNavigateToClientList }) => {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<Array<{ client: Client; entry: BlocklistEntry }>>([]);
+  const [single, setSingle] = useState<Array<{ client: Client; entry: BlocklistEntry }>>([]);
+  const [multi, setMulti] = useState<LookupResult[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const dialogRef = useDialogFocus(isOpen);
+  const [filter, setFilter] = useState<'all' | 'found' | 'missing'>('all');
+  const [copied, setCopied] = useState(false);
+
+  const tokens = useMemo(() => extractTokensFromRawInput(query).map((t) => t.token), [query]);
+  const isMulti = tokens.length > 1;
 
   useEffect(() => {
     if (!isOpen) {
       setQuery('');
-      setResults([]);
-      return;
+      setSingle([]);
+      setMulti(null);
+      setFilter('all');
     }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   useEffect(() => {
-    const handleSearch = async () => {
-      if (!query.trim()) {
-        setResults([]);
-        return;
-      }
+    if (!query.trim()) {
+      setSingle([]);
+      setMulti(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const matches = await searchIndicatorAcrossClients(query);
-        setResults(matches);
+        if (isMulti) {
+          const results = await lookupIndicators(tokens);
+          if (!cancelled) {
+            setMulti(results);
+            setSingle([]);
+          }
+        } else {
+          const [partial, exact] = await Promise.all([searchIndicatorAcrossClients(query.trim()), lookupIndicators([query.trim()])]);
+          if (!cancelled) {
+            setSingle(partial);
+            // Mostra também CIDRs que cobrem o IP e itens removidos.
+            setMulti(exact[0]?.matches.some((m) => m.match !== 'exact' || m.status === 'removed') ? exact : null);
+          }
+        }
       } catch (err) {
         console.error(err);
       } finally {
-        setIsSearching(false);
+        if (!cancelled) setIsSearching(false);
       }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
     };
+  }, [query, isMulti, tokens]);
 
-    const timer = setTimeout(handleSearch, 200);
-    return () => clearTimeout(timer);
-  }, [query]);
+  const found = (multi || []).filter((r) => r.matches.length > 0);
+  const missing = (multi || []).filter((r) => r.valid && r.matches.length === 0);
+  const shown = (multi || []).filter((r) => (filter === 'found' ? r.matches.length > 0 : filter === 'missing' ? r.matches.length === 0 : true));
 
-  if (!isOpen) return null;
+  const copyMissing = async () => {
+    await navigator.clipboard.writeText(missing.map((r) => r.normalized).join('\n')).catch(() => undefined);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  const goTo = (clientId: string) => {
+    onNavigateToClientList(clientId);
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
-      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="quick-search-title" className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden modal-panel">
-        {/* Cabeçalho */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-950/70">
-          <div className="flex items-center gap-2">
-            <Search className="w-5 h-5 text-blue-400" />
-            <h3 id="quick-search-title" className="text-base font-bold text-white">
-              Consultar indicador
-            </h3>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Fechar consulta rápida"
-            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
-          >
-            <X className="w-5 h-5" aria-hidden="true" />
-          </button>
+    <Modal open={isOpen} onClose={onClose} size="lg" title="Consultar IPs em todas as listas" subtitle="Só leitura: nada é alterado. Cole vários IPs (um por linha) para ver onde cada um está.">
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" aria-hidden="true" />
+          <textarea
+            autoFocus
+            data-dialog-initial-focus
+            rows={isMulti ? 5 : 1}
+            placeholder="IP, CIDR ou domínio — ou cole vários, um por linha"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="field w-full font-mono text-sm pl-10 py-3 resize-y"
+            aria-label="Indicadores para consultar"
+          />
         </div>
 
-        {/* Campo de Busca */}
-        <div className="p-6 space-y-4">
-          <div className="relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              autoFocus
-              data-dialog-initial-focus
-              placeholder="IP, CIDR ou domínio"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full bg-slate-950 font-mono text-sm text-white pl-10 pr-4 py-3 rounded-xl border border-slate-700 focus:outline-none focus:border-blue-500"
-            />
-          </div>
+        {isSearching && (
+          <div className="flex items-center gap-2 text-xs text-slate-400"><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Pesquisando em todas as listas…</div>
+        )}
 
-          <p className="text-[11px] text-slate-400">
-            Mostra em quais clientes o indicador aparece. Só leitura: nada é alterado nas listas.
-          </p>
-
-          {/* Resultados */}
-          <div className="max-h-80 overflow-y-auto space-y-2 pt-2">
-            {isSearching ? (
-              <div className="py-8 text-center text-xs text-slate-400">
-                Pesquisando em todas as blocklists...
-              </div>
-            ) : query.trim() && results.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-500">
-                Nenhum cliente ativo possui o indicador "{query}".
-              </div>
-            ) : (
-              results.map(({ client, entry }) => (
-                <div
-                  key={`${client.id}-${entry.id}`}
-                  className="bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 flex items-center justify-between text-xs transition"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-white font-mono text-sm">
-                        {entry.indicator}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-blue-950 text-blue-300 font-bold border border-blue-800 text-[10px] uppercase">
-                        {client.name}
-                      </span>
-                      <span className="text-[10px] text-emerald-400 flex items-center gap-0.5">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Ativo
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3 h-3 text-slate-500" />
-                        Incluso: {entry.addedDate}
-                      </span>
-                      {entry.sourceTicket && (
-                        <span className="flex items-center gap-1">
-                          <Tag className="w-3 h-3 text-slate-500" />
-                          Ticket: {entry.sourceTicket}
-                        </span>
-                      )}
-                      {entry.notes && (
-                        <span className="text-slate-300 italic">
-                          "{entry.notes}"
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      onNavigateToClientList(client.id);
-                      onClose();
-                    }}
-                    className="text-xs text-blue-400 hover:text-white px-2.5 py-1.5 rounded-lg hover:bg-slate-800 font-medium transition shrink-0"
-                  >
-                    Ver na lista
-                  </button>
-                </div>
-              ))
+        {isMulti && multi && !isSearching && (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="segmented" role="group" aria-label="Filtrar resultados">
+              <button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>Todos ({multi.length})</button>
+              <button type="button" aria-pressed={filter === 'found'} onClick={() => setFilter('found')}>Encontrados ({found.length})</button>
+              <button type="button" aria-pressed={filter === 'missing'} onClick={() => setFilter('missing')}>Fora das listas ({missing.length})</button>
+            </div>
+            {missing.length > 0 && (
+              <button type="button" className="btn btn--sm" onClick={copyMissing}>
+                {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                Copiar os {missing.length} que não estão em nenhuma lista
+              </button>
             )}
           </div>
+        )}
+
+        <div className="max-h-[55vh] overflow-y-auto pr-1">
+          {!isMulti && single.length > 0 && (
+            <div className="mb-3">
+              {single.map(({ client, entry }) => (
+                <div key={`${client.id}-${entry.id}`} className="lookup-result">
+                  <div className="lookup-result__head">
+                    <span>
+                      <span className="lookup-result__query">{entry.indicator}</span>{' '}
+                      <span className="data-tag data-tag--client">{client.name}</span>{' '}
+                      <span className="chip chip--ok">Ativo</span>
+                    </span>
+                    <button type="button" className="btn btn--sm" onClick={() => goTo(client.id)}>Ver na lista</button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Incluído {entry.addedDate}{entry.sourceTicket ? ` · ticket ${entry.sourceTicket}` : ''}{entry.addedBy ? ` · por ${entry.addedBy}` : ''}
+                    {entry.notes ? ` · "${entry.notes}"` : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(isMulti ? shown : multi || []).map((r) => (
+            <div key={r.normalized} className="lookup-result">
+              <div className="lookup-result__head">
+                <span className="lookup-result__query">{r.normalized}</span>
+                {!r.valid ? (
+                  <span className="chip chip--danger">Inválido</span>
+                ) : r.matches.length === 0 ? (
+                  <span className="chip">Em nenhuma lista</span>
+                ) : (
+                  <span className="chip chip--warn">{new Set(r.matches.map((m) => m.clientId)).size} cliente(s)</span>
+                )}
+              </div>
+              {r.matches.map((m) => (
+                <div key={`${m.entryId}-${m.match}`} className="lookup-match">
+                  <span className="min-w-0">
+                    <strong className="text-white">{m.clientName}</strong>{' · '}
+                    {MATCH_LABEL[m.match]}{m.match !== 'exact' && <span className="font-mono"> {m.indicator}</span>}{' · '}
+                    <span className={m.status === 'active' ? 'text-emerald-400' : 'text-slate-400'}>{m.status === 'active' ? 'ativo' : 'removido'}</span>
+                    <br />
+                    <small>
+                      Incluído {m.addedDate}{m.sourceTicket ? ` · ticket ${m.sourceTicket}` : ''}{m.addedBy ? ` · por ${m.addedBy}` : ''}
+                      {m.notes ? ` · ${m.notes}` : ''}
+                    </small>
+                  </span>
+                  <button type="button" className="btn btn--sm btn--quiet" onClick={() => goTo(m.clientId)}>Abrir</button>
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {!isSearching && query.trim() && !isMulti && single.length === 0 && !multi && (
+            <p className="py-8 text-center text-xs text-slate-500">Nenhuma lista tem "{query.trim()}".</p>
+          )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };

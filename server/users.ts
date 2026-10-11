@@ -1,4 +1,4 @@
-import { hashPassword, parseUsers, verifyPassword } from '../auth.ts';
+import { hashPassword, hashSessionId, newSessionId, parseUsers, SESSION_TTL_MS, verifyPassword } from '../auth.ts';
 import type { Database } from './db.ts';
 import { StoreError, type Actor } from './store.ts';
 
@@ -15,7 +15,23 @@ export interface UserRow {
   session_version: number;
   created_at: string;
   last_login_at: string | null;
+  failed_logins: number;
+  locked_until: string | null;
 }
+
+export interface SessionInfo {
+  id: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  ip: string | null;
+  userAgent: string | null;
+  current: boolean;
+}
+
+// Bloqueio temporário: depois de MAX_FAILED_LOGINS senhas erradas seguidas, a conta trava por LOCK_MINUTES.
+export const MAX_FAILED_LOGINS = Number(process.env.MAX_FAILED_LOGINS || 5);
+export const LOCK_MINUTES = Number(process.env.LOGIN_LOCK_MINUTES || 15);
 
 export interface PublicUser {
   id: number;
@@ -26,6 +42,7 @@ export interface PublicUser {
   mustChangePassword: boolean;
   createdAt: string;
   lastLoginAt: string | null;
+  lockedUntil: string | null;
 }
 
 const USERNAME_RE = /^[a-z0-9._-]{2,64}$/;
@@ -40,7 +57,8 @@ export function toPublic(row: UserRow): PublicUser {
     active: row.active,
     mustChangePassword: row.must_change_password,
     createdAt: row.created_at,
-    lastLoginAt: row.last_login_at
+    lastLoginAt: row.last_login_at,
+    lockedUntil: row.locked_until && new Date(row.locked_until).getTime() > Date.now() ? new Date(row.locked_until).toISOString() : null
   };
 }
 
@@ -105,15 +123,107 @@ export function createUsers(db: Database) {
       return created;
     },
 
-    async authenticate(username: string, password: string): Promise<UserRow | null> {
+    // Resultado do login: usuário, conta travada (com horário de liberação) ou credenciais inválidas.
+    async authenticate(username: string, password: string): Promise<{ row: UserRow } | { lockedUntil: string } | null> {
       const normalized = username.trim().toLowerCase();
       const rows = await db.query<UserRow>('SELECT * FROM users WHERE username = $1', [normalized]);
       const row = rows[0];
       const ok = verifyPassword(password, row?.password_hash || dummyHash);
+      if (row && row.locked_until && new Date(row.locked_until).getTime() > Date.now()) {
+        return { lockedUntil: new Date(row.locked_until).toISOString() };
+      }
+      if (row && !ok) {
+        const failed = (row.failed_logins || 0) + 1;
+        if (failed >= MAX_FAILED_LOGINS) {
+          const locked = await db.query<{ locked_until: string }>(
+            "UPDATE users SET failed_logins = 0, locked_until = now() + make_interval(mins => $2::int) WHERE id = $1 RETURNING locked_until",
+            [row.id, LOCK_MINUTES]
+          );
+          await audit(row.username, 'auth.locked', { minutes: LOCK_MINUTES });
+          return { lockedUntil: new Date(locked[0].locked_until).toISOString() };
+        }
+        await db.query('UPDATE users SET failed_logins = $2 WHERE id = $1', [row.id, failed]);
+        await audit(row.username, 'auth.failed', { attempt: failed });
+        return null;
+      }
       if (!row || !ok || !row.active) return null;
-      await db.query('UPDATE users SET last_login_at = now() WHERE id = $1', [row.id]);
+      await db.query('UPDATE users SET last_login_at = now(), failed_logins = 0, locked_until = NULL WHERE id = $1', [row.id]);
       await audit(row.username, 'auth.login', {});
+      return { row };
+    },
+
+    async createSession(row: UserRow, ip: string | null, userAgent: string | null): Promise<string> {
+      const sid = newSessionId();
+      await db.query(
+        `INSERT INTO sessions (id, user_id, version, expires_at, ip, user_agent)
+         VALUES ($1, $2, $3, now() + make_interval(secs => $4::double precision), $5, $6)`,
+        [hashSessionId(sid), row.id, row.session_version, SESSION_TTL_MS / 1000, ip, (userAgent || '').slice(0, 300) || null]
+      );
+      // Faxina: sessões vencidas ou encerradas há mais de 30 dias.
+      await db.query("DELETE FROM sessions WHERE expires_at < now() - interval '30 days' OR revoked_at < now() - interval '30 days'");
+      return sid;
+    },
+
+    // Usuário da sessão, se ela segue aberta, dentro da validade e na versão atual do usuário.
+    async bySession(sid: string): Promise<(UserRow & { session_id: string }) | null> {
+      const id = hashSessionId(sid);
+      const rows = await db.query<UserRow & { session_id: string; last_seen_at: string }>(
+        `SELECT u.*, s.id AS session_id, s.last_seen_at FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE s.id = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND s.version = u.session_version AND u.active`,
+        [id]
+      );
+      const row = rows[0];
+      if (!row) return null;
+      if (Date.now() - new Date(row.last_seen_at).getTime() > 5 * 60_000) {
+        await db.query('UPDATE sessions SET last_seen_at = now() WHERE id = $1', [id]);
+      }
       return row;
+    },
+
+    async listSessions(userId: number, currentSessionId?: string): Promise<SessionInfo[]> {
+      const rows = await db.query<{ id: string; created_at: string; last_seen_at: string; expires_at: string; ip: string | null; user_agent: string | null }>(
+        `SELECT s.id, s.created_at, s.last_seen_at, s.expires_at, s.ip, s.user_agent FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE s.user_id = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND s.version = u.session_version
+         ORDER BY s.last_seen_at DESC`,
+        [userId]
+      );
+      return rows.map((r) => ({
+        id: r.id,
+        createdAt: new Date(r.created_at).toISOString(),
+        lastSeenAt: new Date(r.last_seen_at).toISOString(),
+        expiresAt: new Date(r.expires_at).toISOString(),
+        ip: r.ip,
+        userAgent: r.user_agent,
+        current: r.id === currentSessionId
+      }));
+    },
+
+    // Encerra uma sessão. Quem não é admin só encerra as próprias.
+    async revokeSession(actor: Actor, actorId: number, sessionId: string) {
+      const rows = await db.query<{ user_id: number; username: string }>(
+        'SELECT s.user_id, u.username FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = $1',
+        [String(sessionId)]
+      );
+      const target = rows[0];
+      if (!target) throw new StoreError('Sessão não encontrada.', 404);
+      if (target.user_id !== actorId && actor.role !== 'admin') throw new StoreError('Apenas administradores podem fazer isso.', 403);
+      await db.query('UPDATE sessions SET revoked_at = now() WHERE id = $1', [String(sessionId)]);
+      await audit(actor.username, 'session.revoke', { username: target.username });
+      return null;
+    },
+
+    // Encerra todas as sessões de um usuário (inclusive as que ainda não estão na tabela).
+    async revokeAllSessions(actor: Actor, userId: number) {
+      const row = await byId(userId);
+      if (!row) throw new StoreError('Usuário não encontrado.', 404);
+      await db.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [userId]);
+      await db.query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [userId]);
+      await audit(actor.username, 'session.revoke_all', { username: row.username });
+      return null;
+    },
+
+    async revokeSessionById(sessionId: string) {
+      await db.query('UPDATE sessions SET revoked_at = now() WHERE id = $1', [sessionId]);
     },
 
     async list(): Promise<PublicUser[]> {
@@ -140,7 +250,7 @@ export function createUsers(db: Database) {
       return toPublic(rows[0]);
     },
 
-    async update(actor: Actor, id: number, input: { displayName?: unknown; role?: unknown; active?: unknown }) {
+    async update(actor: Actor, id: number, input: { displayName?: unknown; role?: unknown; active?: unknown; unlock?: unknown }) {
       const row = await byId(id);
       if (!row) throw new StoreError('Usuário não encontrado.', 404);
       const role = input.role === undefined ? row.role : input.role === 'admin' ? 'admin' : 'analyst';
@@ -154,6 +264,10 @@ export function createUsers(db: Database) {
       }
 
       const revoke = !active || role !== row.role;
+      if (input.unlock === true) {
+        await db.query('UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = $1', [id]);
+        await audit(actor.username, 'user.unlock', { username: row.username });
+      }
       const rows = await db.query<UserRow>(
         `UPDATE users SET display_name = $2, role = $3, active = $4,
            session_version = session_version + $5 WHERE id = $1 RETURNING *`,
@@ -172,7 +286,7 @@ export function createUsers(db: Database) {
       const pass = checkPassword(password);
       const mustChange = mustChangePassword !== false;
       await db.query(
-        'UPDATE users SET password_hash = $2, must_change_password = $3, session_version = session_version + 1 WHERE id = $1',
+        'UPDATE users SET password_hash = $2, must_change_password = $3, session_version = session_version + 1, failed_logins = 0, locked_until = NULL WHERE id = $1',
         [id, hashPassword(pass), mustChange]
       );
       await audit(actor.username, 'user.reset_password', { username: row.username, mustChange });
@@ -190,10 +304,6 @@ export function createUsers(db: Database) {
       await db.query('DELETE FROM users WHERE id = $1', [id]);
       await audit(actor.username, 'user.delete', { username: row.username, displayName: row.display_name, role: row.role });
       return null;
-    },
-
-    async revokeSessions(id: number) {
-      await db.query('UPDATE users SET session_version = session_version + 1 WHERE id = $1', [id]);
     },
 
     async changeOwnPassword(id: number, current: unknown, next: unknown): Promise<UserRow> {

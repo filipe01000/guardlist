@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import type { Request, Response } from 'express';
 
 // Senhas (scrypt) e cookie de sessão assinado. Os usuários ficam no banco (server/users.ts);
@@ -37,15 +37,22 @@ function sign(secret: string, payload: string): string {
   return createHmac('sha256', secret).update(payload).digest('base64url');
 }
 
-export function createSessionToken(secret: string, userId: number, sessionVersion: number): string {
-  const payload = Buffer.from(
-    JSON.stringify({ uid: userId, v: sessionVersion, exp: Date.now() + SESSION_TTL_MS })
-  ).toString('base64url');
+// Cada login gera um segredo aleatório (sid). O banco guarda só o hash dele, na tabela sessions.
+export function newSessionId(): string {
+  return randomBytes(24).toString('base64url');
+}
+
+export function hashSessionId(sid: string): string {
+  return createHash('sha256').update(sid).digest('hex');
+}
+
+export function createSessionToken(secret: string, sid: string): string {
+  const payload = Buffer.from(JSON.stringify({ sid, exp: Date.now() + SESSION_TTL_MS })).toString('base64url');
   return `${payload}.${sign(secret, payload)}`;
 }
 
-// Valida assinatura e validade; quem chama confere no banco se o usuário segue ativo e na mesma versão.
-export function readSession(secret: string, req: Request): { userId: number; version: number } | null {
+// Valida assinatura e validade; quem chama confere no banco se a sessão segue aberta e o usuário ativo.
+export function readSession(secret: string, req: Request): { sid: string } | null {
   const token = readCookie(req, SESSION_COOKIE);
   if (!token) return null;
   const [payload, signature] = token.split('.');
@@ -54,9 +61,9 @@ export function readSession(secret: string, req: Request): { userId: number; ver
   const received = Buffer.from(signature);
   if (expected.length !== received.length || !timingSafeEqual(expected, received)) return null;
   try {
-    const { uid, v, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    if (typeof uid !== 'number' || typeof v !== 'number' || typeof exp !== 'number' || exp < Date.now()) return null;
-    return { userId: uid, version: v };
+    const { sid, exp } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (typeof sid !== 'string' || !sid || typeof exp !== 'number' || exp < Date.now()) return null;
+    return { sid };
   } catch {
     return null;
   }

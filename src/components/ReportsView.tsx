@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import { Client } from '../types';
 import { getReport, ReportData } from '../db/store';
-import { toCsv, formatDateBR, formatDateTimeBR, CsvCell } from '../utils/csv';
+import { formatDateBR, formatDateTimeBR } from '../utils/csv';
+import { reportCsv, reportFileSlug, reportHtml } from '../utils/reportDocs';
 import { triggerDownload } from '../utils/exporter';
 import { PageHeader } from './PageHeader';
 
@@ -110,59 +111,53 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ clients }) => {
 
   const handleExport = () => {
     if (!report) return;
-    const rows: CsvCell[][] = [];
-    rows.push([isClientReport ? `Relatório do cliente ${client?.name ?? ''}` : 'Relatório geral da operação']);
-    rows.push(['Período', periodLabel]);
-    rows.push(['Gerado em', formatDateTimeBR(report.generatedAt), 'por', report.generatedBy]);
-    rows.push([]);
-    rows.push(['Resumo']);
-    rows.push(['Importações', report.totals.imports]);
-    rows.push(['Indicadores incluídos', report.totals.added]);
-    rows.push(['Indicadores removidos', report.totals.removed]);
-    if (isClientReport) {
-      rows.push(['Ativos hoje', report.totals.activeNow]);
-      rows.push(['Situação', client ? STATUS_LABEL[client.status] : '']);
-      rows.push(['Última revisão', formatDateBR(client?.lastUpdateDate)]);
-      rows.push([]);
-      rows.push(['Mudanças no período']);
-      rows.push(['Data', 'Ação', 'Indicador', 'Tipo', 'Ticket', 'Por', 'Situação atual', 'Observação']);
-      for (const c of report.changes) {
-        rows.push([formatDateBR(c.date), c.action === 'incluido' ? 'Incluído' : 'Removido', c.indicator, c.type.replace('_', ' '), c.ticket, c.by, c.currentStatus === 'active' ? 'Ativo' : 'Removido', c.notes]);
-      }
-    } else {
-      rows.push([`Clientes fora do prazo (${report.slaDays} dias)`, report.totals.late]);
-      rows.push([]);
-      rows.push(['Clientes']);
-      rows.push(['Cliente', 'Situação', 'Última revisão', 'Importações', 'Incluídos', 'Removidos', 'Ativos hoje', 'Responsáveis']);
-      for (const c of report.clients) {
-        rows.push([c.name, STATUS_LABEL[c.status], formatDateBR(c.lastUpdateDate), c.importsInPeriod, c.addedInPeriod, c.removedInPeriod, c.activeNow, c.importers.join(', ')]);
-      }
-    }
-    rows.push([]);
-    rows.push(['Importações no período']);
-    rows.push(['Data', 'Semana', 'Cliente', 'Por', 'Novos', 'Descartados', 'Inválidos', 'Ticket', 'Observações']);
-    for (const r of report.imports) {
-      rows.push([formatDateTimeBR(r.date), r.isoWeek, r.clientName, r.importedBy || '', r.addedCount, r.duplicatesDiscarded + (r.coveredByCidrDiscarded || 0), r.invalidsDiscarded, r.sourceTicket || '', r.notes || '']);
-    }
-    rows.push([]);
-    rows.push(['Atividade por pessoa']);
-    rows.push(['Pessoa', 'Importações', 'Incluídos', 'Removidos']);
-    for (const a of report.activity) rows.push([a.name, a.imports, a.added, a.removed]);
+    triggerDownload(`${reportFileSlug(report)}.csv`, reportCsv(report), 'text/csv;charset=utf-8');
+  };
 
-    const slug = isClientReport ? (client?.name ?? 'cliente').toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'geral';
-    triggerDownload(`relatorio-${slug}_${from}_a_${to}.csv`, toCsv(rows), 'text/csv;charset=utf-8');
+  // PDF: abre a página do relatório com a marca numa moldura invisível e chama a impressão
+  // (no diálogo, escolha "Salvar como PDF").
+  const handlePdf = () => {
+    if (!report) return;
+    const frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    const win = frame.contentWindow;
+    if (!doc || !win) return frame.remove();
+    doc.open();
+    doc.write(reportHtml(report, { logoUrl: `${window.location.origin}/brand/guardlist-mark.png`, forPrint: true }));
+    doc.close();
+    const print = () => {
+      win.focus();
+      win.print();
+      window.setTimeout(() => frame.remove(), 1500);
+    };
+    const logo = doc.querySelector('img');
+    if (logo && !logo.complete) {
+      logo.addEventListener('load', print, { once: true });
+      logo.addEventListener('error', print, { once: true });
+    } else {
+      window.setTimeout(print, 60);
+    }
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Relatórios"
-        description="Resumo de um período para a operação inteira ou para um cliente, pronto para baixar como planilha."
+        description="Resumo de um período para a operação inteira ou para um cliente: planilha para a equipe ou PDF com a marca, pronto para mandar ao cliente."
         actions={
-          <button type="button" className="btn btn--primary" onClick={handleExport} disabled={!report || loading}>
-            <Download aria-hidden="true" />
-            Baixar planilha (.csv)
-          </button>
+          <>
+            <button type="button" className="btn" onClick={handleExport} disabled={!report || loading}>
+              <Download aria-hidden="true" />
+              Planilha (.csv)
+            </button>
+            <button type="button" className="btn btn--primary" onClick={handlePdf} disabled={!report || loading} title="Abre a impressão; escolha Salvar como PDF">
+              <FileText aria-hidden="true" />
+              PDF para o cliente
+            </button>
+          </>
         }
       />
 

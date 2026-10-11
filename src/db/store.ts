@@ -1,4 +1,5 @@
-import { AppSettings, BlocklistEntry, Client, ClientSnapshot, ImportHistoryRecord } from '../types';
+import { AppSettings, BlocklistEntry, Client, ClientException, ClientSnapshot, CtiSummary, EntryComment, ImportHistoryRecord, ImportOutcome, PendingImport, ReportData } from '../types';
+export type { ReportClientRow, ReportChangeRow, ReportData } from '../types';
 
 // Acesso à base compartilhada da equipe pelo servidor (/api/data/<operação>).
 // Mantém os mesmos nomes e assinaturas que as telas usavam com o IndexedDB.
@@ -39,12 +40,6 @@ export async function getClientActiveIndicatorsSet(clientId: string): Promise<{ 
   return { activeSet: new Set(result.activeSet), activeCidrs: result.activeCidrs };
 }
 
-export const bulkInsertEntries = (entries: BlocklistEntry[], clientId: string, lastUpdateDateStr: string) =>
-  call<{ retired: number }>('bulkInsertEntries', entries, clientId, lastUpdateDateStr);
-
-export const replaceClientEntries = (newEntries: BlocklistEntry[], clientId: string, lastUpdateDateStr: string) =>
-  call<{ added: number; removed: number; previousTotal: number; retired: number }>('replaceClientEntries', newEntries, clientId, lastUpdateDateStr);
-
 // Retira repetidos e itens cobertos por CIDR da lista ativa (com versão salva antes).
 export const cleanRedundantEntries = (clientId: string) => call<{ retired: number }>('cleanRedundantEntries', clientId);
 
@@ -84,43 +79,157 @@ export const exportFullBackupJSON = () => call<string>('exportFullBackupJSON');
 export const restoreFullBackupJSON = (jsonStr: string) =>
   call<{ clientsCount: number; entriesCount: number; historyCount: number }>('restoreFullBackupJSON', jsonStr);
 
-export interface ReportClientRow {
-  clientId: string;
-  name: string;
-  notes: string;
-  lastUpdateDate: string | null;
-  status: 'em_dia' | 'atrasado' | 'sem_importacao';
-  activeNow: number;
-  addedInPeriod: number;
-  removedInPeriod: number;
-  importsInPeriod: number;
-  importers: string[];
-}
-
-export interface ReportChangeRow {
-  action: 'incluido' | 'removido';
-  date: string;
-  indicator: string;
-  type: string;
-  ticket: string;
-  notes: string;
-  by: string;
-  currentStatus: 'active' | 'removed';
-}
-
-export interface ReportData {
-  from: string;
-  to: string;
-  clientId: string | null;
-  generatedAt: string;
-  generatedBy: string;
-  slaDays: number;
-  totals: { clients: number; added: number; removed: number; imports: number; late: number; activeNow: number };
-  clients: ReportClientRow[];
-  changes: ReportChangeRow[];
-  imports: ImportHistoryRecord[];
-  activity: Array<{ name: string; imports: number; added: number; removed: number }>;
-}
-
 export const getReport = (params: { from: string; to: string; startIso: string; endIso: string; clientId?: string }) =>
   call<ReportData>('getReport', params);
+
+// ---------- Importação com aprovação ----------
+export interface ImportBatchPayload {
+  clientId: string;
+  mode: 'append' | 'replace';
+  entries: BlocklistEntry[];
+  history: Partial<ImportHistoryRecord>;
+  todayStr: string;
+  seen: string[];
+}
+export const importBatch = (payload: ImportBatchPayload) => call<ImportOutcome>('importBatch', payload);
+export const listPendingImports = () => call<PendingImport[]>('listPendingImports');
+export const decidePendingImport = (id: string, decision: 'approve' | 'reject', note?: string) =>
+  call<ImportOutcome | null>('decidePendingImport', id, decision, note);
+export const undoImport = (snapshotId: string, historyId?: string) => call<{ restoredCount: number }>('undoImport', snapshotId, historyId);
+
+// ---------- Exceções, validação e revisão ----------
+export const updateClientExceptions = (clientId: string, exceptions: Array<{ indicator: string; reason?: string }>) =>
+  call<{ exceptions: ClientException[]; retired: number }>('updateClientExceptions', clientId, exceptions);
+
+export interface ClientValidation {
+  clientId: string;
+  name: string;
+  active: number;
+  duplicates: number;
+  covered: number;
+  exceptionConflicts: number;
+  reviewDue: number;
+  samples: string[];
+}
+export const validateAllClients = () => call<ClientValidation[]>('validateAllClients');
+export const cleanAllClients = () =>
+  call<{ clients: number; retired: number; results: Array<{ clientId: string; name: string; retired: number }> }>('cleanAllClients');
+
+export interface ReviewItem {
+  entry: BlocklistEntry;
+  clientName: string;
+  lastActivity: string | null;
+  daysIdle: number | null;
+  lastReportedAt: string | null;
+  totalReports: number | null;
+  score: number | null;
+}
+export const getReviewQueue = (clientId?: string) => call<{ reviewDays: number; items: ReviewItem[] }>('getReviewQueue', clientId);
+export const reviewEntries = (ids: string[], decision: 'keep' | 'remove') => call<{ count: number }>('reviewEntries', ids, decision);
+
+// ---------- Comentários ----------
+export const getComments = (entryId: string) => call<EntryComment[]>('getComments', entryId);
+export const addComment = (entryId: string, body: string) => call<EntryComment[]>('addComment', entryId, body);
+export const deleteComment = (id: number) => call<EntryComment[]>('deleteComment', id);
+export const getCommentCounts = (clientId: string) => call<Record<string, number>>('getCommentCounts', clientId);
+
+// ---------- Auditoria, busca múltipla e evolução ----------
+export interface AuditRow {
+  id: number;
+  at: string;
+  username: string | null;
+  action: string;
+  detail: Record<string, unknown>;
+}
+export const getAuditLog = (params: { from?: string; to?: string; username?: string; action?: string; q?: string; offset?: number; limit?: number }) =>
+  call<{ total: number; rows: AuditRow[]; users: Array<{ username: string; displayName: string }>; actions: string[] }>('getAuditLog', params);
+
+export interface LookupMatch {
+  clientId: string;
+  clientName: string;
+  entryId: string;
+  indicator: string;
+  status: 'active' | 'removed';
+  match: 'exact' | 'covered' | 'inside';
+  via?: string;
+  addedDate: string;
+  sourceTicket?: string;
+  notes?: string;
+  removedAt?: string;
+  addedBy?: string;
+}
+export interface LookupResult {
+  query: string;
+  normalized: string;
+  valid: boolean;
+  matches: LookupMatch[];
+}
+export const lookupIndicators = (queries: string[]) => call<LookupResult[]>('lookupIndicators', queries);
+
+export interface Evolution {
+  points: Array<{ date: string; active: number; added: number; removed: number }>;
+  enriched: number;
+  activeIps: number;
+  missing: string[];
+  countries: Array<{ label: string; count: number }>;
+  providers: Array<{ label: string; count: number }>;
+  verdicts: Array<{ label: string; count: number }>;
+}
+export const getEvolution = (params?: { weeks?: number; clientId?: string }) => call<Evolution>('getEvolution', params);
+
+// ---------- Rotas fora de /api/data ----------
+async function http<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: 'no-store'
+  });
+  const json = await response.json().catch(() => ({}));
+  if (response.status === 401) window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: json.error }));
+  if (!response.ok) throw new Error(json.error || 'Não foi possível falar com o servidor.');
+  return json as T;
+}
+
+export const enrichIndicators = (indicators: string[], force = false) =>
+  http<{ results: Record<string, CtiSummary>; pending: number; configured: boolean }>('POST', '/api/cti/enrich', { indicators, force });
+
+export interface SessionInfo {
+  id: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  ip: string | null;
+  userAgent: string | null;
+  current: boolean;
+}
+export const listMySessions = () => http<{ sessions: SessionInfo[] }>('GET', '/api/sessions');
+export const revokeSession = (id: string) => http<{ ok: true }>('DELETE', `/api/sessions/${encodeURIComponent(id)}`);
+export const listUserSessions = (userId: number) => http<{ sessions: SessionInfo[] }>('GET', `/api/users/${userId}/sessions`);
+export const revokeAllUserSessions = (userId: number) => http<{ ok: true }>('POST', `/api/users/${userId}/sessions/revoke-all`);
+export const unlockUser = (userId: number) => http<{ user: unknown }>('PATCH', `/api/users/${userId}`, { unlock: true });
+
+export const getNotifications = () => http<{ pendingApprovals: number; failedJobs: string[] }>('GET', '/api/notifications');
+
+export interface JobRun {
+  job: 'backup' | 'monthly_report';
+  lastRunAt: string | null;
+  lastOkAt: string | null;
+  lastError: string | null;
+  detail: Record<string, unknown> | null;
+}
+export interface SystemStatus {
+  version: string | null;
+  uptimeSeconds: number;
+  database: { kind: string; ok: boolean; latencyMs?: number; clients?: number; entries?: number; users?: number; error?: string };
+  cti: { abuseIpDb: boolean; greyNoise: boolean; otx: boolean; cachedIps: number };
+  email: { configured: boolean; reportRecipients: number; backupRecipients: number };
+  jobs: JobRun[];
+  pendingApprovals: number;
+  lastImport: { at: string; client?: string; by?: string; added?: number } | null;
+  proxy: { trustProxyHops: unknown; seenIp: string; forwardedChain: string | null; ips: string[] };
+}
+export const getSystemStatus = () => http<SystemStatus>('GET', '/api/status');
+export const testCtiKeys = () => http<{ configured: Record<string, boolean>; result: CtiSummary | null }>('POST', '/api/status/test-cti');
+export const testEmail = () => http<{ ok: true; to: string[] }>('POST', '/api/status/test-email');
+export const runJob = (job: 'backup' | 'monthly_report') => http<{ ok: true; detail: Record<string, unknown> }>('POST', `/api/status/run/${job}`);

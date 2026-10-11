@@ -17,14 +17,19 @@ export function toCsv(rows: CsvCell[][]): string {
   return '﻿' + rows.map((row) => row.map(cell).join(';')).join('\r\n') + '\r\n';
 }
 
+// Datas sempre no horário de Brasília, também quando geradas no servidor (que roda em UTC).
+const TIME_ZONE = 'America/Sao_Paulo';
+
 export function formatDateBR(value: string | null | undefined): string {
   if (!value) return '';
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00`) : new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR');
+  const plain = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (plain) return `${plain[3]}/${plain[2]}/${plain[1]}`;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('pt-BR', { timeZone: TIME_ZONE });
 }
 
 export function formatDateTimeBR(value: string | null | undefined): string {
   if (!value) return '';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: TIME_ZONE });
 }

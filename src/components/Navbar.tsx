@@ -16,14 +16,15 @@ import {
   Sun,
   FileSpreadsheet,
   KeyRound,
-  Users as UsersIcon,
+  ClipboardCheck,
+  ShieldCheck,
   UploadCloud,
   X
 } from 'lucide-react';
 import { SessionUser } from '../types';
 import './Sidebar.css';
 
-export type AppTab = 'dashboard' | 'import' | 'client-list' | 'intelligence' | 'history' | 'reports' | 'clients' | 'users' | 'backup';
+export type AppTab = 'dashboard' | 'import' | 'client-list' | 'review' | 'intelligence' | 'history' | 'reports' | 'clients' | 'admin' | 'backup';
 
 interface NavbarProps {
   currentTab: AppTab;
@@ -38,6 +39,7 @@ interface NavbarProps {
   currentUser?: SessionUser | null;
   onLogout?: () => void;
   onChangePassword?: () => void;
+  pendingApprovals?: number;
 }
 
 const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = [
@@ -45,13 +47,14 @@ const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = 
   { id: 'intelligence', label: 'Inteligência de IPs', icon: Radio },
   { id: 'import', label: 'Importação semanal', icon: UploadCloud },
   { id: 'client-list', label: 'Listas dos clientes', icon: ListFilter },
+  { id: 'review', label: 'Revisão de bloqueios', icon: ClipboardCheck },
   { id: 'history', label: 'Histórico semanal', icon: History },
   { id: 'reports', label: 'Relatórios', icon: FileSpreadsheet },
   { id: 'clients', label: 'Gerenciar clientes', icon: Building2 },
   { id: 'backup', label: 'Backup e ajustes', icon: HardDrive }
 ];
 
-const usersItem = { id: 'users' as AppTab, label: 'Usuários', icon: UsersIcon };
+const adminItem = { id: 'admin' as AppTab, label: 'Administração', icon: ShieldCheck };
 
 function initials(name: string): string {
   const parts = name.split(/[\s._-]+/).filter(Boolean);
@@ -70,12 +73,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleCollapsed,
   currentUser,
   onLogout,
-  onChangePassword
+  onChangePassword,
+  pendingApprovals = 0
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
-  // Usuários aparece só para administradores, antes de Backup e ajustes.
-  const visibleItems = currentUser?.role === 'admin' ? [...navItems.slice(0, -1), usersItem, navItems[navItems.length - 1]] : navItems;
+  // Administração aparece só para administradores, antes de Backup e ajustes.
+  const visibleItems = currentUser?.role === 'admin' ? [...navItems.slice(0, -1), adminItem, navItems[navItems.length - 1]] : navItems;
   const activeRow = Math.max(0, visibleItems.findIndex((item) => item.id === currentTab));
   const displayName = currentUser?.displayName || 'Uso local';
   const roleLabel = currentUser ? (currentUser.role === 'admin' ? 'Administrador' : 'Analista') : 'Sem login ativo';
@@ -165,8 +169,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             className="gl-profile"
-            data-tip={`${displayName} · alterar senha`}
-            aria-label={`${displayName}, ${roleLabel}. Alterar senha`}
+            data-tip={`${displayName} · minha conta`}
+            aria-label={`${displayName}, ${roleLabel}. Minha conta`}
             onClick={() => { setMobileOpen(false); onChangePassword?.(); }}
             disabled={!onChangePassword}
           >
@@ -198,6 +202,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 >
                   <Icon aria-hidden="true" />
                   <span className="label">{label}</span>
+                  {id === 'admin' && pendingApprovals > 0 && (
+                    <span className="nav-badge" aria-label={`${pendingApprovals} aprovações pendentes`}>{pendingApprovals}</span>
+                  )}
                 </button>
               </li>
             ))}

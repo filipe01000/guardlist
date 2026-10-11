@@ -1,6 +1,9 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus } from 'lucide-react';
-import { Client, BlocklistEntry, IndicatorType, IndicatorStatus, ClientSnapshot } from '../types';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
+import { Client, BlocklistEntry, IndicatorType, IndicatorStatus, ClientSnapshot, EntryComment } from '../types';
+import { Modal } from './Modal';
+import type { ShowToast } from '../App';
+import { formatDateTimeBR } from '../utils/csv';
 import { IpDossierModal } from './IpDossierModal';
 import { PageHeader } from './PageHeader';
 import { 
@@ -13,9 +16,17 @@ import {
   restoreClientSnapshot,
   deleteClientEntriesAll,
   deleteSnapshot,
-  cleanRedundantEntries
+  cleanRedundantEntries,
+  getCommentCounts,
+  getComments,
+  addComment,
+  deleteComment,
+  updateClientExceptions
 } from '../db/store';
-import { findRedundant, type RedundantMatch } from '../utils/redundancy';
+import { findExceptionConflicts, findRedundant } from '../utils/redundancy';
+import { classifyIndicator, normalizeIndicator } from '../utils/validator';
+
+type ListIssue = { item: BlocklistEntry; coveredBy: string; reason: 'duplicate' | 'cidr' | 'exception' };
 import { 
   generateFirewallTxt, 
   generateNanoFormattedTxt,
@@ -39,6 +50,8 @@ interface ClientListViewProps {
   onSelectClient: (clientId: string) => void;
   onRefreshStats: () => void;
   onAddIndicators: (clientId: string) => void;
+  showToast: ShowToast;
+  isAdmin: boolean;
 }
 
 export const ClientListView: React.FC<ClientListViewProps> = ({
@@ -46,8 +59,22 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   selectedClientId,
   onSelectClient,
   onRefreshStats,
-  onAddIndicators
+  onAddIndicators,
+  showToast,
+  isAdmin
 }) => {
+  const searchRef = useRef<HTMLInputElement>(null);
+  // Comentários por item
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [commentEntry, setCommentEntry] = useState<BlocklistEntry | null>(null);
+  const [comments, setComments] = useState<EntryComment[]>([]);
+  const [commentText, setCommentText] = useState('');
+  const [commentBusy, setCommentBusy] = useState(false);
+  // Exceções do cliente
+  const [showExceptions, setShowExceptions] = useState(false);
+  const [exceptionsText, setExceptionsText] = useState('');
+  const [exceptionsError, setExceptionsError] = useState<string | null>(null);
+  const [exceptionsBusy, setExceptionsBusy] = useState(false);
   const activeClients = clients.filter(c => !c.isArchived);
   const currentClient = activeClients.find(c => c.id === selectedClientId) || activeClients[0];
 
@@ -95,7 +122,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
   // Verificação de Duplicatas
   const [isCheckingDuplicates, setIsCheckingDuplicates] = useState(false);
-  const [redundantMatches, setRedundantMatches] = useState<RedundantMatch<BlocklistEntry>[]>([]);
+  const [redundantMatches, setRedundantMatches] = useState<ListIssue[]>([]);
   const [isCleaningRedundant, setIsCleaningRedundant] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
@@ -149,11 +176,96 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     }
   };
 
+  const loadCommentCounts = () => {
+    if (!currentClient) return;
+    getCommentCounts(currentClient.id).then(setCommentCounts).catch(() => undefined);
+  };
+
   useEffect(() => {
     loadClientData();
     loadSnapshots();
+    loadCommentCounts();
     setPage(1);
   }, [currentClient?.id]);
+
+  // Atalhos da lista: N adiciona, V valida, E exporta NANO, F busca.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const el = event.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      const key = event.key.toLowerCase();
+      if (key === 'n' && currentClient) { event.preventDefault(); onAddIndicators(currentClient.id); }
+      else if (key === 'v') { event.preventDefault(); handleCheckDuplicates(); }
+      else if (key === 'e') { event.preventDefault(); handleExportNanoTxt(); }
+      else if (key === 'f') { event.preventDefault(); searchRef.current?.focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  const openComments = async (item: BlocklistEntry) => {
+    setCommentEntry(item);
+    setComments([]);
+    setCommentText('');
+    try {
+      setComments(await getComments(item.id));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Não foi possível carregar os comentários.', 'warn');
+    }
+  };
+
+  const submitComment = async () => {
+    if (!commentEntry || !commentText.trim()) return;
+    setCommentBusy(true);
+    try {
+      const list = await addComment(commentEntry.id, commentText.trim());
+      setComments(list);
+      setCommentText('');
+      setCommentCounts((prev) => ({ ...prev, [commentEntry.id]: list.length }));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Não foi possível comentar.', 'warn');
+    } finally {
+      setCommentBusy(false);
+    }
+  };
+
+  const openExceptions = () => {
+    setExceptionsError(null);
+    setExceptionsText((currentClient?.exceptions || []).map((e) => (e.reason ? `${e.indicator}  # ${e.reason}` : e.indicator)).join('\n'));
+    setShowExceptions(true);
+  };
+
+  // Uma exceção por linha; o que vem depois de # é o motivo.
+  const saveExceptions = async () => {
+    if (!currentClient) return;
+    const parsed: Array<{ indicator: string; reason?: string }> = [];
+    const invalid: string[] = [];
+    for (const line of exceptionsText.split(/\r?\n/)) {
+      const [rawIndicator, ...reasonParts] = line.split('#');
+      const indicator = normalizeIndicator(rawIndicator || '');
+      if (!indicator) continue;
+      if (!classifyIndicator(indicator).isValid) invalid.push(rawIndicator.trim());
+      else parsed.push({ indicator, reason: reasonParts.join('#').trim() || undefined });
+    }
+    if (invalid.length) return setExceptionsError(`Linhas inválidas: ${invalid.slice(0, 5).join(', ')}`);
+    setExceptionsBusy(true);
+    try {
+      const result = await updateClientExceptions(currentClient.id, parsed);
+      setShowExceptions(false);
+      onRefreshStats();
+      await loadClientData();
+      await loadSnapshots();
+      showToast(
+        `${result.exceptions.length} exceç${result.exceptions.length === 1 ? 'ão salva' : 'ões salvas'}.${result.retired ? ` ${result.retired} item(ns) da lista conflitavam e foram retirados.` : ''}`
+      );
+    } catch (err) {
+      setExceptionsError(err instanceof Error ? err.message : 'Não foi possível salvar.');
+    } finally {
+      setExceptionsBusy(false);
+    }
+  };
 
   // Filtragem e Ordenação
   const filteredEntries = useMemo(() => {
@@ -375,12 +487,24 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   const handleBulkToggleStatus = async (targetStatus: 'active' | 'removed') => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
+    const previous = entries.filter(e => ids.includes(e.id)).map(e => ({ id: e.id, status: e.status }));
     for (const id of ids) {
       await updateEntryStatus(id, targetStatus);
     }
     setEntries(prev => prev.map(e => ids.includes(e.id) ? { ...e, status: targetStatus } : e));
     setSelectedIds(new Set());
     onRefreshStats();
+    showToast(`${ids.length} ${targetStatus === 'removed' ? 'marcado(s) como removido(s)' : 'reativado(s)'}.`, {
+      action: {
+        label: 'Desfazer',
+        onClick: async () => {
+          for (const p of previous) await updateEntryStatus(p.id, p.status);
+          await loadClientData();
+          onRefreshStats();
+          showToast('Alteração desfeita.', 'info');
+        }
+      }
+    });
   };
 
   const handleBulkDeleteSelected = async () => {
@@ -388,12 +512,24 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     if (ids.length === 0) return;
     if (window.confirm(`Deseja excluir definitivamente os ${ids.length} itens selecionados?`)) {
       // Criar snapshot de segurança antes
-      await createClientSnapshot(currentClient.id, `Antes de excluir ${ids.length} itens em lote`);
+      const snap = await createClientSnapshot(currentClient.id, `Antes de excluir ${ids.length} itens em lote`);
       await bulkDeleteEntries(ids);
       setEntries(prev => prev.filter(e => !ids.includes(e.id)));
       setSelectedIds(new Set());
       loadSnapshots();
       onRefreshStats();
+      showToast(`${ids.length} item(ns) excluído(s).`, {
+        action: {
+          label: 'Desfazer',
+          onClick: async () => {
+            await restoreClientSnapshot(snap.id);
+            await loadClientData();
+            await loadSnapshots();
+            onRefreshStats();
+            showToast('Exclusão desfeita.', 'info');
+          }
+        }
+      });
     }
   };
 
@@ -463,6 +599,16 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     await updateEntryStatus(item.id, nextStatus);
     setEntries(prev => prev.map(e => e.id === item.id ? { ...e, status: nextStatus } : e));
     onRefreshStats();
+    showToast(`${item.indicator} ${nextStatus === 'removed' ? 'marcado como removido' : 'reativado'}.`, {
+      action: {
+        label: 'Desfazer',
+        onClick: async () => {
+          await updateEntryStatus(item.id, item.status);
+          setEntries(prev => prev.map(e => e.id === item.id ? { ...e, status: item.status } : e));
+          onRefreshStats();
+        }
+      }
+    });
   };
 
   // Salvar Observação Editada
@@ -475,11 +621,25 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
   // Excluir definitivamente Individual
   const handleConfirmDelete = async () => {
-    if (!deleteConfirmId) return;
+    if (!deleteConfirmId || !currentClient) return;
+    const target = entries.find(e => e.id === deleteConfirmId);
+    const snap = await createClientSnapshot(currentClient.id, `Antes de excluir ${target?.indicator ?? 'um item'}`);
     await bulkDeleteEntries([deleteConfirmId]);
     setEntries(prev => prev.filter(e => e.id !== deleteConfirmId));
     setDeleteConfirmId(null);
     onRefreshStats();
+    loadSnapshots();
+    showToast(`${target?.indicator ?? 'Item'} excluído.`, {
+      action: {
+        label: 'Desfazer',
+        onClick: async () => {
+          await restoreClientSnapshot(snap.id);
+          await loadClientData();
+          await loadSnapshots();
+          onRefreshStats();
+        }
+      }
+    });
   };
 
   // Copiar Indicador
@@ -495,7 +655,12 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
     const activeEntries = entries
       .filter(e => e.status === 'active')
       .sort((a, b) => String(a.addedDate || '').localeCompare(String(b.addedDate || '')) || a.id.localeCompare(b.id));
-    setRedundantMatches(findRedundant(activeEntries, e => e.indicator));
+    const conflicts = findExceptionConflicts(activeEntries, e => e.indicator, (currentClient?.exceptions || []).map(x => x.indicator));
+    const conflictSet = new Set(conflicts.map(c => c.item));
+    setRedundantMatches([
+      ...conflicts.map(c => ({ item: c.item, coveredBy: c.exception, reason: 'exception' as const })),
+      ...findRedundant(activeEntries.filter(e => !conflictSet.has(e)), e => e.indicator)
+    ]);
     setShowDuplicateModal(true);
     setIsCheckingDuplicates(false);
   };
@@ -535,7 +700,14 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               ))}
             </select>
             {currentClient && (
-              <button type="button" className="btn" onClick={() => onAddIndicators(currentClient.id)}>
+              <button type="button" className="btn" onClick={openExceptions} title="IPs, redes ou domínios que nunca podem ser bloqueados neste cliente">
+                <ShieldOff aria-hidden="true" />
+                Exceções
+                <span className="tabs__count">{currentClient.exceptions?.length || 0}</span>
+              </button>
+            )}
+            {currentClient && (
+              <button type="button" className="btn btn--primary" onClick={() => onAddIndicators(currentClient.id)} title="Atalho: N">
                 <Plus aria-hidden="true" />
                 Adicionar indicadores
               </button>
@@ -611,8 +783,9 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
         <label className="field field--search">
           <Search aria-hidden="true" />
           <input
+            ref={searchRef}
             type="search"
-            placeholder="Buscar IP, CIDR, domínio, ticket ou observação"
+            placeholder="Buscar IP, CIDR, domínio, ticket ou observação (F)"
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -738,7 +911,37 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
       {/* Tabela de Entradas com Checkboxes e Suporte a Ctrl/Shift */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
+        <div className="entry-cards" aria-label="Itens da lista">
+          {paginatedEntries.length === 0 ? (
+            <p className="py-8 text-center text-slate-500 text-xs">Nenhum indicador encontrado para os filtros selecionados.</p>
+          ) : (
+            paginatedEntries.map(item => (
+              <article key={item.id} className={`entry-card ${item.status === 'active' ? '' : 'opacity-60'}`}>
+                <div className="entry-card__top">
+                  <button type="button" className="entry-card__indicator text-left" onClick={() => setSelectedIpForDossier(item.indicator)}>{item.indicator}</button>
+                  <span className={item.status === 'active' ? 'chip chip--ok' : 'chip'}>{item.status === 'active' ? 'Ativo' : 'Removido'}</span>
+                </div>
+                <div className="entry-card__meta">
+                  <span>{item.type.replace('_', ' ')}</span>
+                  <span>Incluído {item.addedDate}</span>
+                  {item.sourceTicket && <span>Ticket {item.sourceTicket}</span>}
+                  {item.addedBy && <span>Por {item.addedBy}</span>}
+                </div>
+                {item.notes && <p className="entry-card__notes">{item.notes}</p>}
+                <div className="entry-card__actions">
+                  <button type="button" className="btn btn--sm" onClick={() => handleToggleStatus(item)}>{item.status === 'active' ? 'Remover' : 'Reativar'}</button>
+                  <button type="button" className="btn btn--sm" onClick={() => openComments(item)}>
+                    <MessageSquare aria-hidden="true" /> {commentCounts[item.id] || ''}
+                  </button>
+                  <button type="button" className="btn btn--sm btn--icon" onClick={() => handleCopy(item.indicator)} aria-label={`Copiar ${item.indicator}`}>
+                    {copiedIndicator === item.indicator ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                  </button>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+        <div className="overflow-x-auto entry-table-wrap">
           <table className="list-table w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-950/80 border-b border-slate-800 text-slate-400 font-semibold select-none">
@@ -976,6 +1179,16 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                             title={isActive ? 'Marcar como Removido (preserva histórico)' : 'Reativar Indicador'}
                           >
                             <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Comentários */}
+                          <button
+                            onClick={() => openComments(item)}
+                            className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded transition inline-flex items-center gap-0.5"
+                            title={commentCounts[item.id] ? `${commentCounts[item.id]} comentário(s)` : 'Comentar'}
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            {commentCounts[item.id] ? <span className="comment-count">{commentCounts[item.id]}</span> : null}
                           </button>
 
                           {/* Editar observação */}
@@ -1274,6 +1487,107 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
         </div>
       )}
 
+      {/* Comentários do item */}
+      <Modal
+        open={Boolean(commentEntry)}
+        onClose={() => setCommentEntry(null)}
+        title={<span className="font-mono">{commentEntry?.indicator}</span>}
+        subtitle={`Conversa da equipe sobre este item · ${currentClient?.name ?? ''}`}
+        size="md"
+        footer={
+          <form
+            className="flex w-full gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              submitComment();
+            }}
+          >
+            <input
+              className="field flex-1"
+              placeholder="Ex.: bloqueado por causa do chamado SEC-1234"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              maxLength={1000}
+              data-dialog-initial-focus
+            />
+            <button type="submit" className="btn btn--primary" disabled={commentBusy || !commentText.trim()}>
+              <Send aria-hidden="true" /> Enviar
+            </button>
+          </form>
+        }
+      >
+        {comments.length === 0 ? (
+          <p className="text-xs text-slate-400">Nenhum comentário ainda. Registre o motivo do bloqueio, o chamado ou o que combinaram com o cliente.</p>
+        ) : (
+          <div className="comment-thread">
+            {comments.map((c) => (
+              <div key={c.id} className="comment">
+                <header>
+                  <strong>{c.displayName}</strong>
+                  <span>
+                    {formatDateTimeBR(c.at)}
+                    <button
+                      type="button"
+                      className="ml-2 text-slate-500 hover:text-rose-400"
+                      onClick={async () => {
+                        try {
+                          const list = await deleteComment(c.id);
+                          setComments(list);
+                          if (commentEntry) setCommentCounts((prev) => ({ ...prev, [commentEntry.id]: list.length }));
+                        } catch (err) {
+                          showToast(err instanceof Error ? err.message : 'Não foi possível apagar.', 'warn');
+                        }
+                      }}
+                      aria-label="Apagar comentário"
+                      title="Apagar (só quem escreveu ou um administrador)"
+                    >
+                      <Trash2 className="w-3 h-3 inline" />
+                    </button>
+                  </span>
+                </header>
+                <p>{c.body}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
+
+      {/* Exceções do cliente */}
+      <Modal
+        open={showExceptions}
+        onClose={() => setShowExceptions(false)}
+        title={`Exceções de ${currentClient?.name ?? ''}`}
+        subtitle="IPs, redes ou domínios que nunca podem ser bloqueados neste cliente: gateway, parceiros, a própria empresa."
+        size="md"
+        footer={
+          isAdmin ? (
+            <>
+              <button type="button" className="btn" onClick={() => setShowExceptions(false)}>Cancelar</button>
+              <button type="button" className="btn btn--primary" disabled={exceptionsBusy} onClick={saveExceptions}>Salvar exceções</button>
+            </>
+          ) : undefined
+        }
+      >
+        <p className="text-xs text-slate-400 mb-3">
+          Uma por linha. O que vier depois de # é o motivo. A importação recusa qualquer item que bata com uma exceção, inclusive CIDRs que contenham o IP protegido.
+          {isAdmin ? ' Ao salvar, itens ativos em conflito são retirados (com versão salva antes).' : ' Só administradores alteram esta lista.'}
+        </p>
+        {exceptionsError && <div className="notice notice--danger mb-3"><p>{exceptionsError}</p></div>}
+        <textarea
+          className="field w-full py-2 font-mono text-xs"
+          rows={10}
+          value={exceptionsText}
+          onChange={(e) => setExceptionsText(e.target.value)}
+          readOnly={!isAdmin}
+          placeholder={'200.150.10.1  # gateway do cliente\n177.10.0.0/16  # parceiro de pagamentos\nempresa.com.br  # domínio próprio'}
+        />
+        {currentClient?.exceptions?.length ? (
+          <p className="text-[11px] text-slate-500 mt-2">
+            Última alteração: {currentClient.exceptions.map((e) => e.addedBy).filter(Boolean).slice(-1)[0] || '—'}
+          </p>
+        ) : null}
+      </Modal>
+
       {/* MODAL: Verificação de Duplicatas na Lista Inteira */}
       {showDuplicateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
@@ -1298,7 +1612,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 <ShieldCheck className="w-10 h-10 text-emerald-400 mx-auto" />
                 <h4 className="text-sm font-bold text-white">Nada repetido ou coberto</h4>
                 <p className="text-xs text-slate-400">
-                  A lista ativa de {currentClient?.name} não tem indicadores repetidos nem IPs dentro de um CIDR da própria lista.
+                  A lista ativa de {currentClient?.name} não tem repetidos, IPs dentro de um CIDR da própria lista nem conflitos com as exceções.
                 </p>
               </div>
             ) : (
@@ -1309,7 +1623,8 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                     <strong>{redundantMatches.length}</strong>{' '}
                     {redundantMatches.length === 1 ? 'item sobra' : 'itens sobram'} na lista ativa
                     {' '}({redundantMatches.filter(m => m.reason === 'duplicate').length} repetido(s),{' '}
-                    {redundantMatches.filter(m => m.reason === 'cidr').length} dentro de CIDR).
+                    {redundantMatches.filter(m => m.reason === 'cidr').length} dentro de CIDR
+                    {redundantMatches.some(m => m.reason === 'exception') ? `, ${redundantMatches.filter(m => m.reason === 'exception').length} em conflito com exceções` : ''}).
                     Ao retirar, eles ficam como removidos, com o motivo na observação, e uma versão é salva antes.
                   </p>
                   <button
@@ -1331,7 +1646,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                         <span className="text-[11px] text-slate-500 font-sans truncate">{match.item.addedDate}</span>
                       </div>
                       <span className="font-sans text-slate-400 shrink-0">
-                        {match.reason === 'duplicate' ? 'Repetido de ' : 'Coberto por '}
+                        {match.reason === 'duplicate' ? 'Repetido de ' : match.reason === 'exception' ? 'Conflita com a exceção ' : 'Coberto por '}
                         <span className="font-mono text-slate-300">{match.coveredBy}</span>
                       </span>
                     </div>

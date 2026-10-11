@@ -7,7 +7,7 @@
 
 import { ImportPreviewItem, ImportPreviewSummary } from '../types';
 import { normalizeIndicator, classifyIndicator, checkReservedRange } from './validator';
-import { findRedundant } from './redundancy';
+import { exceptionHit, findRedundant, toRange } from './redundancy';
 
 /**
  * Remove cabeçalhos NANO e divide qualquer texto em tokens individuais
@@ -83,7 +83,8 @@ export function analyzeImportBatch(
   rawInput: string,
   existingActiveSet: Set<string>,
   _existingActiveCidrs: string[] = [],
-  mode: 'append' | 'replace' = 'append'
+  mode: 'append' | 'replace' = 'append',
+  exceptions: string[] = []
 ): ImportPreviewSummary {
   const tokens = extractTokensFromRawInput(rawInput);
 
@@ -114,7 +115,14 @@ export function analyzeImportBatch(
     }
     seenInThisBatch.add(normalized);
 
-    // 3. Já está na lista ativa do cliente
+    // 3. Nas exceções do cliente (gateway, parceiros...): nunca entra
+    const hit = exceptionHit(normalized, exceptions);
+    if (hit) {
+      items.push({ indicator: normalized, original, type: classification.type, category: 'exception', exceptionHit: hit });
+      continue;
+    }
+
+    // 4. Já está na lista ativa do cliente
     if (existingLower.has(normalized)) {
       items.push({ indicator: normalized, original, type: classification.type, category: 'already_exists' });
       continue;
@@ -160,7 +168,80 @@ export function analyzeImportBatch(
     coveredByCidrCount: count('covered_by_cidr'),
     invalidCount: count('invalid'),
     reservedWarningCount: count('reserved_warning'),
+    exceptionCount: count('exception'),
     items,
     superseded
+  };
+}
+
+export type OrganizeMode = 'number' | 'range';
+
+/**
+ * Reorganiza o texto colado para facilitar a conferência:
+ * - "number": IPv4 em ordem numérica, depois CIDRs, IPv6 e domínios;
+ * - "range": IPv4 agrupados pela mesma faixa /24, com um cabeçalho por faixa.
+ * Repetidos e linhas inválidas viram comentários (#) no topo, que a importação ignora.
+ */
+export function organizeIndicators(rawText: string, mode: OrganizeMode): { text: string; total: number; duplicates: number; invalid: number } {
+  const counts = new Map<string, number>();
+  const invalid: string[] = [];
+  for (const { token } of extractTokensFromRawInput(rawText)) {
+    const norm = normalizeIndicator(token);
+    if (!classifyIndicator(norm).isValid) {
+      invalid.push(token);
+      continue;
+    }
+    counts.set(norm, (counts.get(norm) ?? 0) + 1);
+  }
+  const unique = [...counts.keys()];
+  const rangeOf = (x: string) => toRange(x);
+  const ipv4 = unique.filter((x) => !x.includes('/') && rangeOf(x)?.family === 4);
+  const cidr4 = unique.filter((x) => x.includes('/') && rangeOf(x)?.family === 4);
+  const ipv6 = unique.filter((x) => rangeOf(x)?.family === 6);
+  const domains = unique.filter((x) => !rangeOf(x)).sort();
+  const byNumber = (a: string, b: string) => {
+    const ra = rangeOf(a)!;
+    const rb = rangeOf(b)!;
+    return ra.start < rb.start ? -1 : ra.start > rb.start ? 1 : ra.end > rb.end ? -1 : ra.end < rb.end ? 1 : 0;
+  };
+  ipv4.sort(byNumber);
+  cidr4.sort(byNumber);
+  ipv6.sort(byNumber);
+
+  const lines: string[] = [];
+  const repeated = [...counts].filter(([, n]) => n > 1);
+  if (repeated.length) {
+    lines.push(`# ${repeated.length} repetido(s) removido(s):`);
+    for (const [value, n] of repeated) lines.push(`#   ${value} (${n}x)`);
+  }
+  if (invalid.length) {
+    lines.push(`# ${invalid.length} linha(s) inválida(s) ignorada(s): ${invalid.slice(0, 10).join(', ')}${invalid.length > 10 ? ' …' : ''}`);
+  }
+  if (lines.length) lines.push('');
+
+  if (mode === 'range') {
+    const groups = new Map<string, string[]>();
+    for (const ip of ipv4) {
+      const key = ip.split('.').slice(0, 3).join('.');
+      groups.set(key, [...(groups.get(key) ?? []), ip]);
+    }
+    for (const [key, ips] of groups) {
+      const cover = cidr4.find((net) => { const r = rangeOf(net)!; return ips.every((ip) => { const x = rangeOf(ip)!; return r.start <= x.start && x.end <= r.end; }); });
+      const hint = cover ? ` (já dentro de ${cover})` : ips.length >= 8 ? ` (avalie bloquear ${key}.0/24)` : '';
+      lines.push(`# ${key}.x — ${ips.length} IP${ips.length > 1 ? 's' : ''}${hint}`);
+      lines.push(...ips, '');
+    }
+  } else if (ipv4.length) {
+    lines.push(`# IPv4 (${ipv4.length})`, ...ipv4, '');
+  }
+  if (cidr4.length) lines.push(`# Redes CIDR (${cidr4.length})`, ...cidr4, '');
+  if (ipv6.length) lines.push(`# IPv6 (${ipv6.length})`, ...ipv6, '');
+  if (domains.length) lines.push(`# Domínios (${domains.length})`, ...domains, '');
+
+  return {
+    text: lines.join('\n').trimEnd(),
+    total: unique.length,
+    duplicates: repeated.reduce((n, [, c]) => n + c - 1, 0),
+    invalid: invalid.length
   };
 }

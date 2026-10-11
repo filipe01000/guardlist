@@ -3,10 +3,15 @@ import type {
   AppSettings,
   BlocklistEntry,
   Client,
+  ClientException,
   ClientSnapshot,
-  ImportHistoryRecord
+  EntryComment,
+  ImportHistoryRecord,
+  ImportOutcome,
+  PendingImport
 } from '../src/types/index.ts';
-import { findRedundant } from '../src/utils/redundancy.ts';
+import { exceptionHit, findExceptionConflicts, findRedundant, toRange } from '../src/utils/redundancy.ts';
+import { classifyIndicator, normalizeIndicator } from '../src/utils/validator.ts';
 
 // Operações da base compartilhada da equipe. Espelham as funções que o app usava no IndexedDB,
 // agora no Postgres, registrando quem fez cada alteração.
@@ -18,7 +23,27 @@ export interface Actor {
 }
 
 const SNAPSHOTS_PER_CLIENT = 30;
-const DEFAULT_SETTINGS: AppSettings = { slaDays: 7, lastBackupDate: null, sortNumericallyByDefault: true };
+const DEFAULT_SETTINGS: AppSettings = {
+  slaDays: 7,
+  lastBackupDate: null,
+  sortNumericallyByDefault: true,
+  reviewDays: 90,
+  approvalThreshold: 500,
+  requireApprovalForReplace: true
+};
+
+const exceptionList = (client: Client | null) => (client?.exceptions || []).map((e) => e.indicator);
+
+// Data (YYYY-MM-DD ou ISO) mais recente entre as informadas, em milissegundos.
+function latest(...dates: Array<string | null | undefined>): number {
+  let max = 0;
+  for (const date of dates) {
+    if (!date) continue;
+    const time = new Date(/^\d{4}-\d{2}-\d{2}$/.test(date) ? `${date}T00:00:00` : date).getTime();
+    if (!Number.isNaN(time) && time > max) max = time;
+  }
+  return max;
+}
 
 export class StoreError extends Error {
   status: number;
@@ -104,21 +129,167 @@ async function retireRedundant(q: Query, clientId: string, actor: Actor): Promis
   const active = (await entriesOf(q, clientId, 'active')).sort(
     (a, b) => String(a.addedDate || '').localeCompare(String(b.addedDate || '')) || a.id.localeCompare(b.id)
   );
-  const matches = findRedundant(active, (e) => e.indicator);
-  if (matches.length === 0) return 0;
+  const client = await getClient(q, clientId);
+  const reasons = new Map<BlocklistEntry, string>();
+  for (const { item, exception } of findExceptionConflicts(active, (e) => e.indicator, exceptionList(client))) {
+    reasons.set(item, `Conflita com a exceção ${exception}`);
+  }
+  const remaining = active.filter((e) => !reasons.has(e));
+  for (const { item, coveredBy, reason } of findRedundant(remaining, (e) => e.indicator)) {
+    reasons.set(item, reason === 'duplicate' ? `Repetido de ${coveredBy}` : `Coberto pelo CIDR ${coveredBy}`);
+  }
+  if (reasons.size === 0) return 0;
   const now = new Date().toISOString();
-  const retired = matches.map(({ item, coveredBy, reason }) => ({
+  const retired = [...reasons].map(([item, why]) => ({
     ...item,
     status: 'removed' as const,
     removedAt: now,
     removedBy: actor.displayName,
-    notes:
-      (item.notes ? `${item.notes} • ` : '') +
-      (reason === 'duplicate' ? `Repetido de ${coveredBy}` : `Coberto pelo CIDR ${coveredBy}`)
+    notes: (item.notes ? `${item.notes} • ` : '') + why
   }));
   await upsertEntries(q, retired, actor);
-  await audit(q, actor, 'entries.dedupe', { clientId, removed: retired.length });
+  await audit(q, actor, 'entries.dedupe', { clientId, name: client?.name, removed: retired.length });
   return retired.length;
+}
+
+interface ImportPayload {
+  clientId: string;
+  mode: 'append' | 'replace';
+  entries: BlocklistEntry[];
+  history: ImportHistoryRecord;
+  todayStr: string;
+  seen: string[];
+}
+
+function parseImportPayload(raw: unknown): ImportPayload {
+  const input = (raw || {}) as Record<string, unknown>;
+  const clientId = asString(input.clientId, 'clientId');
+  const entries = asArray<BlocklistEntry>(input.entries, 'entries');
+  for (const entry of entries) {
+    if (!entry || typeof entry.id !== 'string' || typeof entry.indicator !== 'string') throw new StoreError('Item inválido no lote.');
+  }
+  const history = (input.history && typeof input.history === 'object' ? input.history : {}) as ImportHistoryRecord;
+  const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(String(input.todayStr)) ? String(input.todayStr) : new Date().toISOString().slice(0, 10);
+  const seen = Array.isArray(input.seen) ? input.seen.filter((x): x is string => typeof x === 'string').slice(0, 100_000) : [];
+  return { clientId, mode: input.mode === 'replace' ? 'replace' : 'append', entries, history, todayStr, seen };
+}
+
+// Grava um lote já aprovado: respeita as exceções do cliente, salva uma versão antes, atualiza "visto por último",
+// retira redundâncias e registra o histórico. `author` é quem assina a inclusão (o solicitante, numa aprovação).
+async function executeImport(q: Query, author: Actor, payload: ImportPayload, extraNote?: string): Promise<ImportOutcome> {
+  const { clientId, mode, todayStr } = payload;
+  const client = await getClient(q, clientId);
+  if (!client) throw new StoreError('Cliente não encontrado.', 404);
+  const exceptions = exceptionList(client);
+  const list = payload.entries
+    .map((e) => ({ ...e, clientId, addedBy: author.displayName, status: 'active' as const }))
+    .filter((e) => !exceptionHit(e.indicator, exceptions));
+  const blockedByException = payload.entries.length - list.length;
+
+  const currentActive = await entriesOf(q, clientId, 'active');
+  const previousTotal = currentActive.length;
+  const snap = await snapshot(
+    q,
+    clientId,
+    mode === 'replace'
+      ? `Segurança antes de substituir lista (${previousTotal} itens)`
+      : `Antes da importação de ${list.length} novos itens (${todayStr})`,
+    author
+  );
+
+  let added = 0;
+  let removed = 0;
+  const now = new Date().toISOString();
+  const existing = new Map(currentActive.map((e) => [e.indicator.toLowerCase(), e]));
+  if (mode === 'replace') {
+    const incoming = new Set(list.map((e) => e.indicator.toLowerCase()));
+    const changed: BlocklistEntry[] = [];
+    for (const old of currentActive) {
+      if (!incoming.has(old.indicator.toLowerCase())) {
+        changed.push({
+          ...old,
+          status: 'removed',
+          removedAt: now,
+          removedBy: author.displayName,
+          notes: (old.notes ? `${old.notes} • ` : '') + `Removido na sincronização semanal (${todayStr})`
+        });
+        removed++;
+      }
+    }
+    for (const entry of list) {
+      if (!existing.has(entry.indicator.toLowerCase())) {
+        changed.push(entry);
+        added++;
+      }
+    }
+    await upsertEntries(q, changed, author);
+  } else {
+    const fresh = list.filter((e) => !existing.has(e.indicator.toLowerCase()));
+    added = fresh.length;
+    await upsertEntries(q, fresh, author);
+  }
+
+  // Quem reapareceu neste lote volta a contar como visto (sai da fila de revisão).
+  const seen = new Set(payload.seen.map((x) => x.toLowerCase()));
+  if (mode === 'replace') for (const e of list) if (existing.has(e.indicator.toLowerCase())) seen.add(e.indicator.toLowerCase());
+  if (seen.size > 0) {
+    await q(
+      `UPDATE entries SET data = data || jsonb_build_object('lastSeenAt', $3::text)
+       WHERE client_id = $1 AND status = 'active' AND lower(indicator) = ANY($2::text[])`,
+      [clientId, [...seen], now]
+    );
+  }
+
+  const retired = await retireRedundant(q, clientId, author);
+  removed += retired;
+  const totalAfter = (await q<{ n: number }>("SELECT count(*)::int AS n FROM entries WHERE client_id = $1 AND status = 'active'", [clientId]))[0]?.n ?? 0;
+
+  await putClient(q, { ...client, lastVariation: { added, removed, previousTotal }, lastUpdateDate: todayStr, updatedAt: now }, author);
+
+  const notes = [payload.history.notes, mode === 'replace' ? `Modo Substituir (-${removed - retired} itens arquivados)` : '',
+    retired > 0 ? `${retired} retirados por repetição, cobertura de CIDR ou exceção` : '',
+    blockedByException > 0 ? `${blockedByException} recusados por estarem nas exceções do cliente` : '', extraNote || '']
+    .filter(Boolean).join(' • ');
+  const historyId = typeof payload.history.id === 'string' && payload.history.id ? payload.history.id : `hist-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const record: ImportHistoryRecord = {
+    ...payload.history,
+    id: historyId,
+    date: now,
+    clientId,
+    clientName: client.name,
+    totalBefore: previousTotal,
+    addedCount: added,
+    totalAfter,
+    notes: notes || undefined,
+    importedBy: author.displayName
+  };
+  await q(
+    'INSERT INTO history (id, client_id, happened_at, data, created_by) VALUES ($1, $2, $3, $4::jsonb, $5) ON CONFLICT (id) DO NOTHING',
+    [historyId, clientId, now, JSON.stringify(record), author.username]
+  );
+  await audit(q, author, 'entries.import', { clientId, name: client.name, added, removed, mode, blockedByException });
+  return { status: 'done', added, retired, removed, blockedByException, snapshotId: snap.id, historyId };
+}
+
+function toPendingImport(row: { id: string; client_id: string; mode: string; data: Record<string, any>; requested_by: string; requested_at: string; status: string; decided_by: string | null; decided_at: string | null; decision_note: string | null }, clientName: string): PendingImport {
+  const entries = (row.data.entries || []) as BlocklistEntry[];
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    clientName,
+    mode: row.mode === 'replace' ? 'replace' : 'append',
+    itemCount: entries.length,
+    requestedBy: row.requested_by,
+    requestedByName: row.data.requestedByName || row.requested_by,
+    requestedAt: new Date(row.requested_at).toISOString(),
+    status: row.status as PendingImport['status'],
+    decidedBy: row.decided_by,
+    decidedAt: row.decided_at ? new Date(row.decided_at).toISOString() : null,
+    decisionNote: row.decision_note,
+    sourceTicket: row.data.history?.sourceTicket,
+    notes: row.data.history?.notes,
+    sample: entries.slice(0, 12).map((e) => e.indicator)
+  };
 }
 
 function requireAdmin(actor: Actor) {
@@ -218,6 +389,44 @@ export function createStore(db: Database) {
       });
     },
 
+    // Exceções do cliente: o que nunca pode ser bloqueado. Ao salvar, itens ativos em conflito são retirados.
+    async updateClientExceptions(actor: Actor, clientId: string, input: unknown) {
+      requireAdmin(actor);
+      const raw = asArray<{ indicator?: unknown; reason?: unknown }>(input, 'exceptions').slice(0, 1000);
+      const seen = new Set<string>();
+      const list: ClientException[] = [];
+      const invalid: string[] = [];
+      for (const item of raw) {
+        const indicator = normalizeIndicator(String(item?.indicator ?? ''));
+        if (!indicator) continue;
+        if (!classifyIndicator(indicator).isValid) {
+          invalid.push(String(item?.indicator));
+          continue;
+        }
+        if (seen.has(indicator)) continue;
+        seen.add(indicator);
+        list.push({ indicator, reason: String(item?.reason ?? '').trim().slice(0, 200) || undefined });
+      }
+      if (invalid.length) throw new StoreError(`Exceções inválidas: ${invalid.slice(0, 5).join(', ')}`);
+      return db.tx(async (q) => {
+        const client = await getClient(q, asString(clientId, 'clientId'));
+        if (!client) throw new StoreError('Cliente não encontrado.', 404);
+        const previous = new Map((client.exceptions || []).map((e) => [e.indicator, e]));
+        const now = new Date().toISOString();
+        const exceptions = list.map((e) => ({ ...e, addedBy: previous.get(e.indicator)?.addedBy || actor.displayName, addedAt: previous.get(e.indicator)?.addedAt || now }));
+        await putClient(q, { ...client, exceptions, updatedAt: now }, actor);
+        const active = await entriesOf(q, clientId, 'active');
+        const conflicts = findExceptionConflicts(active, (e) => e.indicator, exceptions.map((e) => e.indicator));
+        let retired = 0;
+        if (conflicts.length) {
+          await snapshot(q, clientId, 'Antes de aplicar as exceções do cliente', actor);
+          retired = await retireRedundant(q, clientId, actor);
+        }
+        await audit(q, actor, 'client.exceptions', { clientId, name: client.name, count: exceptions.length, retired });
+        return { exceptions, retired };
+      });
+    },
+
     async archiveClient(actor: Actor, clientId: string, isArchived: boolean) {
       await db.tx(async (q) => {
         const client = await getClient(q, clientId);
@@ -309,13 +518,365 @@ export function createStore(db: Database) {
       });
     },
 
-    // Limpeza manual: retira repetidos e itens cobertos por CIDR da lista ativa, com versão salva antes.
+    // Importação vinda da tela: grava na hora ou, se a regra pedir, deixa aguardando um administrador.
+    async importBatch(actor: Actor, rawPayload: unknown): Promise<ImportOutcome> {
+      const payload = parseImportPayload(rawPayload);
+      const settings = await ops.getAppSettings();
+      const needsApproval =
+        actor.role !== 'admin' &&
+        ((payload.mode === 'replace' && settings.requireApprovalForReplace !== false) ||
+          payload.entries.length > (settings.approvalThreshold ?? 500));
+      if (!needsApproval) return db.tx((q) => executeImport(q, actor, payload));
+
+      const client = await getClient(db.query, payload.clientId);
+      if (!client) throw new StoreError('Cliente não encontrado.', 404);
+      const id = `pend-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      await db.tx(async (q) => {
+        await q(
+          'INSERT INTO pending_imports (id, client_id, mode, data, requested_by) VALUES ($1, $2, $3, $4::jsonb, $5)',
+          [id, payload.clientId, payload.mode, JSON.stringify({ ...payload, requestedByName: actor.displayName }), actor.username]
+        );
+        await audit(q, actor, 'import.pending', { clientId: payload.clientId, name: client.name, mode: payload.mode, items: payload.entries.length });
+      });
+      return { status: 'pending', pendingId: id, added: 0, retired: 0, removed: 0, blockedByException: 0 };
+    },
+
+    // Admin vê todas as pendentes e as últimas decididas; analista vê só as próprias.
+    async listPendingImports(actor: Actor) {
+      const rows = await db.query<any>(
+        actor.role === 'admin'
+          ? `(SELECT * FROM pending_imports WHERE status = 'pending' ORDER BY requested_at)
+             UNION ALL (SELECT * FROM pending_imports WHERE status <> 'pending' ORDER BY decided_at DESC LIMIT 20)`
+          : 'SELECT * FROM pending_imports WHERE requested_by = $1 ORDER BY requested_at DESC LIMIT 30',
+        actor.role === 'admin' ? [] : [actor.username]
+      );
+      const names = new Map((await ops.getAllClients()).map((c) => [c.id, c.name]));
+      return rows.map((r) => toPendingImport(r, names.get(r.client_id) || 'Cliente removido'));
+    },
+
+    async decidePendingImport(actor: Actor, id: string, decision: string, note?: string) {
+      requireAdmin(actor);
+      if (decision !== 'approve' && decision !== 'reject') throw new StoreError('Decisão inválida.');
+      return db.tx(async (q) => {
+        const rows = await q<any>("SELECT * FROM pending_imports WHERE id = $1 AND status = 'pending' FOR UPDATE", [String(id)]);
+        const row = rows[0];
+        if (!row) throw new StoreError('Esta importação já foi decidida ou não existe.', 404);
+        const cleanNote = String(note ?? '').trim().slice(0, 500) || null;
+        let outcome: ImportOutcome | null = null;
+        if (decision === 'approve') {
+          const payload = parseImportPayload(row.data);
+          const requester: Actor = { username: row.requested_by, displayName: row.data.requestedByName || row.requested_by, role: 'analyst' };
+          outcome = await executeImport(q, requester, payload, `Aprovado por ${actor.displayName}`);
+        }
+        await q(
+          'UPDATE pending_imports SET status = $2, decided_by = $3, decided_at = now(), decision_note = $4 WHERE id = $1',
+          [row.id, decision === 'approve' ? 'approved' : 'rejected', actor.displayName, cleanNote]
+        );
+        await audit(q, actor, decision === 'approve' ? 'import.approve' : 'import.reject', {
+          clientId: row.client_id, requestedBy: row.requested_by, items: (row.data.entries || []).length, note: cleanNote
+        });
+        return outcome;
+      });
+    },
+
+    // Desfaz uma importação: volta a lista para a versão salva antes dela e marca o histórico.
+    async undoImport(actor: Actor, snapshotId: string, historyId?: string) {
+      const result = await ops.restoreClientSnapshot(actor, asString(snapshotId, 'snapshotId'));
+      if (typeof historyId === 'string' && historyId) {
+        await db.query(
+          `UPDATE history SET data = data || jsonb_build_object('undone', true, 'notes',
+             coalesce(data->>'notes' || ' • ', '') || $2::text) WHERE id = $1`,
+          [historyId, `Desfeito por ${actor.displayName}`]
+        );
+      }
+      return result;
+    },
+
+    // Validação de todas as listas: repetidos, cobertos por CIDR, conflitos com exceções e itens para revisão.
+    async validateAllClients(actor: Actor) {
+      const [clients, settings, entries] = await Promise.all([
+        ops.getAllClients(),
+        ops.getAppSettings(),
+        db.query<{ data: BlocklistEntry; last_reported: string | null }>(
+          `SELECT e.data, c.data->>'lastReportedAt' AS last_reported FROM entries e
+           LEFT JOIN cti_cache c ON c.indicator = lower(e.indicator) WHERE e.status = 'active'`
+        )
+      ]);
+      const byClient = new Map<string, Array<{ data: BlocklistEntry; last_reported: string | null }>>();
+      for (const row of entries) {
+        const list = byClient.get(row.data.clientId) ?? [];
+        list.push(row);
+        byClient.set(row.data.clientId, list);
+      }
+      const cutoff = Date.now() - (settings.reviewDays || 90) * 86_400_000;
+      return clients.filter((c) => !c.isArchived).map((c) => {
+        const rows = (byClient.get(c.id) ?? []).sort((a, b) => String(a.data.addedDate).localeCompare(String(b.data.addedDate)));
+        const active = rows.map((r) => r.data);
+        const conflicts = findExceptionConflicts(active, (e) => e.indicator, exceptionList(c));
+        const conflictSet = new Set(conflicts.map((x) => x.item));
+        const redundant = findRedundant(active.filter((e) => !conflictSet.has(e)), (e) => e.indicator);
+        const reviewDue = rows.filter((r) => latest(r.data.addedDate, r.data.lastSeenAt, r.data.reviewedAt, r.last_reported) < cutoff).length;
+        return {
+          clientId: c.id,
+          name: c.name,
+          active: active.length,
+          duplicates: redundant.filter((m) => m.reason === 'duplicate').length,
+          covered: redundant.filter((m) => m.reason === 'cidr').length,
+          exceptionConflicts: conflicts.length,
+          reviewDue,
+          samples: [
+            ...conflicts.slice(0, 3).map((x) => `${x.item.indicator} (exceção ${x.exception})`),
+            ...redundant.slice(0, 5).map((m) => `${m.item.indicator} → ${m.coveredBy}`)
+          ]
+        };
+      });
+    },
+
+    // Corrige todas as listas de uma vez (versão salva antes em cada cliente alterado).
+    async cleanAllClients(actor: Actor) {
+      const report = await ops.validateAllClients(actor);
+      const results: Array<{ clientId: string; name: string; retired: number }> = [];
+      for (const item of report) {
+        if (item.duplicates + item.covered + item.exceptionConflicts === 0) continue;
+        const { retired } = await ops.cleanRedundantEntries(actor, item.clientId);
+        results.push({ clientId: item.clientId, name: item.name, retired });
+      }
+      return { clients: results.length, retired: results.reduce((n, r) => n + r.retired, 0), results };
+    },
+
+    // Fila de revisão: ativos sem reaparecer em importações, sem revisão e sem denúncias recentes há mais de N dias.
+    async getReviewQueue(_actor: Actor, clientId?: string) {
+      const settings = await ops.getAppSettings();
+      const days = settings.reviewDays || 90;
+      const rows = await db.query<{ data: BlocklistEntry; last_reported: string | null; reports: string | null; score: string | null }>(
+        `SELECT e.data, c.data->>'lastReportedAt' AS last_reported, c.data->>'totalReports' AS reports, c.data->>'score' AS score
+         FROM entries e LEFT JOIN cti_cache c ON c.indicator = lower(e.indicator)
+         WHERE e.status = 'active' ${typeof clientId === 'string' && clientId ? 'AND e.client_id = $1' : ''}`,
+        typeof clientId === 'string' && clientId ? [clientId] : []
+      );
+      const cutoff = Date.now() - days * 86_400_000;
+      const names = new Map((await ops.getAllClients()).map((c) => [c.id, c.name]));
+      const items = rows
+        .map((r) => {
+          const last = latest(r.data.addedDate, r.data.lastSeenAt, r.data.reviewedAt, r.last_reported);
+          return {
+            entry: r.data,
+            clientName: names.get(r.data.clientId) || '',
+            lastActivity: last ? new Date(last).toISOString() : null,
+            daysIdle: last ? Math.floor((Date.now() - last) / 86_400_000) : null,
+            lastReportedAt: r.last_reported,
+            totalReports: r.reports === null ? null : Number(r.reports),
+            score: r.score === null ? null : Number(r.score)
+          };
+        })
+        .filter((x) => x.lastActivity === null || new Date(x.lastActivity).getTime() < cutoff)
+        .sort((a, b) => (b.daysIdle ?? 99999) - (a.daysIdle ?? 99999));
+      return { reviewDays: days, items };
+    },
+
+    async reviewEntries(actor: Actor, ids: unknown, decision: string) {
+      const list = asArray<string>(ids, 'ids').filter((x) => typeof x === 'string').slice(0, 5000);
+      if (decision !== 'keep' && decision !== 'remove') throw new StoreError('Decisão inválida.');
+      if (list.length === 0) return { count: 0 };
+      await db.tx(async (q) => {
+        if (decision === 'keep') {
+          await q(
+            `UPDATE entries SET data = data || jsonb_build_object('reviewedAt', to_jsonb(now()), 'reviewedBy', $2::text),
+               updated_at = now(), updated_by = $3 WHERE id = ANY($1::text[]) AND status = 'active'`,
+            [list, actor.displayName, actor.username]
+          );
+        } else {
+          await q(
+            `UPDATE entries SET status = 'removed', data = data || jsonb_build_object('status', 'removed', 'removedAt', to_jsonb(now()),
+               'removedBy', $2::text, 'notes', coalesce(data->>'notes' || ' • ', '') || 'Removido na revisão (sem novas denúncias)'),
+               updated_at = now(), updated_by = $3 WHERE id = ANY($1::text[]) AND status = 'active'`,
+            [list, actor.displayName, actor.username]
+          );
+        }
+        await audit(q, actor, decision === 'keep' ? 'review.keep' : 'review.remove', { count: list.length });
+      });
+      return { count: list.length };
+    },
+
+    // Comentários por item.
+    async getComments(_actor: Actor, entryId: string) {
+      const rows = await db.query<any>('SELECT * FROM comments WHERE entry_id = $1 ORDER BY at', [asString(entryId, 'entryId')]);
+      return rows.map((r): EntryComment => ({
+        id: Number(r.id), entryId: r.entry_id, clientId: r.client_id, indicator: r.indicator,
+        username: r.username, displayName: r.display_name || r.username, body: r.body, at: new Date(r.at).toISOString()
+      }));
+    },
+
+    async addComment(actor: Actor, entryId: string, body: string) {
+      const text = String(body ?? '').trim().slice(0, 1000);
+      if (!text) throw new StoreError('Escreva o comentário.');
+      const rows = await db.query<{ data: BlocklistEntry }>('SELECT data FROM entries WHERE id = $1', [asString(entryId, 'entryId')]);
+      const entry = rows[0]?.data;
+      if (!entry) throw new StoreError('Item não encontrado.', 404);
+      await db.query(
+        'INSERT INTO comments (entry_id, client_id, indicator, username, display_name, body) VALUES ($1, $2, $3, $4, $5, $6)',
+        [entryId, entry.clientId, entry.indicator, actor.username, actor.displayName, text]
+      );
+      await db.query('INSERT INTO audit_log (username, action, detail) VALUES ($1, $2, $3::jsonb)', [
+        actor.username, 'comment.add', JSON.stringify({ clientId: entry.clientId, indicator: entry.indicator })
+      ]);
+      return ops.getComments(actor, entryId);
+    },
+
+    async deleteComment(actor: Actor, id: number) {
+      const rows = await db.query<{ username: string; entry_id: string }>('SELECT username, entry_id FROM comments WHERE id = $1', [Number(id)]);
+      const row = rows[0];
+      if (!row) throw new StoreError('Comentário não encontrado.', 404);
+      if (row.username !== actor.username && actor.role !== 'admin') throw new StoreError('Só quem escreveu ou um administrador pode apagar.', 403);
+      await db.query('DELETE FROM comments WHERE id = $1', [Number(id)]);
+      return ops.getComments(actor, row.entry_id);
+    },
+
+    async getCommentCounts(_actor: Actor, clientId: string) {
+      const rows = await db.query<{ entry_id: string; n: number }>(
+        'SELECT entry_id, count(*)::int AS n FROM comments WHERE client_id = $1 GROUP BY entry_id',
+        [asString(clientId, 'clientId')]
+      );
+      return Object.fromEntries(rows.map((r) => [r.entry_id, r.n]));
+    },
+
+    // Trilha de auditoria (só administradores).
+    async getAuditLog(actor: Actor, params: { from?: unknown; to?: unknown; username?: unknown; action?: unknown; q?: unknown; offset?: unknown; limit?: unknown }) {
+      requireAdmin(actor);
+      const where: string[] = [];
+      const args: unknown[] = [];
+      const add = (sql: string, value: unknown) => {
+        args.push(value);
+        where.push(sql.replace('?', () => `$${args.length}`));
+      };
+      if (typeof params?.from === 'string' && params.from) add('at >= ?::timestamptz', params.from);
+      if (typeof params?.to === 'string' && params.to) add('at <= ?::timestamptz', params.to);
+      if (typeof params?.username === 'string' && params.username) add('username = ?', params.username);
+      if (typeof params?.action === 'string' && params.action) add('action LIKE ?', `${params.action}%`);
+      if (typeof params?.q === 'string' && params.q.trim()) add('detail::text ILIKE ?', `%${params.q.trim()}%`);
+      const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+      const limit = Math.min(Math.max(Number(params?.limit) || 100, 1), 500);
+      const offset = Math.max(Number(params?.offset) || 0, 0);
+      const [rows, total, users, actions] = await Promise.all([
+        db.query<any>(`SELECT id, at, username, action, detail FROM audit_log ${clause} ORDER BY at DESC, id DESC LIMIT ${limit} OFFSET ${offset}`, args),
+        db.query<{ n: number }>(`SELECT count(*)::int AS n FROM audit_log ${clause}`, args),
+        db.query<{ username: string; display_name: string | null }>('SELECT DISTINCT a.username, u.display_name FROM audit_log a LEFT JOIN users u ON u.username = a.username WHERE a.username IS NOT NULL ORDER BY a.username'),
+        db.query<{ action: string }>('SELECT DISTINCT action FROM audit_log ORDER BY action')
+      ]);
+      return {
+        total: total[0]?.n ?? 0,
+        rows: rows.map((r) => ({ id: Number(r.id), at: new Date(r.at).toISOString(), username: r.username, action: r.action, detail: r.detail || {} })),
+        users: users.map((u) => ({ username: u.username, displayName: u.display_name || u.username })),
+        actions: actions.map((a) => a.action)
+      };
+    },
+
+    // Busca de vários indicadores em todas as listas: igual, coberto por um CIDR, ou CIDR pesquisado que contém itens.
+    async lookupIndicators(_actor: Actor, queries: unknown) {
+      const tokens = asArray<string>(queries, 'queries').filter((x) => typeof x === 'string').slice(0, 2000);
+      const [clients, rows] = await Promise.all([
+        ops.getAllClients(),
+        db.query<{ data: BlocklistEntry }>('SELECT data FROM entries')
+      ]);
+      const names = new Map(clients.map((c) => [c.id, c.name]));
+      const exact = new Map<string, BlocklistEntry[]>();
+      const ranged: Array<{ entry: BlocklistEntry; range: NonNullable<ReturnType<typeof toRange>> }> = [];
+      for (const { data } of rows) {
+        const key = data.indicator.toLowerCase();
+        exact.set(key, [...(exact.get(key) ?? []), data]);
+        const range = toRange(data.indicator);
+        if (range) ranged.push({ entry: data, range });
+      }
+      const nets = ranged.filter((r) => r.range.end > r.range.start);
+      const seen = new Set<string>();
+      const results = [];
+      for (const raw of tokens) {
+        const normalized = normalizeIndicator(raw);
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        const valid = classifyIndicator(normalized).isValid;
+        const matches: Array<Record<string, unknown>> = [];
+        const push = (entry: BlocklistEntry, match: string, via?: string) => matches.push({
+          clientId: entry.clientId, clientName: names.get(entry.clientId) || entry.clientId, entryId: entry.id,
+          indicator: entry.indicator, status: entry.status, match, via, addedDate: entry.addedDate,
+          sourceTicket: entry.sourceTicket, notes: entry.notes, removedAt: entry.removedAt, addedBy: entry.addedBy
+        });
+        for (const entry of exact.get(normalized) ?? []) push(entry, 'exact');
+        const range = valid ? toRange(normalized) : null;
+        if (range) {
+          for (const net of nets) {
+            if (net.entry.indicator.toLowerCase() === normalized) continue;
+            if (net.range.family === range.family && net.range.start <= range.start && range.end <= net.range.end) push(net.entry, 'covered', net.entry.indicator);
+          }
+          if (range.end > range.start) {
+            let inside = 0;
+            for (const r of ranged) {
+              if (r.entry.indicator.toLowerCase() === normalized) continue;
+              if (r.range.family === range.family && range.start <= r.range.start && r.range.end <= range.end && !(r.range.start === range.start && r.range.end === range.end)) {
+                if (inside++ < 50) push(r.entry, 'inside');
+              }
+            }
+          }
+        }
+        results.push({ query: raw, normalized, valid, matches });
+      }
+      return results;
+    },
+
+    // Evolução: total ativo por semana, e países/provedores dos IPs ativos que já têm reputação consultada.
+    async getEvolution(_actor: Actor, params?: { weeks?: unknown; clientId?: unknown }) {
+      const weeks = Math.min(Math.max(Number(params?.weeks) || 26, 4), 104);
+      const clientId = typeof params?.clientId === 'string' && params.clientId ? params.clientId : null;
+      const rows = await db.query<{ data: BlocklistEntry; updated_at: string; cti: Record<string, any> | null }>(
+        `SELECT e.data, e.updated_at, c.data AS cti FROM entries e LEFT JOIN cti_cache c ON c.indicator = lower(e.indicator)
+         ${clientId ? 'WHERE e.client_id = $1' : ''}`,
+        clientId ? [clientId] : []
+      );
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      const points: Array<{ date: string; active: number; added: number; removed: number }> = [];
+      const spans = rows.map((r) => ({
+        start: latest(r.data.addedDate),
+        end: r.data.status === 'removed' ? latest(r.data.removedAt || r.updated_at) : Infinity
+      }));
+      for (let i = weeks - 1; i >= 0; i--) {
+        const pointEnd = end.getTime() - i * 7 * 86_400_000;
+        const pointStart = pointEnd - 7 * 86_400_000;
+        let active = 0, added = 0, removed = 0;
+        for (const span of spans) {
+          if (span.start && span.start <= pointEnd && span.end > pointEnd) active++;
+          if (span.start > pointStart && span.start <= pointEnd) added++;
+          if (span.end !== Infinity && span.end > pointStart && span.end <= pointEnd) removed++;
+        }
+        points.push({ date: new Date(pointEnd).toISOString().slice(0, 10), active, added, removed });
+      }
+      const activeIps = rows.filter((r) => r.data.status === 'active' && toRange(r.data.indicator) && !r.data.indicator.includes('/'));
+      const tally = (pick: (cti: Record<string, any>) => string | null | undefined) => {
+        const counts = new Map<string, number>();
+        for (const r of activeIps) {
+          const value = r.cti ? pick(r.cti) : null;
+          if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
+        }
+        return [...counts].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([label, count]) => ({ label, count }));
+      };
+      return {
+        points,
+        enriched: activeIps.filter((r) => r.cti).length,
+        activeIps: activeIps.length,
+        missing: activeIps.filter((r) => !r.cti).map((r) => r.data.indicator).slice(0, 500),
+        countries: tally((c) => c.countryCode),
+        providers: tally((c) => c.asn || c.isp),
+        verdicts: tally((c) => c.verdict)
+      };
+    },
+
+    // Limpeza manual: retira repetidos, itens cobertos por CIDR e conflitos com exceções, com versão salva antes.
     async cleanRedundantEntries(actor: Actor, clientId: string) {
       return db.tx(async (q) => {
         const client = await getClient(q, asString(clientId, 'clientId'));
         if (!client) throw new StoreError('Cliente não encontrado.', 404);
         const active = await entriesOf(q, clientId, 'active');
-        if (findRedundant(active, (e) => e.indicator).length === 0) return { retired: 0 };
+        if (findRedundant(active, (e) => e.indicator).length === 0 && findExceptionConflicts(active, (e) => e.indicator, exceptionList(client)).length === 0) return { retired: 0 };
         await snapshot(q, clientId, 'Antes de retirar repetidos e itens cobertos por CIDR', actor);
         return { retired: await retireRedundant(q, clientId, actor) };
       });
@@ -482,6 +1043,21 @@ export function createStore(db: Database) {
     },
 
     async saveAppSettings(actor: Actor, settings: AppSettings) {
+      if (actor.role !== 'admin') {
+        const current = await ops.getAppSettings();
+        settings = { ...settings, reviewDays: current.reviewDays, approvalThreshold: current.approvalThreshold, requireApprovalForReplace: current.requireApprovalForReplace };
+      }
+      const clampInt = (value: unknown, min: number, max: number, fallback: number) => {
+        const n = Math.round(Number(value));
+        return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
+      };
+      settings = {
+        ...settings,
+        slaDays: clampInt(settings?.slaDays, 1, 365, 7),
+        reviewDays: clampInt(settings?.reviewDays, 7, 3650, 90),
+        approvalThreshold: clampInt(settings?.approvalThreshold, 1, 1_000_000, 500),
+        requireApprovalForReplace: settings?.requireApprovalForReplace !== false
+      };
       await db.tx(async (q) => {
         await q(
           `INSERT INTO settings (key, data) VALUES ('app_settings', $1::jsonb)
@@ -575,7 +1151,7 @@ export function createStore(db: Database) {
           clientId ? [startIso, endIso, clientId] : [startIso, endIso]
         ),
         db.query<{ data: ImportHistoryRecord }>(
-          `SELECT data FROM history WHERE happened_at >= $1 AND happened_at <= $2 ${clientId ? 'AND client_id = $3' : ''} ORDER BY happened_at DESC`,
+          `SELECT data FROM history WHERE happened_at >= $1 AND happened_at <= $2 AND NOT coalesce((data->>'undone')::boolean, false) ${clientId ? 'AND client_id = $3' : ''} ORDER BY happened_at DESC`,
           clientId ? [startIso, endIso, clientId] : [startIso, endIso]
         ),
         db.query<{ username: string; action: string; detail: Record<string, unknown> }>(
@@ -603,7 +1179,7 @@ export function createStore(db: Database) {
             name: c.name,
             notes: c.notes || '',
             lastUpdateDate: c.lastUpdateDate,
-            status: since === null ? 'sem_importacao' : since > sla ? 'atrasado' : 'em_dia',
+            status: (since === null ? 'sem_importacao' : since > sla ? 'atrasado' : 'em_dia') as 'sem_importacao' | 'atrasado' | 'em_dia',
             activeNow: activeByClient.get(c.id) || 0,
             addedInPeriod: added.length,
             removedInPeriod: removed.length,
@@ -696,8 +1272,22 @@ export const PUBLIC_OPS = [
   'archiveClient',
   'getClientEntries',
   'getClientActiveIndicatorsSet',
-  'bulkInsertEntries',
-  'replaceClientEntries',
+  'importBatch',
+  'listPendingImports',
+  'decidePendingImport',
+  'undoImport',
+  'updateClientExceptions',
+  'validateAllClients',
+  'cleanAllClients',
+  'getReviewQueue',
+  'reviewEntries',
+  'getComments',
+  'addComment',
+  'deleteComment',
+  'getCommentCounts',
+  'getAuditLog',
+  'lookupIndicators',
+  'getEvolution',
   'cleanRedundantEntries',
   'updateEntryStatus',
   'updateEntryNotes',

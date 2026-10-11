@@ -1,10 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, Copy, Eye, EyeOff, KeyRound, Plus, RefreshCw, Trash2, UserCheck, UserX, Users } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff, KeyRound, LockOpen, MonitorSmartphone, Plus, RefreshCw, Trash2, UserCheck, UserX, Users } from 'lucide-react';
+import { Modal } from './Modal';
+import { SessionList } from './SessionList';
+import { listUserSessions, revokeAllUserSessions, revokeSession, unlockUser, type SessionInfo } from '../db/store';
 import { SessionUser } from '../types';
 import { PageHeader } from './PageHeader';
 
 interface UsersViewProps {
   currentUser: SessionUser;
+  embedded?: boolean;
 }
 
 const ROLE_LABEL: Record<SessionUser['role'], string> = { admin: 'Administrador', analyst: 'Analista' };
@@ -110,7 +114,30 @@ const PasswordChoice: React.FC<{
 
 // ---------- Tela ----------
 
-export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
+export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = false }) => {
+  const [sessionsFor, setSessionsFor] = useState<SessionUser | null>(null);
+  const [sessions, setSessions] = useState<SessionInfo[]>([]);
+  const [sessionsBusy, setSessionsBusy] = useState<string | null>(null);
+
+  const openSessions = async (user: SessionUser) => {
+    setSessionsFor(user);
+    setSessions([]);
+    try {
+      setSessions((await listUserSessions(user.id)).sessions);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível carregar as sessões.');
+    }
+  };
+
+  const handleUnlock = async (user: SessionUser) => {
+    try {
+      await unlockUser(user.id);
+      setNotice({ text: `A conta de ${user.displayName} foi liberada.` });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível liberar a conta.');
+    }
+  };
   const [users, setUsers] = useState<SessionUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -238,10 +265,12 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Usuários"
-        description="Quem acessa o GuardList. Todos trabalham na mesma base; administradores também gerenciam contas, backups, restauração e exclusão de clientes."
-      />
+      {!embedded && (
+        <PageHeader
+          title="Usuários"
+          description="Quem acessa o GuardList. Todos trabalham na mesma base; administradores também gerenciam contas, backups, restauração e exclusão de clientes."
+        />
+      )}
 
       {notice && (
         <div className="notice notice--ok" role="status">
@@ -318,13 +347,13 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="data-table" style={{ minWidth: 1020 }}>
+            <table className="data-table" style={{ minWidth: 1140 }}>
               <colgroup>
                 <col />
                 <col style={{ width: '160px' }} />
                 <col style={{ width: '150px' }} />
                 <col style={{ width: '150px' }} />
-                <col style={{ width: '340px' }} />
+                <col style={{ width: '460px' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -360,6 +389,8 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
                       <td>
                         {!user.active ? (
                           <span className="chip">Desativado</span>
+                        ) : user.lockedUntil ? (
+                          <span className="chip chip--danger" title={`Bloqueada até ${formatDate(user.lockedUntil)}`}>Bloqueada</span>
                         ) : user.mustChangePassword ? (
                           <span className="chip chip--warn">Senha provisória</span>
                         ) : (
@@ -369,9 +400,19 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
                       <td className="font-mono text-[0.72rem] whitespace-nowrap">{formatDate(user.lastLoginAt)}</td>
                       <td>
                         {isSelf ? (
-                          <span className="block text-right text-[11px] text-slate-500">Altere a sua senha clicando no seu nome</span>
+                          <span className="block text-right text-[11px] text-slate-500">Senha e sessões: clique no seu nome no menu</span>
                         ) : (
                           <div className="flex justify-end gap-1">
+                            {user.lockedUntil && (
+                              <button type="button" className="btn btn--sm" onClick={() => handleUnlock(user)} title="Libera a conta travada por senhas erradas">
+                                <LockOpen aria-hidden="true" />
+                                Liberar
+                              </button>
+                            )}
+                            <button type="button" className="btn btn--sm btn--quiet" onClick={() => openSessions(user)} disabled={!user.active}>
+                              <MonitorSmartphone aria-hidden="true" />
+                              Sessões
+                            </button>
                             <button type="button" className="btn btn--sm" onClick={() => openReset(user)} disabled={!user.active}>
                               <KeyRound aria-hidden="true" />
                               Nova senha
@@ -402,6 +443,43 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser }) => {
           </div>
         )}
       </section>
+
+      <Modal
+        open={Boolean(sessionsFor)}
+        onClose={() => setSessionsFor(null)}
+        title={`Sessões de ${sessionsFor?.displayName ?? ''}`}
+        subtitle="Onde a conta está conectada agora."
+        footer={
+          <button
+            type="button"
+            className="btn btn--danger"
+            disabled={sessions.length === 0}
+            onClick={async () => {
+              if (!sessionsFor) return;
+              await revokeAllUserSessions(sessionsFor.id);
+              setSessions([]);
+              setNotice({ text: `Todas as sessões de ${sessionsFor.displayName} foram encerradas.` });
+            }}
+          >
+            Encerrar todas
+          </button>
+        }
+      >
+        <SessionList
+          sessions={sessions}
+          busyId={sessionsBusy}
+          onRevoke={async (id) => {
+            if (!sessionsFor) return;
+            setSessionsBusy(id);
+            try {
+              await revokeSession(id);
+              setSessions((await listUserSessions(sessionsFor.id)).sessions);
+            } finally {
+              setSessionsBusy(null);
+            }
+          }}
+        />
+      </Modal>
 
       {resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop" onClick={() => setResetTarget(null)}>

@@ -116,6 +116,38 @@ export function findRedundant<T>(items: T[], indicatorOf: (item: T) => string): 
   return redundant;
 }
 
+// Um item conflita com uma exceção quando bloquearia algum endereço dela: mesma faixa, faixa dentro da outra
+// ou sobreposição. Para domínios, o próprio domínio ou um subdomínio dele.
+export function exceptionHit(indicator: string, exceptions: string[]): string | null {
+  const range = toRange(indicator);
+  const lower = indicator.trim().toLowerCase();
+  for (const exception of exceptions) {
+    const exc = exception.trim().toLowerCase();
+    if (!exc) continue;
+    const excRange = toRange(exc);
+    if (range && excRange) {
+      if (range.family === excRange.family && range.start <= excRange.end && excRange.start <= range.end) return exception;
+    } else if (!range && !excRange) {
+      if (lower === exc || lower.endsWith(`.${exc}`)) return exception;
+    }
+  }
+  return null;
+}
+
+export function findExceptionConflicts<T>(
+  items: T[],
+  indicatorOf: (item: T) => string,
+  exceptions: string[]
+): Array<{ item: T; exception: string }> {
+  if (exceptions.length === 0) return [];
+  const conflicts: Array<{ item: T; exception: string }> = [];
+  for (const item of items) {
+    const exception = exceptionHit(indicatorOf(item), exceptions);
+    if (exception) conflicts.push({ item, exception });
+  }
+  return conflicts;
+}
+
 // Lista sem os redundantes, preservando a ordem original.
 export function withoutRedundant<T>(items: T[], indicatorOf: (item: T) => string): T[] {
   // Compara por posição, para funcionar também com valores iguais (ex.: a mesma string duas vezes).

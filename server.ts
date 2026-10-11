@@ -6,7 +6,10 @@ import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSessionToken, readSession, setSessionCookie } from './auth.ts';
+import { createCti, ctiConfigured } from './server/cti.ts';
 import { openDatabase } from './server/db.ts';
+import { createJobs } from './server/jobs.ts';
+import { recipients, sendMail, smtpConfigured } from './server/mailer.ts';
 import { seedDemoData } from './server/seed.ts';
 import { createStore, PUBLIC_OPS, StoreError, type Actor } from './server/store.ts';
 import { createUsers, toActor, toPublic, type UserRow } from './server/users.ts';
@@ -26,6 +29,8 @@ app.disable('x-powered-by');
 const db = await openDatabase(rootDir);
 const store = createStore(db);
 const users = createUsers(db);
+const cti = createCti(db);
+const startedAt = Date.now();
 
 if (db.kind === 'pglite') {
   if (production) console.warn('Aviso: DATABASE_URL não definido; usando banco local temporário. Configure o Neon no Render.');
@@ -41,6 +46,36 @@ const sessionSecret = process.env.SESSION_SECRET || randomBytes(32).toString('he
 if (!process.env.SESSION_SECRET) {
   console.warn('Aviso: SESSION_SECRET não definido; as sessões expiram a cada reinício do servidor.');
 }
+
+// Cabeçalhos de segurança: o app não pode ser aberto dentro de outro site e só carrega recursos do próprio domínio.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  if (production) {
+    res.setHeader(
+      'Content-Security-Policy',
+      [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "media-src 'self'",
+        "connect-src 'self'",
+        "frame-src 'self'",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'"
+      ].join('; ')
+    );
+    if (req.secure) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 // Health check usado pelo Render; fica fora da autenticação.
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
@@ -74,12 +109,16 @@ const abuseSummaryLimit = rateLimit('AbuseIPDB', Number(process.env.ABUSE_SUMMAR
 const loginLimit = rateLimit('login', 20, 15 * 60_000);
 const passwordLimit = rateLimit('senha', 10, 15 * 60_000);
 
-// Sessão válida = cookie assinado + usuário ativo na mesma versão de sessão.
-async function currentUser(req: express.Request): Promise<UserRow | null> {
+// Sessão válida = cookie assinado + sessão aberta no banco + usuário ativo na mesma versão de sessão.
+async function currentUser(req: express.Request): Promise<(UserRow & { session_id: string }) | null> {
   const session = readSession(sessionSecret, req);
   if (!session) return null;
-  const row = await users.byId(session.userId);
-  return row && row.active && row.session_version === session.version ? row : null;
+  return users.bySession(session.sid);
+}
+
+async function startSession(req: express.Request, res: express.Response, row: UserRow) {
+  const sid = await users.createSession(row, req.ip || null, req.get('user-agent') || null);
+  setSessionCookie(req, res, createSessionToken(sessionSecret, sid));
 }
 
 function sendError(res: express.Response, error: unknown) {
@@ -103,10 +142,14 @@ app.post('/api/auth/login', loginLimit, jsonSmall, async (req, res) => {
     return res.status(400).json({ error: 'Informe usuário e senha.' });
   }
   try {
-    const row = await users.authenticate(username, password);
-    if (!row) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
-    setSessionCookie(req, res, createSessionToken(sessionSecret, row.id, row.session_version));
-    return res.json({ user: toPublic(row) });
+    const result = await users.authenticate(username, password);
+    if (result && 'lockedUntil' in result) {
+      const minutes = Math.max(1, Math.ceil((new Date(result.lockedUntil).getTime() - Date.now()) / 60_000));
+      return res.status(423).json({ error: `Conta bloqueada por excesso de tentativas. Tente de novo em ${minutes} min ou peça a um administrador para liberar.` });
+    }
+    if (!result) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    await startSession(req, res, result.row);
+    return res.json({ user: toPublic(result.row) });
   } catch (error) {
     return sendError(res, error);
   }
@@ -115,7 +158,7 @@ app.post('/api/auth/login', loginLimit, jsonSmall, async (req, res) => {
 // Sair invalida a sessão no servidor: um cookie copiado antes deixa de valer.
 app.post('/api/auth/logout', async (req, res) => {
   const row = await currentUser(req).catch(() => null);
-  if (row) await users.revokeSessions(row.id).catch((error) => console.error(error));
+  if (row) await users.revokeSessionById(row.session_id).catch((error: unknown) => console.error(error));
   setSessionCookie(req, res, null);
   return res.json({ ok: true });
 });
@@ -125,7 +168,7 @@ app.post('/api/auth/change-password', passwordLimit, jsonSmall, async (req, res)
   if (!row) return res.status(401).json({ error: 'Sessão expirada. Entre novamente.' });
   try {
     const updated = await users.changeOwnPassword(row.id, req.body?.currentPassword, req.body?.newPassword);
-    setSessionCookie(req, res, createSessionToken(sessionSecret, updated.id, updated.session_version));
+    await startSession(req, res, updated);
     return res.json({ user: toPublic(updated) });
   } catch (error) {
     return sendError(res, error);
@@ -139,7 +182,27 @@ app.use('/api', async (req, res, next) => {
   if (row.must_change_password) return res.status(403).json({ error: 'Troque sua senha para continuar.' });
   res.locals.actor = toActor(row) satisfies Actor;
   res.locals.userId = row.id;
+  res.locals.sessionId = row.session_id;
   return next();
+});
+
+// Sessões abertas: cada pessoa vê e encerra as suas; administradores, as de qualquer usuário.
+app.get('/api/sessions', async (_req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ sessions: await users.listSessions(res.locals.userId, res.locals.sessionId) });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.delete('/api/sessions/:id', async (req, res) => {
+  try {
+    await users.revokeSession(res.locals.actor as Actor, res.locals.userId, req.params.id);
+    return res.json({ ok: true });
+  } catch (error) {
+    return sendError(res, error);
+  }
 });
 
 // Dados da equipe: cada operação do app vira POST /api/data/<operação> com { args: [...] }.
@@ -190,6 +253,24 @@ app.patch('/api/users/:id', adminOnly, jsonSmall, async (req, res) => {
 app.delete('/api/users/:id', adminOnly, async (req, res) => {
   try {
     await users.remove(res.locals.actor as Actor, Number(req.params.id));
+    return res.json({ ok: true });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.get('/api/users/:id/sessions', adminOnly, async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ sessions: await users.listSessions(Number(req.params.id), res.locals.sessionId) });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.post('/api/users/:id/sessions/revoke-all', adminOnly, async (req, res) => {
+  try {
+    await users.revokeAllSessions(res.locals.actor as Actor, Number(req.params.id));
     return res.json({ ok: true });
   } catch (error) {
     return sendError(res, error);
@@ -336,12 +417,122 @@ app.get('/api/abuse-summary/:indicator', abuseSummaryLimit, async (req, res) => 
   return res.json(value);
 });
 
+// Reputação de vários IPs de uma vez (triagem da importação e gráficos). Até 100 consultas novas por chamada;
+// o restante vem do cache ou fica para a próxima chamada.
+const enrichLimit = rateLimit('reputação', Number(process.env.CTI_ENRICH_RATE_LIMIT_PER_MIN || 20));
+app.post('/api/cti/enrich', enrichLimit, express.json({ limit: '512kb' }), async (req, res) => {
+  const indicators = Array.isArray(req.body?.indicators) ? req.body.indicators.filter((x: unknown) => typeof x === 'string').slice(0, 5000) : [];
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json(await cti.enrich(indicators, { force: req.body?.force === true }));
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// Origem pública do app (links e logo nos e-mails).
+const configuredOrigin = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
+const publicOrigin = () => (/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin) ? configuredOrigin : `http://localhost:${port}`);
+const jobs = createJobs(db, store, publicOrigin);
+jobs.start();
+
+// Status do sistema (somente administradores): banco, chaves, e-mail, rotinas, última importação e proxy.
+app.get('/api/status', adminOnly, async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const t0 = Date.now();
+    await db.query('SELECT 1');
+    const dbLatencyMs = Date.now() - t0;
+    const [counts, lastImport, runs, pending, cacheCount] = await Promise.all([
+      db.query<{ clients: number; entries: number; users: number }>(
+        "SELECT (SELECT count(*)::int FROM clients) AS clients, (SELECT count(*)::int FROM entries WHERE status = 'active') AS entries, (SELECT count(*)::int FROM users WHERE active) AS users"
+      ),
+      db.query<{ happened_at: string; data: { clientName?: string; importedBy?: string; addedCount?: number } }>('SELECT happened_at, data FROM history ORDER BY happened_at DESC LIMIT 1'),
+      jobs.runs(),
+      db.query<{ n: number }>("SELECT count(*)::int AS n FROM pending_imports WHERE status = 'pending'"),
+      db.query<{ n: number }>('SELECT count(*)::int AS n FROM cti_cache')
+    ]);
+    const hops = app.get('trust proxy');
+    return res.json({
+      version: process.env.RENDER_GIT_COMMIT?.slice(0, 7) || null,
+      uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
+      database: { kind: db.kind, ok: true, latencyMs: dbLatencyMs, ...counts[0] },
+      cti: { ...ctiConfigured(), cachedIps: cacheCount[0]?.n ?? 0 },
+      email: {
+        configured: smtpConfigured(),
+        reportRecipients: recipients('REPORT_EMAILS').length,
+        backupRecipients: recipients('BACKUP_EMAILS').length
+      },
+      jobs: runs,
+      pendingApprovals: pending[0]?.n ?? 0,
+      lastImport: lastImport[0]
+        ? { at: new Date(lastImport[0].happened_at).toISOString(), client: lastImport[0].data.clientName, by: lastImport[0].data.importedBy, added: lastImport[0].data.addedCount }
+        : null,
+      proxy: {
+        trustProxyHops: hops,
+        seenIp: req.ip,
+        forwardedChain: req.get('x-forwarded-for') || null,
+        ips: req.ips
+      }
+    });
+  } catch (error) {
+    return res.json({ database: { kind: db.kind, ok: false, error: error instanceof Error ? error.message : 'Falha' } });
+  }
+});
+
+// Contagem leve de pendências para o menu (qualquer usuário: admin vê as da equipe; analista, as próprias).
+app.get('/api/notifications', async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  try {
+    const actor = res.locals.actor as Actor;
+    const pending = await db.query<{ n: number }>(
+      actor.role === 'admin'
+        ? "SELECT count(*)::int AS n FROM pending_imports WHERE status = 'pending'"
+        : "SELECT count(*)::int AS n FROM pending_imports WHERE status = 'pending' AND requested_by = $1",
+      actor.role === 'admin' ? [] : [actor.username]
+    );
+    const failed = actor.role === 'admin' ? (await jobs.runs()).filter((r) => r.lastError) : [];
+    return res.json({ pendingApprovals: pending[0]?.n ?? 0, failedJobs: failed.map((r) => r.job) });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+const adminAction = rateLimit('ação administrativa', 6);
+app.post('/api/status/test-cti', adminOnly, adminAction, async (_req, res) => {
+  try {
+    return res.json(await cti.testKeys());
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.post('/api/status/test-email', adminOnly, adminAction, async (_req, res) => {
+  try {
+    const to = [...new Set([...recipients('REPORT_EMAILS'), ...recipients('BACKUP_EMAILS')])];
+    await sendMail(to, 'GuardList · teste de e-mail', '<p>O envio de e-mails do GuardList está funcionando.</p>');
+    return res.json({ ok: true, to });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha no envio.' });
+  }
+});
+
+app.post('/api/status/run/:job', adminOnly, adminAction, async (req, res) => {
+  try {
+    const actor = res.locals.actor as Actor;
+    const detail = req.params.job === 'backup' ? await jobs.runBackup(actor) : req.params.job === 'monthly_report' ? await jobs.runMonthlyReport(actor) : null;
+    if (!detail) return res.status(404).json({ error: 'Rotina desconhecida.' });
+    return res.json({ ok: true, detail });
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao executar.' });
+  }
+});
+
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota de API não encontrada.' }));
 
 if (production) {
   // index.html recebe a origem pública para que og:image tenha URL absoluta (exigida pelas prévias de link).
   const indexHtml = readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8');
-  const configuredOrigin = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
   const originFor = (req: express.Request): string => {
     if (/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin)) return configuredOrigin;
     const hostHeader = req.get('host') || '';

@@ -27,3 +27,18 @@ services:
         sync: false
       - key: OTX_API_KEY
         sync: false
+      # E-mail para o relatório mensal e o backup diário (veja .env.example).
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: REPORT_EMAILS
+        sync: false
+      - key: BACKUP_EMAILS
+        sync: false
