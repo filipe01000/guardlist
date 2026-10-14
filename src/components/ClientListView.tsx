@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Globe, ShieldPlus, Sparkles, Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
+import { FileSignature, X, Globe, ShieldPlus, Sparkles, Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
 import { Client, BlocklistEntry, IndicatorType, ClientSnapshot, EntryComment } from '../types';
 import { Modal } from './Modal';
 import ActionMenu, { openActionMenuAt } from './ActionMenu';
-import { aiAvailability, externalLookupEntries, requestIndicatorAction } from './contextActions';
+import { aiAvailability, externalLookupEntries, requestCaseBuilder, requestIndicatorAction } from './contextActions';
 import type { ShowToast } from '../App';
 import { formatDateBR, formatDateTimeBR } from '../utils/csv';
 import { IpDossierModal } from './IpDossierModal';
@@ -953,6 +953,10 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
           <div className="flex flex-wrap items-center gap-1.5">
             <button type="button" onClick={() => handleBulkToggleStatus('removed')} className="btn btn--sm">Marcar como removido</button>
             <button type="button" onClick={() => handleBulkToggleStatus('active')} className="btn btn--sm">Reativar</button>
+            <button type="button" onClick={() => requestCaseBuilder(getSelectedEntries().map((e) => e.indicator))} className="btn btn--sm" title="Texto do caso para o cliente com os itens marcados">
+              <FileSignature aria-hidden="true" />
+              Gerar caso
+            </button>
             <button type="button" onClick={handleExportSelectedNano} className="btn btn--sm">
               <Download aria-hidden="true" />
               Exportar NANO

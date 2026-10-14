@@ -452,6 +452,60 @@ Regras:
     emit({ type: 'done', model: aiSettings().model, ms: Date.now() - t0, tokens: tokens || undefined });
   }
 
+  /**
+   * Motivo do caso enviado ao cliente (só os parágrafos de contexto). A lista de indicadores e o ticket
+   * são montados pelo GuardList; a IA não escreve endereços nem nomes de clientes.
+   */
+  async function writeCaseReason(
+    actor: Actor,
+    input: { ips: string[]; cidrs: string[]; domains: string[]; note?: string },
+    emit: (e: AiEvent) => void,
+    signal: AbortSignal
+  ) {
+    const t0 = Date.now();
+    let tokens = 0;
+    await withSlot(() => emit({ type: 'status', text: 'Na fila: a IA está respondendo outra pessoa…' }), async () => {
+      emit({ type: 'status', text: 'Lendo a reputação dos indicadores…' });
+      const ips = input.ips.slice(0, 40);
+      const rep = await reputation(ips, 10);
+      const known = ips.map((ip) => rep[ip]).filter(Boolean) as CtiSummary[];
+      const verdicts = known.reduce<Record<string, number>>((acc, c) => ({ ...acc, [c.verdict]: (acc[c.verdict] ?? 0) + 1 }), {});
+      const usage = [...new Set(known.map((c) => c.usageType).filter(Boolean))].slice(0, 4);
+      const gn = [...new Set(known.map((c) => c.greyNoise?.classification).filter(Boolean))];
+      const isps = [...new Set(known.map((c) => c.isp).filter(Boolean))].slice(0, 4);
+      const maxReports = Math.max(0, ...known.map((c) => c.totalReports ?? 0));
+      const singular = input.ips.length + input.cidrs.length + input.domains.length === 1;
+      const what = [
+        input.ips.length ? `${input.ips.length} endereço(s) IP` : '',
+        input.cidrs.length ? `${input.cidrs.length} faixa(s) de rede CIDR` : '',
+        input.domains.length ? `${input.domains.length} domínio(s)` : ''
+      ].filter(Boolean).join(' e ');
+      const facts = known.length
+        ? `Reputação consultada de ${known.length} IP(s): vereditos ${JSON.stringify(verdicts)}; tipos de uso: ${usage.join(', ') || '—'}; GreyNoise: ${gn.join(', ') || '—'}; provedores: ${isps.join(', ') || '—'}; maior número de denúncias no AbuseIPDB: ${maxReports}.`
+        : 'Não há dados de reputação consultados para esses indicadores.';
+      emit({ type: 'status', text: 'Escrevendo o motivo…' });
+      const messages: ChatMessage[] = [
+        {
+          role: 'system',
+          content: `Você escreve, em português do Brasil formal, o trecho de MOTIVO de um e-mail enviado a um cliente informando bloqueios no firewall.
+Regras: exatamente 2 parágrafos curtos separados por uma linha em branco; não cite nomes de clientes; não liste endereços IP, faixas nem domínios (a lista vem depois); não invente números, ataques ou fontes que não estejam nos dados; termine dizendo que, como medida preventiva, foi realizado o bloqueio ${singular ? 'da origem identificada' : 'das origens identificadas'}. Não escreva saudação, despedida, título nem a frase "Após a análise dos eventos". Use ${singular ? 'singular' : 'plural'}.
+Exemplo do estilo da equipe:
+"Durante as atividades de monitoramento dos eventos de segurança, foram identificadas conexões originadas de endereços IP associados a serviços automatizados de varredura na Internet.
+
+Essas origens realizam atividades de reconhecimento em ativos expostos, buscando identificar portas abertas e serviços acessíveis. Embora esse comportamento, por si só, não caracterize uma tentativa de comprometimento, ele pode representar uma etapa inicial de reconhecimento utilizada antes de possíveis ataques. Como medida preventiva, foi realizado o bloqueio dos endereços identificados."`
+        },
+        {
+          role: 'user',
+          content: `Bloqueados: ${what}.\n${facts}${input.note?.trim() ? `\nObservação do analista sobre o que foi visto: ${clip(input.note, 400)}` : ''}\n\nEscreva o motivo.`
+        }
+      ];
+      const result = await streamCompletion(messages, { signal, maxTokens: 400, onText: (text) => emit({ type: 'text', text }) });
+      tokens = result.tokens ?? 0;
+    });
+    await auditAi(actor, 'ai.case_reason', { ips: input.ips.length, cidrs: input.cidrs.length, domains: input.domains.length, ms: Date.now() - t0 });
+    emit({ type: 'done', model: aiSettings().model, ms: Date.now() - t0, tokens: tokens || undefined });
+  }
+
   async function auditAi(actor: Actor, action: string, detail: Record<string, unknown>) {
     await db.query('INSERT INTO audit_log (username, action, detail) VALUES ($1, $2, $3::jsonb)', [actor.username, action, JSON.stringify(detail)]).catch(() => undefined);
   }
@@ -470,7 +524,7 @@ Regras:
     return { configured: true as const, model: s.model, baseUrl: s.baseUrl, reply: result.content.slice(0, 120), ms, firstTokenMs, tokens: result.tokens ?? null };
   }
 
-  return { chat, analyzeIndicator, test };
+  return { chat, analyzeIndicator, writeCaseReason, test };
 }
 
 export type Ai = ReturnType<typeof createAi>;

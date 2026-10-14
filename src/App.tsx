@@ -10,7 +10,8 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { ContextMenuHost } from './components/ContextMenuHost';
 import { IndicatorActionModal, type IndicatorActionMode } from './components/IndicatorActionModal';
 import { IpDossierModal } from './components/IpDossierModal';
-import { INDICATOR_ACTION_EVENT, aiAvailability, type IndicatorAction } from './components/contextActions';
+import { INDICATOR_ACTION_EVENT, OPEN_CASE_EVENT, aiAvailability, type IndicatorAction } from './components/contextActions';
+import { CaseBuilderModal } from './components/CaseBuilderModal';
 import { AiAssistant, type AiRequest } from './components/AiAssistant';
 import { Client, AppSettings, ImportOutcome, SessionUser, DashboardStats, BlocklistEntry } from './types';
 import {
@@ -134,6 +135,13 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   // Assistente de IA: só aparece se o servidor tiver um servidor de IA configurado.
   const [ai, setAi] = useState<{ configured: boolean; model: string | null }>({ configured: false, model: null });
   const [isAiOpen, setIsAiOpen] = useState(false);
+  // Gerador do texto do caso enviado ao cliente.
+  const [caseBuilder, setCaseBuilder] = useState<{ text: string } | null>(null);
+  useEffect(() => {
+    const onOpen = (e: Event) => setCaseBuilder({ text: (e as CustomEvent<{ text?: string }>).detail?.text ?? '' });
+    window.addEventListener(OPEN_CASE_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_CASE_EVENT, onOpen);
+  }, []);
   const [aiRequest, setAiRequest] = useState<AiRequest | null>(null);
   const aiEnabledRef = useRef(false);
   useEffect(() => {
@@ -442,6 +450,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
         onChangePassword={() => setIsAccountOpen(true)}
         onOpenAssistant={ai.configured ? () => setIsAiOpen((v) => !v) : undefined}
         isAssistantOpen={isAiOpen}
+        onOpenCaseBuilder={() => setCaseBuilder({ text: '' })}
         pendingApprovals={isAdmin ? notifications.pendingApprovals : 0}
       />
 
@@ -622,6 +631,16 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
         onIndicatorAction={(action, indicator) => { void handleIndicatorAction(action, indicator); }}
         aiEnabled={ai.configured}
         onOpenAssistant={() => setIsAiOpen(true)}
+        onOpenCaseBuilder={(indicators) => setCaseBuilder({ text: (indicators ?? []).join('\n') })}
+      />
+
+      <CaseBuilderModal
+        open={caseBuilder !== null}
+        initialText={caseBuilder?.text}
+        onClose={() => setCaseBuilder(null)}
+        currentUser={currentUser}
+        aiEnabled={ai.configured}
+        showToast={showToast}
       />
 
       {ai.configured && <AiAssistant open={isAiOpen} onClose={() => setIsAiOpen(false)} model={ai.model} request={aiRequest} />}

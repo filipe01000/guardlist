@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useState } from 'react';
-import { Sparkles,
+import { FileSignature, Sparkles,
   Building2,
   HardDrive,
   History,
@@ -42,6 +42,8 @@ interface NavbarProps {
   /** Abre o assistente de IA (só existe quando o servidor tem IA configurada). */
   onOpenAssistant?: () => void;
   isAssistantOpen?: boolean;
+  /** Abre o gerador do texto do caso para o cliente. */
+  onOpenCaseBuilder?: () => void;
 }
 
 const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = [
@@ -78,7 +80,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onChangePassword,
   pendingApprovals = 0,
   onOpenAssistant,
-  isAssistantOpen
+  isAssistantOpen,
+  onOpenCaseBuilder
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
@@ -224,6 +227,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="label">Consultar IP</span>
             <kbd className="label">Ctrl K</kbd>
           </button>
+
+          {onOpenCaseBuilder && (
+            <button
+              type="button"
+              className="gl-row gl-search"
+              onClick={() => { setMobileOpen(false); onOpenCaseBuilder(); }}
+              data-tip="Gerar caso para o cliente"
+              aria-label="Gerar caso para o cliente"
+            >
+              <FileSignature aria-hidden="true" />
+              <span className="label">Gerar caso</span>
+            </button>
+          )}
 
           {onOpenAssistant && (
             <button

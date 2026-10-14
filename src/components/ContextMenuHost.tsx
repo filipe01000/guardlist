@@ -6,6 +6,7 @@ import {
   Compass,
   Copy,
   Download,
+  FileSignature,
   FileText,
   Globe,
   HardDrive,
@@ -64,6 +65,7 @@ interface Props {
   onIndicatorAction: (action: IndicatorAction, indicator: string) => void;
   aiEnabled: boolean;
   onOpenAssistant: () => void;
+  onOpenCaseBuilder: (indicators?: string[]) => void;
 }
 
 /**
@@ -146,7 +148,8 @@ export function ContextMenuHost(props: Props) {
         { label: 'Abrir dossiê do indicador', icon: ScanSearch, onSelect: () => p.onIndicatorAction('dossier', value) },
         { label: 'Onde está bloqueado?', icon: Search, hint: 'Ctrl K', onSelect: () => p.onQuickSearch(value) },
         { type: 'divider' },
-        { label: 'Bloquear em clientes…', icon: ShieldPlus, onSelect: () => p.onIndicatorAction('block', value) }
+        { label: 'Bloquear em clientes…', icon: ShieldPlus, onSelect: () => p.onIndicatorAction('block', value) },
+        { label: 'Gerar caso para o cliente…', icon: FileSignature, onSelect: () => p.onOpenCaseBuilder([value]) }
       );
       if (p.isAdmin) {
         items.push({ label: 'Adicionar exceção…', icon: ShieldOff, title: 'Nunca bloquear nos clientes escolhidos', onSelect: () => p.onIndicatorAction('exception', value) });
@@ -164,6 +167,7 @@ export function ContextMenuHost(props: Props) {
       { type: 'heading', label: page?.label ?? 'GuardList', detail: 'Página' },
       { label: 'Consultar IPs…', icon: Search, hint: 'Ctrl K', onSelect: () => p.onQuickSearch() },
       ...(p.aiEnabled ? [{ label: 'Assistente IA', icon: Sparkles, hint: 'Ctrl J', onSelect: () => p.onOpenAssistant() }] : []),
+      { label: 'Gerar caso para o cliente…', icon: FileSignature, onSelect: () => p.onOpenCaseBuilder() },
       { label: 'Atualizar dados', icon: RefreshCw, onSelect: () => p.onRefresh() }
     ];
     if (p.previousTab !== p.currentTab) {

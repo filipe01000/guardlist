@@ -9,6 +9,13 @@ import type { ActionMenuEntry } from './ActionMenu';
 export const INDICATOR_ACTION_EVENT = 'guardlist:indicator-action';
 export type IndicatorAction = 'dossier' | 'where' | 'block' | 'exception' | 'ai';
 
+export const OPEN_CASE_EVENT = 'guardlist:open-case';
+
+/** Abre o gerador do caso para o cliente, já com estes indicadores. */
+export function requestCaseBuilder(indicators: string[] = []) {
+  window.dispatchEvent(new CustomEvent(OPEN_CASE_EVENT, { detail: { text: indicators.join('\n') } }));
+}
+
 /** Se o assistente de IA está ligado neste servidor (definido pelo App ao carregar). */
 export const aiAvailability = { enabled: false };
 

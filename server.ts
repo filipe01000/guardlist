@@ -491,6 +491,13 @@ app.post('/api/ai/indicator', aiLimit, jsonSmall, (req, res) => {
   return streamAi(res, (emit, signal) => ai.analyzeIndicator(res.locals.actor as Actor, indicator, emit, signal));
 });
 
+app.post('/api/ai/case-reason', aiLimit, express.json({ limit: '256kb' }), (req, res) => {
+  const pick = (value: unknown) => (Array.isArray(value) ? value.filter((x): x is string => typeof x === 'string').slice(0, 2000) : []);
+  const input = { ips: pick(req.body?.ips), cidrs: pick(req.body?.cidrs), domains: pick(req.body?.domains), note: typeof req.body?.note === 'string' ? req.body.note : undefined };
+  if (!input.ips.length && !input.cidrs.length && !input.domains.length) return res.status(400).json({ error: 'Valide os indicadores antes de pedir o texto.' });
+  return streamAi(res, (emit, signal) => ai.writeCaseReason(res.locals.actor as Actor, input, emit, signal));
+});
+
 // Origem pública do app (links e logo nos e-mails).
 const configuredOrigin = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
 const publicOrigin = () => (/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin) ? configuredOrigin : `http://localhost:${port}`);

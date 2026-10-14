@@ -253,7 +253,7 @@ export const testAi = () =>
 
 /** Pergunta à IA e recebe a resposta em partes (uma linha JSON por evento), enquanto ela escreve. */
 export async function streamAi(
-  path: '/api/ai/chat' | '/api/ai/indicator',
+  path: '/api/ai/chat' | '/api/ai/indicator' | '/api/ai/case-reason',
   body: unknown,
   onEvent: (event: AiEvent) => void,
   signal?: AbortSignal
