@@ -24,7 +24,7 @@
   border: 8px solid var(--surface);
   box-shadow:
     0 0 0 1px var(--line),
-    0 12px 80px rgba(41, 30, 113, 0.12);
+    0 12px 80px rgba(5, 40, 100, 0.14);
 }
 
 .gl-card-bg {
@@ -39,7 +39,7 @@
   /* Pôster da porta do cofre (primeiro quadro do loop); o degradê é o fallback. */
   background:
     url("/brand/login-vault-poster.webp") center / cover no-repeat,
-    linear-gradient(160deg, #1d3f8f 0%, #0d1830 100%);
+    linear-gradient(160deg, #0b3d8c 0%, #050d1f 100%);
   translate: 100% 0;
   animation: gl-slide-in 0.65s ease-in-out;
 }
@@ -58,7 +58,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(13, 24, 48, 0.72) 0%, rgba(13, 24, 48, 0.35) 55%, rgba(13, 24, 48, 0.55) 100%);
+  background: radial-gradient(circle at 50% 50%, rgba(5, 13, 31, 0.72) 0%, rgba(5, 13, 31, 0.35) 55%, rgba(5, 13, 31, 0.55) 100%);
 }
 
 .gl-hero,
@@ -218,7 +218,7 @@
   height: 44px;
   border-radius: 50px;
   background: var(--action);
-  color: #fff;
+  color: var(--action-text, #fff);
   font-size: 0.875rem;
   font-weight: 700;
   cursor: pointer;

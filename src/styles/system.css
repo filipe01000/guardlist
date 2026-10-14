@@ -98,13 +98,13 @@
 .btn--primary {
   border-color: transparent;
   background: var(--action);
-  color: #fff;
+  color: var(--action-text, #fff);
 }
 
 .btn--primary:hover {
   border-color: transparent;
   background: var(--action-hover);
-  color: #fff;
+  color: var(--action-text, #fff);
 }
 
 .btn--quiet {
@@ -1050,7 +1050,7 @@ select.field {
   padding: 2px 8px;
   border-radius: 6px;
   background: var(--accent);
-  color: #fff;
+  color: var(--action-text, #fff);
   font-family: var(--font-mono);
   font-weight: 600;
   text-align: center;

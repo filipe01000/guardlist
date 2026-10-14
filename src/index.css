@@ -10,39 +10,44 @@
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --app-bg: #0a0c10;
-  --sidebar: #101319;
-  --surface: #131820;
-  --surface-raised: #181e27;
-  --surface-subtle: #0f1319;
-  --line: #29313d;
-  --line-strong: #3a4554;
-  --text: #f2f5f8;
-  --text-soft: #c3cbd5;
-  --muted: #8e9aaa;
-  --accent: #5791ff;
-  --action: #2f6fdf;
-  --action-hover: #285fc5;
-  --accent-soft: rgba(87, 145, 255, 0.12);
-  --danger: #f56a77;
-  --warning: #e7ab4e;
-  --success: #4ec995;
+  /* Paleta azul-noite (identidade Horus Line): fundo profundo, painéis navy e azul-ciano de destaque. */
+  --app-bg: #050d1f;
+  --sidebar: #07132b;
+  --surface: #0a1a36;
+  --surface-raised: #0e2244;
+  --surface-subtle: #071429;
+  --line: #17305a;
+  --line-strong: #24467c;
+  --text: #f1f6fd;
+  --text-soft: #c0cee4;
+  --muted: #8094b6;
+  --accent: #2ea6ff;
+  --action: #2ea6ff;
+  --action-hover: #5bb9ff;
+  --action-text: #04132b;
+  --accent-soft: rgba(46, 166, 255, 0.12);
+  --danger: #ff6b7a;
+  --warning: #f2b04f;
+  --success: #3fd69b;
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --app-bg: #f3f5f8;
+  --app-bg: #f2f6fb;
   --sidebar: #ffffff;
   --surface: #ffffff;
   --surface-raised: #f5f7fa;
   --surface-subtle: #edf1f5;
-  --line: #d9e0e8;
-  --line-strong: #b9c3cf;
-  --text: #17202b;
-  --text-soft: #344154;
-  --muted: #5f6d80;
-  --accent: #2f6fdf;
-  --accent-soft: rgba(47, 111, 223, 0.1);
+  --line: #d6e1ee;
+  --line-strong: #b4c4d8;
+  --text: #0b1a33;
+  --text-soft: #2c3f5c;
+  --muted: #5a6c87;
+  --accent: #0a6fc2;
+  --action: #0a6fc2;
+  --action-hover: #085a9e;
+  --action-text: #ffffff;
+  --accent-soft: rgba(10, 111, 194, 0.1);
   --danger: #b4233c;
   --warning: #9a5b08;
   --success: #167653;
@@ -64,6 +69,15 @@ body {
   min-height: 100vh;
   margin: 0;
   background: var(--app-bg);
+}
+
+/* Brilho azul suave no fundo escuro, como um céu noturno: só no tema escuro. */
+:root:not([data-theme="light"]) body {
+  background:
+    radial-gradient(1100px 650px at 78% 8%, rgba(24, 82, 176, 0.26), transparent 62%),
+    radial-gradient(900px 600px at 0% 100%, rgba(12, 48, 112, 0.2), transparent 60%),
+    var(--app-bg);
+  background-attachment: fixed;
 }
 
 button,
@@ -92,7 +106,7 @@ a {
 
 ::selection {
   color: #fff;
-  background: #2f6dcc;
+  background: #1673c4;
 }
 
 ::-webkit-scrollbar {
@@ -417,8 +431,8 @@ a {
 
 .app-shell button.disabled-action:disabled {
   border-color: var(--line) !important;
-  background-color: #202630 !important;
-  color: #7f8a99 !important;
+  background-color: #12223f !important;
+  color: #7488aa !important;
   cursor: not-allowed;
 }
 
@@ -428,9 +442,9 @@ a {
 .app-shell button[class*="bg-cyan-600"],
 .app-shell button[class*="bg-emerald-600"],
 .app-shell button[class*="bg-indigo-600"] {
-  border-color: rgba(87, 145, 255, 0.42) !important;
-  background-color: #244a85 !important;
-  color: #eef4ff !important;
+  border-color: rgba(46, 166, 255, 0.42) !important;
+  background-color: #0f3d78 !important;
+  color: #eef7ff !important;
 }
 
 .app-shell button[class*="bg-purple-600"]:hover,
@@ -439,22 +453,22 @@ a {
 .app-shell button[class*="bg-cyan-600"]:hover,
 .app-shell button[class*="bg-emerald-600"]:hover,
 .app-shell button[class*="bg-indigo-600"]:hover {
-  background-color: #2d5b9f !important;
+  background-color: #145099 !important;
 }
 
 .app-shell [class*="text-purple-"],
 .app-shell [class*="text-cyan-"] {
-  color: #8fb3ff !important;
+  color: #7cc6ff !important;
 }
 
 .app-shell [class*="border-purple-"],
 .app-shell [class*="border-cyan-"] {
-  border-color: rgba(87, 145, 255, 0.36) !important;
+  border-color: rgba(46, 166, 255, 0.36) !important;
 }
 
 .app-shell [class*="bg-purple-"],
 .app-shell [class*="bg-cyan-"] {
-  background-color: rgba(87, 145, 255, 0.1) !important;
+  background-color: rgba(46, 166, 255, 0.1) !important;
 }
 
 .app-shell details > summary {
@@ -472,7 +486,7 @@ a {
 
 :root[data-theme="light"] ::selection {
   color: #ffffff;
-  background: #2f6fdf;
+  background: var(--accent);
 }
 
 :root[data-theme="light"] ::-webkit-scrollbar-track {
