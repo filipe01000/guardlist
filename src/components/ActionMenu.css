@@ -67,18 +67,17 @@
   background: var(--surface);
   box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.2);
   font-family: var(--font-sans);
+  min-width: 232px;
+  max-width: 340px;
   opacity: 0;
-  transform: translateY(-4px) scale(0.98);
-  transform-origin: top right;
+  transform: scale(0.97);
+  outline: none;
 }
 
-.am__menu.is-up {
-  transform: translateY(4px) scale(0.98);
-  transform-origin: bottom right;
+.am__menu.is-sub {
+  z-index: 201;
+  min-width: 210px;
 }
-
-.am__menu.is-at-point { transform-origin: top left; }
-.am__menu.is-at-point.is-up { transform-origin: bottom left; }
 
 .am__menu.is-placed {
   opacity: 1;
@@ -119,6 +118,7 @@
 }
 
 .am__menu.is-placed .am__item,
+.am__menu.is-placed .am__heading,
 .am__menu.is-placed .am__divider {
   animation: am-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: calc(var(--am-i, 0) * 18ms);
@@ -167,6 +167,67 @@
 .am__item:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+/* Título de seção: o que foi clicado (ex.: o IP e o tipo). */
+.am__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 10px 7px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.am__heading span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.am__heading small {
+  flex: none;
+  color: var(--muted);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.am__heading + .am__item,
+.am__heading + .am__divider {
+  margin-top: 0;
+}
+
+.am__kbd {
+  flex: none;
+  margin-left: 12px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+}
+
+.am__chev {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-left: 8px;
+  color: var(--muted);
+}
+
+.am__item.is-active .am__chev,
+.am__item.is-expanded .am__chev,
+.am__item.is-active .am__kbd {
+  color: var(--text-soft);
+}
+
+.am__plate.no-hint .am__hint {
+  opacity: 0;
 }
 
 .am__divider {

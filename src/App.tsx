@@ -7,12 +7,17 @@ import { DashboardView } from './components/DashboardView';
 import { QuickSearchModal } from './components/QuickSearchView';
 import { TestRunnerModal } from './components/TestRunnerModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
-import { Client, AppSettings, ImportOutcome, SessionUser, DashboardStats } from './types';
+import { ContextMenuHost } from './components/ContextMenuHost';
+import { IndicatorActionModal, type IndicatorActionMode } from './components/IndicatorActionModal';
+import { IpDossierModal } from './components/IpDossierModal';
+import { INDICATOR_ACTION_EVENT, type IndicatorAction } from './components/contextActions';
+import { Client, AppSettings, ImportOutcome, SessionUser, DashboardStats, BlocklistEntry } from './types';
 import {
   getAllClients,
   getDashboardStats,
   getAppSettings,
   getClientEntries,
+  getIndicatorEntries,
   getNotifications,
   importBatch,
   undoImport,
@@ -120,6 +125,10 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
 
   // Modais globais
   const [isQuickSearchOpen, setIsQuickSearchOpen] = useState(false);
+  const [quickSearchSeed, setQuickSearchSeed] = useState('');
+  // Ações sobre um indicador pedidas pelo menu de contexto (de qualquer tela).
+  const [dossier, setDossier] = useState<{ indicator: string; entries: BlocklistEntry[] } | null>(null);
+  const [indicatorAction, setIndicatorAction] = useState<{ indicator: string; mode: IndicatorActionMode } | null>(null);
   const [isTestsOpen, setIsTestsOpen] = useState(false);
 
   // Aviso (toast), com ação opcional como "Desfazer".
@@ -213,6 +222,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       if (document.querySelector('[aria-modal="true"]')) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
+        setQuickSearchSeed('');
         setIsQuickSearchOpen(true);
         return;
       }
@@ -231,6 +241,32 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [isAdmin]);
+
+  const openQuickSearch = useCallback((seed?: string) => {
+    setQuickSearchSeed(seed ?? '');
+    setIsQuickSearchOpen(true);
+  }, []);
+
+  const handleIndicatorAction = useCallback(async (action: IndicatorAction, indicator: string) => {
+    if (action === 'where') {
+      openQuickSearch(indicator);
+    } else if (action === 'dossier') {
+      const entries = await getIndicatorEntries(indicator).catch(() => [] as BlocklistEntry[]);
+      setDossier({ indicator, entries });
+    } else {
+      setIndicatorAction({ indicator, mode: action });
+    }
+  }, [openQuickSearch]);
+
+  // Pedidos vindos dos menus das linhas (ex.: "Bloquear em outros clientes").
+  useEffect(() => {
+    const onAction = (e: Event) => {
+      const { action, indicator } = (e as CustomEvent<{ action: IndicatorAction; indicator: string }>).detail;
+      void handleIndicatorAction(action, indicator);
+    };
+    window.addEventListener(INDICATOR_ACTION_EVENT, onAction);
+    return () => window.removeEventListener(INDICATOR_ACTION_EVENT, onAction);
+  }, [handleIndicatorAction]);
 
   // Navegações cruzadas
   const handleNavigateToImport = (clientId: string) => {
@@ -532,8 +568,45 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       {/* Consulta de um ou vários indicadores em todas as listas */}
       <QuickSearchModal
         isOpen={isQuickSearchOpen}
-        onClose={() => setIsQuickSearchOpen(false)}
+        initialQuery={quickSearchSeed}
+        onClose={() => { setIsQuickSearchOpen(false); setQuickSearchSeed(''); }}
         onNavigateToClientList={handleNavigateToList}
+      />
+
+      {/* Menu do botão direito em todo o aplicativo */}
+      <ContextMenuHost
+        clients={clients}
+        isAdmin={isAdmin}
+        currentTab={currentTab}
+        previousTab={previousTab}
+        theme={theme}
+        showToast={showToast}
+        onNavigate={setCurrentTab}
+        onOpenList={handleNavigateToList}
+        onImport={handleNavigateToImport}
+        onExportTxt={handleQuickExportTxt}
+        onExportNano={handleQuickExportNanoTxt}
+        onRefresh={() => { void refreshAllData().then(() => showToast('Dados atualizados.', 'info')); }}
+        onToggleTheme={handleToggleTheme}
+        onOpenShortcuts={() => setIsShortcutsOpen(true)}
+        onQuickSearch={openQuickSearch}
+        onIndicatorAction={(action, indicator) => { void handleIndicatorAction(action, indicator); }}
+      />
+
+      <IpDossierModal
+        indicator={dossier?.indicator ?? null}
+        allEntries={dossier?.entries ?? []}
+        clients={clients}
+        onClose={() => setDossier(null)}
+      />
+
+      <IndicatorActionModal
+        request={indicatorAction}
+        clients={clients}
+        isAdmin={isAdmin}
+        onClose={() => setIndicatorAction(null)}
+        onDone={refreshAllData}
+        showToast={showToast}
       />
 
       {/* Modal de Testes Unitários da Validação (Acessível via Modo Dev em Backup) */}

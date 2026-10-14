@@ -7,6 +7,8 @@ import { Modal } from './Modal';
 
 interface QuickSearchModalProps {
   isOpen: boolean;
+  /** Texto já preenchido ao abrir (ex.: IP clicado com o botão direito). */
+  initialQuery?: string;
   onClose: () => void;
   onNavigateToClientList: (clientId: string) => void;
 }
@@ -15,7 +17,7 @@ const MATCH_LABEL = { exact: 'Na lista', covered: 'Dentro de', inside: 'Contém'
 
 // Consulta em todas as listas. Um termo: busca parcial. Vários (um por linha, ou separados por espaço/vírgula):
 // mostra, para cada IP, em quais clientes ele está, se está dentro de um CIDR ou se já foi removido.
-export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, onClose, onNavigateToClientList }) => {
+export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, initialQuery, onClose, onNavigateToClientList }) => {
   const [query, setQuery] = useState('');
   const [single, setSingle] = useState<Array<{ client: Client; entry: BlocklistEntry }>>([]);
   const [multi, setMulti] = useState<LookupResult[] | null>(null);
@@ -32,8 +34,10 @@ export const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, onCl
       setSingle([]);
       setMulti(null);
       setFilter('all');
+    } else if (initialQuery) {
+      setQuery(initialQuery);
     }
-  }, [isOpen]);
+  }, [isOpen, initialQuery]);
 
   useEffect(() => {
     if (!query.trim()) {

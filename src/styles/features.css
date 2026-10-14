@@ -450,3 +450,48 @@ kbd.key {
 }
 .banner svg { width: 16px; height: 16px; color: var(--warning); flex: 0 0 auto; }
 .banner .btn { margin-left: auto; }
+
+/* ---------- Bloquear / exceção pelo menu de contexto ---------- */
+.ia-clients {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 2px;
+}
+
+.ia-client {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ia-client:hover { border-color: var(--line-strong); }
+.ia-client.is-on {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--accent-soft);
+}
+.ia-client.is-locked { cursor: default; opacity: 0.75; }
+.ia-client__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ia-client .chip { flex: none; font-size: 0.6875rem; }
+
+@media (max-width: 640px) {
+  .ia-clients { grid-template-columns: 1fr; }
+}

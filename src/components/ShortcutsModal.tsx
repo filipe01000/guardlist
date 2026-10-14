@@ -10,6 +10,8 @@ export const ShortcutsModal: React.FC<{ open: boolean; onClose: () => void; isAd
       <dt><K>Ctrl</K><K>K</K> ou <K>/</K></dt><dd>Consultar IPs em todas as listas</dd>
       <dt><K>?</K></dt><dd>Mostrar estes atalhos</dd>
       <dt><K>Esc</K></dt><dd>Fechar janela</dd>
+      <dt><K>Botão direito</K></dt><dd>Ações do que está sob o cursor (IP, CIDR, domínio, cliente ou página)</dd>
+      <dt><K>Shift</K> + <K>Botão direito</K></dt><dd>Menu normal do navegador</dd>
 
       <span className="shortcut-group">Ir para</span>
       <dt><K>D</K></dt><dd>Painel geral</dd>

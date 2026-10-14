@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
+import { X, Globe, ShieldPlus, Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
 import { Client, BlocklistEntry, IndicatorType, ClientSnapshot, EntryComment } from '../types';
 import { Modal } from './Modal';
 import ActionMenu, { openActionMenuAt } from './ActionMenu';
+import { externalLookupEntries, requestIndicatorAction } from './contextActions';
 import type { ShowToast } from '../App';
 import { formatDateBR, formatDateTimeBR } from '../utils/csv';
 import { IpDossierModal } from './IpDossierModal';
@@ -1240,6 +1241,8 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                           badge={commentCounts[item.id] || undefined}
                           items={[
                             { label: 'Abrir dossiê do indicador', icon: ScanSearch, onSelect: () => openDossier(item.indicator) },
+                            { label: 'Onde mais está bloqueado?', icon: Search, onSelect: () => requestIndicatorAction('where', item.indicator) },
+                            { label: 'Consultar fora', icon: Globe, children: externalLookupEntries(item.indicator, item.type) },
                             { label: 'Copiar indicador', icon: Copy, onSelect: () => handleCopy(item.indicator) },
                             {
                               label: commentCounts[item.id] ? `Comentários (${commentCounts[item.id]})` : 'Comentar',
@@ -1254,6 +1257,11 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                                 setEditNotesText(item.notes || '');
                               }
                             },
+                            { type: 'divider' },
+                            { label: 'Bloquear em outros clientes…', icon: ShieldPlus, onSelect: () => requestIndicatorAction('block', item.indicator) },
+                            ...(isAdmin
+                              ? [{ label: 'Adicionar exceção…', icon: ShieldOff, title: 'Nunca bloquear nos clientes escolhidos', onSelect: () => requestIndicatorAction('exception', item.indicator) }]
+                              : []),
                             { type: 'divider' },
                             isActive
                               ? { label: 'Marcar como removido', icon: RotateCcw, title: 'Sai da exportação, mas o histórico fica guardado', onSelect: () => handleToggleStatus(item) }
