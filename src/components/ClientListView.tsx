@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
 import { Client, BlocklistEntry, IndicatorType, ClientSnapshot, EntryComment } from '../types';
 import { Modal } from './Modal';
+import ActionMenu from './ActionMenu';
 import type { ShowToast } from '../App';
 import { formatDateBR, formatDateTimeBR } from '../utils/csv';
 import { IpDossierModal } from './IpDossierModal';
@@ -1232,51 +1233,32 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
                       {/* Ações */}
                       <td className="py-2.5 px-4 text-right font-sans" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1.5">
-                          {/* Alternar Status */}
-                          <button
-                            onClick={() => handleToggleStatus(item)}
-                            className={`p-1.5 rounded transition ${
-                              isActive
-                                ? 'text-slate-400 hover:text-amber-400 hover:bg-slate-800'
-                                : 'text-slate-500 hover:text-emerald-400 hover:bg-slate-800'
-                            }`}
-                            title={isActive ? 'Marcar como Removido (preserva histórico)' : 'Reativar Indicador'}
-                          >
-                            <RotateCcw className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* Comentários */}
-                          <button
-                            onClick={() => openComments(item)}
-                            className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded transition inline-flex items-center gap-0.5"
-                            title={commentCounts[item.id] ? `${commentCounts[item.id]} comentário(s)` : 'Comentar'}
-                          >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            {commentCounts[item.id] ? <span className="comment-count">{commentCounts[item.id]}</span> : null}
-                          </button>
-
-                          {/* Editar observação */}
-                          <button
-                            onClick={() => {
-                              setEditingEntry(item);
-                              setEditNotesText(item.notes || '');
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-slate-800 rounded transition"
-                            title="Editar observação"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                          </button>
-
-                          {/* Excluir definitivamente */}
-                          <button
-                            onClick={() => setDeleteConfirmId(item.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded transition"
-                            title="Excluir definitivamente"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        <ActionMenu
+                          label={`Ações de ${item.indicator}`}
+                          badge={commentCounts[item.id] || undefined}
+                          items={[
+                            { label: 'Abrir dossiê do indicador', icon: ScanSearch, onSelect: () => openDossier(item.indicator) },
+                            { label: 'Copiar indicador', icon: Copy, onSelect: () => handleCopy(item.indicator) },
+                            {
+                              label: commentCounts[item.id] ? `Comentários (${commentCounts[item.id]})` : 'Comentar',
+                              icon: MessageSquare,
+                              onSelect: () => openComments(item)
+                            },
+                            {
+                              label: 'Editar observação',
+                              icon: Edit3,
+                              onSelect: () => {
+                                setEditingEntry(item);
+                                setEditNotesText(item.notes || '');
+                              }
+                            },
+                            { type: 'divider' },
+                            isActive
+                              ? { label: 'Marcar como removido', icon: RotateCcw, title: 'Sai da exportação, mas o histórico fica guardado', onSelect: () => handleToggleStatus(item) }
+                              : { label: 'Reativar bloqueio', icon: Undo2, onSelect: () => handleToggleStatus(item) },
+                            { label: 'Excluir definitivamente', icon: Trash2, danger: true, onSelect: () => setDeleteConfirmId(item.id) }
+                          ]}
+                        />
                       </td>
                     </tr>
                   );

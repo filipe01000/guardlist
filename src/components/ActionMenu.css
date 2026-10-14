@@ -1,0 +1,300 @@
+/* Menu de ações com placa deslizante (ActionMenu.tsx). */
+
+.am__trigger {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.am__trigger svg {
+  width: 17px;
+  height: 17px;
+}
+
+.am__trigger:hover,
+.am__trigger.is-open {
+  border-color: var(--line);
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.am__trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.am__badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--action-text);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+}
+
+/* ---------- Painel ---------- */
+
+.am__menu {
+  --am-bar: var(--accent);
+  --am-pad: 6px;
+  --am-row-pad-y: 8px;
+  --am-row-pad-x: 10px;
+  --am-item-radius: 8px;
+  --am-wash-from: color-mix(in srgb, var(--am-bar) 38%, #0000);
+  --am-wash-to: color-mix(in srgb, var(--am-bar) 9%, #0000);
+  --am-wash-edge: color-mix(in srgb, var(--am-bar) 24%, #0000);
+  --am-glow-ink: color-mix(in srgb, var(--am-bar) 42%, #0000);
+
+  position: fixed;
+  z-index: 200;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.55), 0 2px 6px rgb(0 0 0 / 0.2);
+  font-family: var(--font-sans);
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  transform-origin: top right;
+}
+
+.am__menu.is-up {
+  transform: translateY(4px) scale(0.98);
+  transform-origin: bottom right;
+}
+
+.am__menu.is-placed {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.14s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.am__sheet {
+  position: relative;
+  padding: var(--am-pad);
+}
+
+.am__list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Itens ---------- */
+
+.am__item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: var(--am-row-pad-y) var(--am-row-pad-x);
+  border: 0;
+  border-radius: var(--am-item-radius);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.8125rem;
+  font-weight: 560;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.am__menu.is-placed .am__item,
+.am__menu.is-placed .am__divider {
+  animation: am-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--am-i, 0) * 18ms);
+}
+
+@keyframes am-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+
+.am__icon {
+  display: inline-grid;
+  place-items: center;
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+
+.am__icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.am__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.am__item.is-active {
+  color: var(--text);
+}
+
+.am__item.is-active .am__icon {
+  color: var(--text);
+}
+
+.am__item--danger,
+.am__item--danger .am__icon,
+.am__item--danger.is-active,
+.am__item--danger.is-active .am__icon {
+  color: var(--danger);
+}
+
+.am__item:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.am__divider {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--line);
+}
+
+/* ---------- Placa deslizante ---------- */
+
+.am__plate {
+  position: absolute;
+  top: 0;
+  left: var(--am-pad);
+  right: var(--am-pad);
+  height: var(--am-plate-h, 0px);
+  overflow: hidden;
+  border: 1px solid var(--am-wash-edge);
+  border-radius: var(--am-item-radius);
+  background: var(--am-wash-to);
+  opacity: 0;
+  transform: translateY(calc(var(--am-plate-y, 0px) + var(--am-pad))) scale(0.985);
+  pointer-events: none;
+  transition:
+    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.am__plate.is-visible {
+  opacity: 1;
+  transform: translateY(calc(var(--am-plate-y, 0px) + var(--am-pad))) scale(1);
+}
+
+.am__plate.is-pressed {
+  transform: translateY(calc(var(--am-plate-y, 0px) + var(--am-pad))) scale(0.985);
+}
+
+.am__plate.is-danger {
+  --am-bar: var(--danger);
+  --am-wash-from: color-mix(in srgb, var(--danger) 38%, #0000);
+  --am-wash-to: color-mix(in srgb, var(--danger) 9%, #0000);
+  --am-wash-edge: color-mix(in srgb, var(--danger) 24%, #0000);
+  --am-glow-ink: color-mix(in srgb, var(--danger) 42%, #0000);
+}
+
+/* Tons: faixa clara à esquerda + lavagem; o de perigo só aparece em itens vermelhos. */
+.am__tone {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.16s ease;
+}
+
+.am__tone::before {
+  content: '';
+  position: absolute;
+  top: 28%;
+  bottom: 28%;
+  left: 0;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--am-bar);
+}
+
+.am__tone--accent {
+  background: radial-gradient(ellipse 8rem 220% at var(--am-halo-x, 0%) 50%, var(--am-wash-from), transparent);
+}
+
+.am__tone--danger {
+  --am-bar: var(--danger);
+  opacity: 0;
+  background: radial-gradient(ellipse 8rem 220% at var(--am-halo-x, 0%) 50%, color-mix(in srgb, var(--danger) 38%, #0000), transparent);
+}
+
+.am__plate.is-danger .am__tone--accent { opacity: 0; }
+.am__plate.is-danger .am__tone--danger { opacity: 1; }
+
+/* Brilho que segue o ponteiro. */
+.am__glow {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 12rem;
+  height: 7rem;
+  background: radial-gradient(closest-side, var(--am-glow-ink), transparent);
+  opacity: 0.55;
+  transform: translate(calc(var(--am-glow-x, 40px) - 50%), -50%);
+  transition: transform 0.18s ease-out;
+}
+
+/* Dica "Enter" à direita do item ativo. */
+.am__hint {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  display: inline-grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--am-bar) 80%, var(--text));
+  opacity: 0.7;
+  transform: translateY(-50%);
+}
+
+.am__hint svg {
+  width: 13px;
+  height: 13px;
+}
+
+:root[data-theme='light'] .am__menu {
+  box-shadow: 0 16px 36px -12px rgb(15 35 70 / 0.28), 0 2px 6px rgb(15 35 70 / 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .am__menu,
+  .am__menu.is-placed,
+  .am__plate,
+  .am__glow,
+  .am__tone {
+    transition: none;
+  }
+
+  .am__menu.is-placed .am__item,
+  .am__menu.is-placed .am__divider {
+    animation: none;
+  }
+}
+
+/* A placa já marca o item com foco; sem o contorno padrão por cima. */
+.am__menu .am__item:focus,
+.am__menu .am__item:focus-visible {
+  outline: none;
+  box-shadow: none;
+}

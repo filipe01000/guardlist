@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import ActionMenu from './ActionMenu';
 import { Check, Copy, Eye, EyeOff, KeyRound, LockOpen, MonitorSmartphone, Plus, RefreshCw, Trash2, UserCheck, UserX, Users } from 'lucide-react';
 import { Modal } from './Modal';
 import { SessionList } from './SessionList';
@@ -347,13 +348,13 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="data-table" style={{ minWidth: 1040 }}>
+            <table className="data-table" style={{ minWidth: 760 }}>
               <colgroup>
                 <col />
                 <col style={{ width: '200px' }} />
                 <col style={{ width: '120px' }} />
                 <col style={{ width: '145px' }} />
-                <col style={{ width: '420px' }} />
+                <col style={{ width: '170px' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -402,36 +403,22 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                         {isSelf ? (
                           <span className="block text-right text-[11px] text-slate-500 whitespace-nowrap" title="Senha e sessões ficam em Minha conta (clique no seu nome no menu)">Gerencie em Minha conta</span>
                         ) : (
-                          <div className="flex justify-end gap-1">
-                            {user.lockedUntil && (
-                              <button type="button" className="btn btn--sm" onClick={() => handleUnlock(user)} title="Libera a conta travada por senhas erradas">
-                                <LockOpen aria-hidden="true" />
-                                Liberar
-                              </button>
-                            )}
-                            <button type="button" className="btn btn--sm btn--quiet" onClick={() => openSessions(user)} disabled={!user.active}>
-                              <MonitorSmartphone aria-hidden="true" />
-                              Sessões
-                            </button>
-                            <button type="button" className="btn btn--sm" onClick={() => openReset(user)} disabled={!user.active}>
-                              <KeyRound aria-hidden="true" />
-                              Nova senha
-                            </button>
-                            {user.active ? (
-                              <button type="button" className="btn btn--sm btn--quiet" onClick={() => handleUpdate(user, { active: false })} title="Bloqueia o acesso sem apagar a conta">
-                                <UserX aria-hidden="true" />
-                                Desativar
-                              </button>
-                            ) : (
-                              <button type="button" className="btn btn--sm" onClick={() => handleUpdate(user, { active: true })}>
-                                <UserCheck aria-hidden="true" />
-                                Reativar
-                              </button>
-                            )}
-                            <button type="button" className="btn btn--sm btn--quiet btn--danger" onClick={() => handleDelete(user)} aria-label={`Apagar ${user.displayName}`} title="Apagar definitivamente">
-                              <Trash2 aria-hidden="true" />
-                              Apagar
-                            </button>
+                          <div className="flex justify-end">
+                            <ActionMenu
+                              label={`Ações de ${user.displayName}`}
+                              items={[
+                                ...(user.lockedUntil
+                                  ? [{ label: 'Liberar conta travada', icon: LockOpen, title: 'Libera a conta travada por senhas erradas', onSelect: () => handleUnlock(user) }]
+                                  : []),
+                                { label: 'Ver sessões abertas', icon: MonitorSmartphone, disabled: !user.active, onSelect: () => openSessions(user) },
+                                { label: 'Gerar nova senha', icon: KeyRound, disabled: !user.active, onSelect: () => openReset(user) },
+                                { type: 'divider' as const },
+                                user.active
+                                  ? { label: 'Desativar acesso', icon: UserX, title: 'Bloqueia o acesso sem apagar a conta', onSelect: () => handleUpdate(user, { active: false }) }
+                                  : { label: 'Reativar acesso', icon: UserCheck, onSelect: () => handleUpdate(user, { active: true }) },
+                                { label: 'Apagar usuário', icon: Trash2, danger: true, onSelect: () => handleDelete(user) }
+                              ]}
+                            />
                           </div>
                         )}
                       </td>

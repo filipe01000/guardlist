@@ -8,8 +8,10 @@ import {
   List,
   ShieldCheck,
   Table as TableIcon,
-  Upload
+  Upload,
+  ListChecks
 } from 'lucide-react';
+import ActionMenu from './ActionMenu';
 import { ValidateAllModal } from './ValidateAllModal';
 import type { ShowToast } from '../App';
 import { Client, DashboardStats, ImportHistoryRecord } from '../types';
@@ -337,18 +339,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span className="text-slate-500 ml-2">{daysSince === null ? '' : `há ${daysSince}d`}</span>
                       </td>
                       <td className="py-2.5 px-3">{statusChip(isLate, isNearDeadline)}</td>
-                      <td className="py-2.5 px-3">
-                        <div className="flex items-center justify-end gap-1">
-                          <button type="button" className="btn btn--sm btn--icon btn--quiet" onClick={() => onNavigateToImport(client.id)} title="Importar" aria-label={`Importar lista de ${client.name}`}>
-                            <Upload aria-hidden="true" />
-                          </button>
-                          <button type="button" className="btn btn--sm btn--icon btn--quiet" onClick={() => onQuickExportTxt(client)} title="Baixar .txt" aria-label={`Baixar .txt de ${client.name}`}>
-                            <Download aria-hidden="true" />
-                          </button>
-                          <button type="button" className="btn btn--sm btn--icon btn--quiet" onClick={() => onQuickExportNanoTxt(client)} title="Baixar .txt NANO" aria-label={`Baixar .txt NANO de ${client.name}`}>
-                            <FileText aria-hidden="true" />
-                          </button>
-                        </div>
+                      <td className="py-2.5 px-3 text-right">
+                        <ActionMenu
+                          label={`Ações de ${client.name}`}
+                          items={[
+                            { label: 'Importar lista da semana', icon: Upload, onSelect: () => onNavigateToImport(client.id) },
+                            { label: 'Abrir lista do cliente', icon: ListChecks, onSelect: () => onNavigateToList(client.id) },
+                            { type: 'divider' },
+                            { label: 'Baixar .txt', icon: Download, onSelect: () => onQuickExportTxt(client) },
+                            { label: 'Baixar .txt NANO', icon: FileText, onSelect: () => onQuickExportNanoTxt(client) }
+                          ]}
+                        />
                       </td>
                     </tr>
                   ))}
