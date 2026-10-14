@@ -77,6 +77,9 @@
   transform-origin: bottom right;
 }
 
+.am__menu.is-at-point { transform-origin: top left; }
+.am__menu.is-at-point.is-up { transform-origin: bottom left; }
+
 .am__menu.is-placed {
   opacity: 1;
   transform: none;
@@ -297,4 +300,9 @@
 .am__menu .am__item:focus-visible {
   outline: none;
   box-shadow: none;
+}
+
+/* Linha cujo menu está aberto fica destacada, para ficar claro a qual item o menu se refere. */
+tr:has(.am__trigger.is-open) > td {
+  background-color: var(--accent-soft);
 }

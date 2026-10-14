@@ -11,7 +11,7 @@ import {
   Upload,
   ListChecks
 } from 'lucide-react';
-import ActionMenu from './ActionMenu';
+import ActionMenu, { openActionMenuAt } from './ActionMenu';
 import { ValidateAllModal } from './ValidateAllModal';
 import type { ShowToast } from '../App';
 import { Client, DashboardStats, ImportHistoryRecord } from '../types';
@@ -320,7 +320,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {sortedClients.map(({ client, daysSince, total, ips, cidrs, isLate, isNearDeadline }, idx) => (
-                    <tr key={client.id} className="hover:bg-slate-800/30 transition-colors">
+                    <tr key={client.id} className="hover:bg-slate-800/30 transition-colors" onContextMenu={openActionMenuAt}>
                       <td className="py-2.5 px-4 font-mono text-slate-500 tabular-nums">{idx + 1}</td>
                       <td className="py-2.5 px-4">
                         <button

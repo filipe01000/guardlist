@@ -37,6 +37,19 @@ const COMMANDS: Record<string, string> = Object.freeze({
 });
 
 const MENU_WIDTH = 232;
+const OPEN_AT = 'am:open-at';
+
+/**
+ * Para usar no onContextMenu de uma linha: abre o menu ⋯ daquela linha na posição do cursor.
+ * Com texto selecionado ou Shift pressionado, deixa o menu normal do navegador.
+ */
+export function openActionMenuAt(e: React.MouseEvent) {
+  if (e.shiftKey || window.getSelection()?.toString()) return;
+  const trigger = (e.currentTarget as HTMLElement).querySelector<HTMLButtonElement>('.am__trigger');
+  if (!trigger) return;
+  e.preventDefault();
+  trigger.dispatchEvent(new CustomEvent(OPEN_AT, { detail: { x: e.clientX, y: e.clientY } }));
+}
 
 /**
  * Menu de ações "⋯" com placa deslizante: a placa acompanha o item ativo (mouse ou teclado),
@@ -46,6 +59,7 @@ const MENU_WIDTH = 232;
 export default function ActionMenu({ items, label, badge }: ActionMenuProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number; up: boolean } | null>(null);
+  const [point, setPoint] = useState<{ x: number; y: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const plateRef = useRef<HTMLDivElement>(null);
@@ -104,12 +118,32 @@ export default function ActionMenu({ items, label, badge }: ActionMenuProps) {
   // Posiciona o menu junto ao botão (abre para cima se faltar espaço embaixo).
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
-    const r = triggerRef.current.getBoundingClientRect();
     const height = menuRef.current?.offsetHeight ?? 200;
+    if (point) {
+      // Aberto pelo botão direito: nasce no cursor, sem sair da tela.
+      const up = point.y + height + 8 > window.innerHeight && point.y - height > 8;
+      const left = Math.min(Math.max(8, point.x), window.innerWidth - MENU_WIDTH - 8);
+      setPos({ top: up ? point.y - height : point.y, left, up });
+      return;
+    }
+    const r = triggerRef.current.getBoundingClientRect();
     const up = r.bottom + height + 12 > window.innerHeight && r.top - height - 12 > 0;
     const left = Math.min(Math.max(8, r.right - MENU_WIDTH), window.innerWidth - MENU_WIDTH - 8);
     setPos({ top: up ? r.top - height - 6 : r.bottom + 6, left, up });
-  }, [open]);
+  }, [open, point]);
+
+  // Pedido de abertura vindo do botão direito na linha (openActionMenuAt).
+  useEffect(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const onOpenAt = (e: Event) => {
+      const { x, y } = (e as CustomEvent<{ x: number; y: number }>).detail;
+      setPoint({ x, y });
+      setOpen(true);
+    };
+    trigger.addEventListener(OPEN_AT, onOpenAt);
+    return () => trigger.removeEventListener(OPEN_AT, onOpenAt);
+  }, []);
 
   // Ao abrir pelo teclado ou mouse, o primeiro item habilitado recebe o foco.
   useEffect(() => {
@@ -142,7 +176,10 @@ export default function ActionMenu({ items, label, badge }: ActionMenuProps) {
   }, [open, closeMenu]);
 
   useEffect(() => {
-    if (!open) setPos(null);
+    if (!open) {
+      setPos(null);
+      setPoint(null);
+    }
   }, [open]);
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -196,6 +233,7 @@ export default function ActionMenu({ items, label, badge }: ActionMenuProps) {
         title="Ações"
         onClick={(e) => {
           e.stopPropagation();
+          setPoint(null);
           setOpen((v) => !v);
         }}
         onKeyDown={onTriggerKey}
@@ -211,11 +249,12 @@ export default function ActionMenu({ items, label, badge }: ActionMenuProps) {
             id={menuId}
             role="menu"
             aria-label={label}
-            className={`am__menu${pos ? ' is-placed' : ''}${pos?.up ? ' is-up' : ''}`}
+            className={`am__menu${pos ? ' is-placed' : ''}${pos?.up ? ' is-up' : ''}${point ? ' is-at-point' : ''}`}
             style={{ top: pos?.top ?? -9999, left: pos?.left ?? -9999, width: MENU_WIDTH }}
             onKeyDown={onKeyDown}
             onPointerMove={onPointerMove}
             onClick={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
           >
             <div className="am__sheet" role="presentation">
               <div ref={plateRef} className="am__plate" aria-hidden="true">

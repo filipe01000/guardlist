@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
 import { Client, BlocklistEntry, IndicatorType, ClientSnapshot, EntryComment } from '../types';
 import { Modal } from './Modal';
-import ActionMenu from './ActionMenu';
+import ActionMenu, { openActionMenuAt } from './ActionMenu';
 import type { ShowToast } from '../App';
 import { formatDateBR, formatDateTimeBR } from '../utils/csv';
 import { IpDossierModal } from './IpDossierModal';
@@ -1060,6 +1060,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                     <tr
                       key={item.id}
                       onClick={(e) => handleToggleSelectRow(item.id, idx, e)}
+                      onContextMenu={openActionMenuAt}
                       className={`cursor-pointer transition-colors group select-none ${
                         isSelected 
                           ? 'bg-blue-950/50 hover:bg-blue-900/40 text-white' 
@@ -1073,6 +1074,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                         <button
                           type="button"
                           onClick={(e) => handleToggleSelectRow(item.id, idx, e)}
+                      onContextMenu={openActionMenuAt}
                           aria-label={`${isSelected ? 'Desmarcar' : 'Marcar'} ${item.indicator}`}
                           aria-pressed={isSelected}
                           className="p-1 text-slate-400 hover:text-white transition"

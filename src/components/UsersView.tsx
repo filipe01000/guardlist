@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import ActionMenu from './ActionMenu';
+import ActionMenu, { openActionMenuAt } from './ActionMenu';
 import { Check, Copy, Eye, EyeOff, KeyRound, LockOpen, MonitorSmartphone, Plus, RefreshCw, Trash2, UserCheck, UserX, Users } from 'lucide-react';
 import { Modal } from './Modal';
 import { SessionList } from './SessionList';
@@ -369,7 +369,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                 {users.map((user) => {
                   const isSelf = user.id === currentUser.id;
                   return (
-                    <tr key={user.id} className={user.active ? '' : 'opacity-60'}>
+                    <tr key={user.id} className={user.active ? '' : 'opacity-60'} onContextMenu={openActionMenuAt}>
                       <td>
                         <span className="block font-semibold text-white">{user.displayName}{isSelf && <span className="text-slate-500 font-normal"> (você)</span>}</span>
                         <span className="block font-mono text-[11px] text-slate-500">{user.username}</span>
