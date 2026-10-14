@@ -10,7 +10,8 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { ContextMenuHost } from './components/ContextMenuHost';
 import { IndicatorActionModal, type IndicatorActionMode } from './components/IndicatorActionModal';
 import { IpDossierModal } from './components/IpDossierModal';
-import { INDICATOR_ACTION_EVENT, type IndicatorAction } from './components/contextActions';
+import { INDICATOR_ACTION_EVENT, aiAvailability, type IndicatorAction } from './components/contextActions';
+import { AiAssistant, type AiRequest } from './components/AiAssistant';
 import { Client, AppSettings, ImportOutcome, SessionUser, DashboardStats, BlocklistEntry } from './types';
 import {
   getAllClients,
@@ -18,6 +19,7 @@ import {
   getAppSettings,
   getClientEntries,
   getIndicatorEntries,
+  getAiStatus,
   getNotifications,
   importBatch,
   undoImport,
@@ -129,6 +131,24 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   // Ações sobre um indicador pedidas pelo menu de contexto (de qualquer tela).
   const [dossier, setDossier] = useState<{ indicator: string; entries: BlocklistEntry[] } | null>(null);
   const [indicatorAction, setIndicatorAction] = useState<{ indicator: string; mode: IndicatorActionMode } | null>(null);
+  // Assistente de IA: só aparece se o servidor tiver um servidor de IA configurado.
+  const [ai, setAi] = useState<{ configured: boolean; model: string | null }>({ configured: false, model: null });
+  const [isAiOpen, setIsAiOpen] = useState(false);
+  const [aiRequest, setAiRequest] = useState<AiRequest | null>(null);
+  const aiEnabledRef = useRef(false);
+  useEffect(() => {
+    getAiStatus()
+      .then((status) => {
+        setAi(status);
+        aiEnabledRef.current = status.configured;
+        aiAvailability.enabled = status.configured;
+      })
+      .catch(() => undefined);
+  }, []);
+  const askAi = useCallback((request: { kind: 'question'; text: string } | { kind: 'indicator'; indicator: string }) => {
+    setIsAiOpen(true);
+    setAiRequest({ ...request, id: Date.now() } as AiRequest);
+  }, []);
   const [isTestsOpen, setIsTestsOpen] = useState(false);
 
   // Aviso (toast), com ação opcional como "Desfazer".
@@ -220,6 +240,11 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (document.querySelector('[aria-modal="true"]')) return;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'j' && aiEnabledRef.current) {
+        event.preventDefault();
+        setIsAiOpen((v) => !v);
+        return;
+      }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setQuickSearchSeed('');
@@ -250,13 +275,15 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   const handleIndicatorAction = useCallback(async (action: IndicatorAction, indicator: string) => {
     if (action === 'where') {
       openQuickSearch(indicator);
+    } else if (action === 'ai') {
+      if (aiEnabledRef.current) askAi({ kind: 'indicator', indicator });
     } else if (action === 'dossier') {
       const entries = await getIndicatorEntries(indicator).catch(() => [] as BlocklistEntry[]);
       setDossier({ indicator, entries });
     } else {
       setIndicatorAction({ indicator, mode: action });
     }
-  }, [openQuickSearch]);
+  }, [openQuickSearch, askAi]);
 
   // Pedidos vindos dos menus das linhas (ex.: "Bloquear em outros clientes").
   useEffect(() => {
@@ -413,6 +440,8 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
         currentUser={currentUser}
         onLogout={onLogout}
         onChangePassword={() => setIsAccountOpen(true)}
+        onOpenAssistant={ai.configured ? () => setIsAiOpen((v) => !v) : undefined}
+        isAssistantOpen={isAiOpen}
         pendingApprovals={isAdmin ? notifications.pendingApprovals : 0}
       />
 
@@ -591,7 +620,11 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
         onQuickSearch={openQuickSearch}
         onIndicatorAction={(action, indicator) => { void handleIndicatorAction(action, indicator); }}
+        aiEnabled={ai.configured}
+        onOpenAssistant={() => setIsAiOpen(true)}
       />
+
+      {ai.configured && <AiAssistant open={isAiOpen} onClose={() => setIsAiOpen(false)} model={ai.model} request={aiRequest} />}
 
       <IpDossierModal
         indicator={dossier?.indicator ?? null}

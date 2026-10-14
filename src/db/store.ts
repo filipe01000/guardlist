@@ -89,6 +89,8 @@ export interface ImportBatchPayload {
   history: Partial<ImportHistoryRecord>;
   todayStr: string;
   seen: string[];
+  /** Bloqueio avulso: não conta como a manutenção semanal do cliente. */
+  adHoc?: boolean;
 }
 export const importBatch = (payload: ImportBatchPayload) => call<ImportOutcome>('importBatch', payload);
 export const listPendingImports = () => call<PendingImport[]>('listPendingImports');
@@ -231,8 +233,64 @@ export interface SystemStatus {
   pendingApprovals: number;
   lastImport: { at: string; client?: string; by?: string; added?: number } | null;
   proxy: { trustProxyHops: unknown; seenIp: string; forwardedChain: string | null; ips: string[] };
+  ai?: { configured: boolean; model: string | null; baseUrl: string | null };
 }
 export const getSystemStatus = () => http<SystemStatus>('GET', '/api/status');
 export const testCtiKeys = () => http<{ configured: Record<string, boolean>; result: CtiSummary | null }>('POST', '/api/status/test-cti');
 export const testEmail = () => http<{ ok: true; to: string[] }>('POST', '/api/status/test-email');
 export const runJob = (job: 'backup' | 'monthly_report') => http<{ ok: true; detail: Record<string, unknown> }>('POST', `/api/status/run/${job}`);
+
+// ---------- Assistente de IA ----------
+export type AiEvent =
+  | { type: 'status'; text: string }
+  | { type: 'text'; text: string }
+  | { type: 'done'; model: string; ms: number; tokens?: number }
+  | { type: 'error'; error: string };
+
+export const getAiStatus = () => http<{ configured: boolean; model: string | null }>('GET', '/api/ai/status');
+export const testAi = () =>
+  http<{ configured: boolean; model?: string; baseUrl?: string; reply?: string; ms?: number; firstTokenMs?: number | null; tokens?: number | null }>('POST', '/api/status/test-ai');
+
+/** Pergunta à IA e recebe a resposta em partes (uma linha JSON por evento), enquanto ela escreve. */
+export async function streamAi(
+  path: '/api/ai/chat' | '/api/ai/indicator',
+  body: unknown,
+  onEvent: (event: AiEvent) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+    signal
+  });
+  if (!response.ok || !response.body) {
+    const json = await response.json().catch(() => ({}));
+    if (response.status === 401 || (response.status === 403 && json.code === 'PASSWORD_CHANGE_REQUIRED')) {
+      window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT, { detail: json.error }));
+    }
+    throw new Error(json.error || 'Não foi possível falar com o assistente.');
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    pending += decoder.decode(value, { stream: true });
+    const lines = pending.split('\n');
+    pending = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try {
+        onEvent(JSON.parse(line) as AiEvent);
+      } catch {
+        // linha incompleta ou inválida: ignora
+      }
+    }
+  }
+  if (pending.trim()) {
+    try { onEvent(JSON.parse(pending) as AiEvent); } catch { /* ignora */ }
+  }
+}

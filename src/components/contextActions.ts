@@ -7,7 +7,10 @@ import type { ActionMenuEntry } from './ActionMenu';
 // ---------- Pedidos de ação vindos de qualquer tela (ex.: menu de uma linha) ----------
 
 export const INDICATOR_ACTION_EVENT = 'guardlist:indicator-action';
-export type IndicatorAction = 'dossier' | 'where' | 'block' | 'exception';
+export type IndicatorAction = 'dossier' | 'where' | 'block' | 'exception' | 'ai';
+
+/** Se o assistente de IA está ligado neste servidor (definido pelo App ao carregar). */
+export const aiAvailability = { enabled: false };
 
 /** Pede ao app uma ação sobre um indicador (abre a janela certa, onde quer que o usuário esteja). */
 export function requestIndicatorAction(action: IndicatorAction, indicator: string) {

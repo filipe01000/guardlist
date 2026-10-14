@@ -109,6 +109,7 @@ export const IndicatorActionModal: React.FC<Props> = ({ request, clients, isAdmi
             entries: [entry],
             todayStr: today(),
             seen: [],
+            adHoc: true,
             history: {
               id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
               isoWeek: getIsoWeek(),

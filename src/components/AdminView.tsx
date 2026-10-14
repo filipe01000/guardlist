@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
+import { Sparkles,
   Activity, CheckCircle2, ClipboardList, Database, Inbox, KeyRound, Loader2, Mail, Network, RefreshCw, Search, Server, ShieldCheck, Users, XCircle
 } from 'lucide-react';
 import { PageHeader } from './PageHeader';
@@ -7,7 +7,7 @@ import { UsersView } from './UsersView';
 import { Modal } from './Modal';
 import { SessionUser, PendingImport } from '../types';
 import {
-  decidePendingImport, getAuditLog, getSystemStatus, listPendingImports, runJob, testCtiKeys, testEmail,
+  decidePendingImport, getAuditLog, getSystemStatus, listPendingImports, runJob, testAi, testCtiKeys, testEmail,
   type AuditRow, type SystemStatus
 } from '../db/store';
 import { formatDateTimeBR } from '../utils/csv';
@@ -360,6 +360,7 @@ const StatusPanel: React.FC<{ showToast: ShowToast }> = ({ showToast }) => {
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [ctiTest, setCtiTest] = useState<Awaited<ReturnType<typeof testCtiKeys>> | null>(null);
+  const [aiTest, setAiTest] = useState<Awaited<ReturnType<typeof testAi>> | null>(null);
 
   const load = useCallback(() => {
     getSystemStatus().then(setStatus).catch((e) => showToast(e.message, 'info'));
@@ -437,6 +438,31 @@ const StatusPanel: React.FC<{ showToast: ShowToast }> = ({ showToast }) => {
           )}
           <button type="button" className="btn btn--sm mt-3" disabled={!status.email.configured || busy === 'mail'} onClick={() => run('mail', testEmail, 'E-mail de teste enviado.')}>
             Enviar e-mail de teste
+          </button>
+        </div>
+
+        <div className="status-card">
+          <h3><Sparkles aria-hidden="true" /> Assistente de IA</h3>
+          <dl>
+            <dt>Situação</dt><dd><Dot state={status.ai?.configured ? 'ok' : 'off'} />{status.ai?.configured ? 'Configurado' : 'Desligado'}</dd>
+            <dt>Modelo</dt><dd>{status.ai?.model || '—'}</dd>
+            <dt>Servidor</dt><dd className="font-mono text-[0.72rem] break-all">{status.ai?.baseUrl || '—'}</dd>
+            {aiTest?.ms !== undefined && (
+              <>
+                <dt>Teste</dt>
+                <dd>
+                  <Dot state="ok" />
+                  {(aiTest.ms / 1000).toFixed(1)} s{aiTest.firstTokenMs != null ? ` (1ª palavra em ${(aiTest.firstTokenMs / 1000).toFixed(1)} s)` : ''}
+                  {aiTest.tokens ? ` · ${Math.round(aiTest.tokens / (aiTest.ms / 1000))} tokens/s` : ''}
+                </dd>
+              </>
+            )}
+          </dl>
+          {!status.ai?.configured && (
+            <p className="text-[11px] text-slate-400 mt-3">Defina AI_BASE_URL e AI_MODEL (ex.: Ollama em http://localhost:11434/v1 com qwen3:8b).</p>
+          )}
+          <button type="button" className="btn btn--sm mt-3" disabled={!status.ai?.configured || busy === 'ai'} onClick={() => run('ai', async () => setAiTest(await testAi()), 'A IA respondeu.')}>
+            {busy === 'ai' ? 'Testando…' : 'Testar resposta da IA'}
           </button>
         </div>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useState } from 'react';
-import {
+import { Sparkles,
   Building2,
   HardDrive,
   History,
@@ -39,6 +39,9 @@ interface NavbarProps {
   onLogout?: () => void;
   onChangePassword?: () => void;
   pendingApprovals?: number;
+  /** Abre o assistente de IA (só existe quando o servidor tem IA configurada). */
+  onOpenAssistant?: () => void;
+  isAssistantOpen?: boolean;
 }
 
 const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = [
@@ -73,7 +76,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   onLogout,
   onChangePassword,
-  pendingApprovals = 0
+  pendingApprovals = 0,
+  onOpenAssistant,
+  isAssistantOpen
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
@@ -219,6 +224,21 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="label">Consultar IP</span>
             <kbd className="label">Ctrl K</kbd>
           </button>
+
+          {onOpenAssistant && (
+            <button
+              type="button"
+              className={`gl-row gl-search gl-ai ${isAssistantOpen ? 'active' : ''}`}
+              onClick={() => { setMobileOpen(false); onOpenAssistant(); }}
+              data-tip="Assistente IA (Ctrl J)"
+              aria-label="Assistente IA"
+              aria-pressed={isAssistantOpen}
+            >
+              <Sparkles aria-hidden="true" />
+              <span className="label">Assistente IA</span>
+              <kbd className="label">Ctrl J</kbd>
+            </button>
+          )}
 
           <ul className="gl-nav" style={{ '--active-row': activeRow } as React.CSSProperties}>
             <li className="gl-indicator" aria-hidden="true" />

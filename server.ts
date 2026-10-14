@@ -6,7 +6,9 @@ import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSessionToken, readSession, setSessionCookie } from './auth.ts';
+import { aiConfigured, aiSettings, createAi, type AiEvent } from './server/ai.ts';
 import { createCti, ctiConfigured } from './server/cti.ts';
+import { classifyIndicator, normalizeIndicator } from './src/utils/validator.ts';
 import { openDatabase } from './server/db.ts';
 import { createJobs } from './server/jobs.ts';
 import { recipients, sendMail, smtpConfigured } from './server/mailer.ts';
@@ -430,6 +432,65 @@ app.post('/api/cti/enrich', enrichLimit, express.json({ limit: '512kb' }), async
   }
 });
 
+// ---------- Assistente de IA (opcional: só com AI_BASE_URL e AI_MODEL) ----------
+const ai = createAi({ db, store, cti });
+const aiLimit = rateLimit('assistente de IA', Number(process.env.AI_RATE_LIMIT_PER_MIN || 12));
+
+app.get('/api/ai/status', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  return res.json({ configured: aiConfigured(), model: aiConfigured() ? aiSettings().model : null });
+});
+
+function aiErrorMessage(error: unknown): string {
+  const err = error as { name?: string; message?: string; cause?: { code?: string } };
+  if (err?.name === 'TimeoutError') return 'A IA demorou demais para responder. Tente uma pergunta mais curta ou tente de novo.';
+  if (err?.name === 'AbortError') return 'Resposta interrompida.';
+  if (err?.cause?.code === 'ECONNREFUSED' || /fetch failed/i.test(err?.message ?? '')) {
+    return `Não foi possível falar com o servidor de IA (${aiSettings().baseUrl}). Verifique se ele está ligado.`;
+  }
+  return err?.message || 'Falha no assistente de IA.';
+}
+
+// Resposta em partes (uma linha JSON por evento): o texto aparece enquanto a IA escreve.
+function streamAi(res: express.Response, run: (emit: (e: AiEvent) => void, signal: AbortSignal) => Promise<void>) {
+  if (!aiConfigured()) return res.status(404).json({ error: 'Assistente de IA não configurado neste servidor.' });
+  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+  const stop = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) stop.abort();
+  });
+  const signal = AbortSignal.any([stop.signal, AbortSignal.timeout(aiSettings().timeoutMs)]);
+  const emit = (event: AiEvent) => {
+    if (!res.writableEnded) res.write(`${JSON.stringify(event)}\n`);
+  };
+  run(emit, signal)
+    .catch((error) => {
+      if (!stop.signal.aborted) emit({ type: 'error', error: aiErrorMessage(error) });
+    })
+    .finally(() => res.end());
+}
+
+app.post('/api/ai/chat', aiLimit, express.json({ limit: '256kb' }), (req, res) => {
+  const raw: unknown[] = Array.isArray(req.body?.messages) ? req.body.messages : [];
+  const messages = raw
+    .filter((m): m is { role: 'user' | 'assistant'; content: string } => {
+      const msg = m as { role?: unknown; content?: unknown };
+      return (msg?.role === 'user' || msg?.role === 'assistant') && typeof msg.content === 'string' && msg.content.trim() !== '';
+    })
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+  if (!messages.length || messages.at(-1)!.role !== 'user') return res.status(400).json({ error: 'Envie uma pergunta.' });
+  return streamAi(res, (emit, signal) => ai.chat(res.locals.actor as Actor, messages, emit, signal));
+});
+
+app.post('/api/ai/indicator', aiLimit, jsonSmall, (req, res) => {
+  const indicator = normalizeIndicator(String(req.body?.indicator ?? ''));
+  if (!indicator || !classifyIndicator(indicator).isValid) return res.status(400).json({ error: 'Informe um IP, CIDR ou domínio válido.' });
+  return streamAi(res, (emit, signal) => ai.analyzeIndicator(res.locals.actor as Actor, indicator, emit, signal));
+});
+
 // Origem pública do app (links e logo nos e-mails).
 const configuredOrigin = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
 const publicOrigin = () => (/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin) ? configuredOrigin : `http://localhost:${port}`);
@@ -458,6 +519,7 @@ app.get('/api/status', adminOnly, async (req, res) => {
       uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
       database: { kind: db.kind, ok: true, latencyMs: dbLatencyMs, ...counts[0] },
       cti: { ...ctiConfigured(), cachedIps: cacheCount[0]?.n ?? 0 },
+      ai: { configured: aiConfigured(), model: aiSettings().model || null, baseUrl: aiSettings().baseUrl || null },
       email: {
         configured: smtpConfigured(),
         reportRecipients: recipients('REPORT_EMAILS').length,
@@ -504,6 +566,14 @@ app.post('/api/status/test-cti', adminOnly, adminAction, async (_req, res) => {
     return res.json(await cti.testKeys());
   } catch (error) {
     return sendError(res, error);
+  }
+});
+
+app.post('/api/status/test-ai', adminOnly, adminAction, async (_req, res) => {
+  try {
+    return res.json(await ai.test());
+  } catch (error) {
+    return res.status(400).json({ error: aiErrorMessage(error) });
   }
 });
 

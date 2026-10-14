@@ -197,6 +197,8 @@ interface ImportPayload {
   history: ImportHistoryRecord;
   todayStr: string;
   seen: string[];
+  /** Bloqueio avulso (menu de ações): não conta como a manutenção semanal do cliente. */
+  adHoc?: boolean;
 }
 
 function parseImportPayload(raw: unknown): ImportPayload {
@@ -209,7 +211,7 @@ function parseImportPayload(raw: unknown): ImportPayload {
   const history = (input.history && typeof input.history === 'object' ? input.history : {}) as ImportHistoryRecord;
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(String(input.todayStr)) ? String(input.todayStr) : new Date().toISOString().slice(0, 10);
   const seen = Array.isArray(input.seen) ? input.seen.filter((x): x is string => typeof x === 'string').slice(0, 100_000) : [];
-  return { clientId, mode: input.mode === 'replace' ? 'replace' : 'append', entries, history, todayStr, seen };
+  return { clientId, mode: input.mode === 'replace' ? 'replace' : 'append', entries, history, todayStr, seen, adHoc: input.adHoc === true };
 }
 
 // Grava um lote já aprovado: respeita as exceções do cliente, salva uma versão antes, atualiza "visto por último",
@@ -282,7 +284,8 @@ async function executeImport(q: Query, author: Actor, payload: ImportPayload, ex
   removed += retired;
   const totalAfter = (await q<{ n: number }>("SELECT count(*)::int AS n FROM entries WHERE client_id = $1 AND status = 'active'", [clientId]))[0]?.n ?? 0;
 
-  await putClient(q, { ...client, lastVariation: { added, removed, previousTotal }, lastUpdateDate: todayStr, updatedAt: now }, author);
+  // Bloqueio avulso não muda a data da manutenção semanal nem a variação da semana.
+  await putClient(q, payload.adHoc ? { ...client, updatedAt: now } : { ...client, lastVariation: { added, removed, previousTotal }, lastUpdateDate: todayStr, updatedAt: now }, author);
 
   const notes = [payload.history.notes, mode === 'replace' ? `Modo Substituir (-${removed - retired} itens arquivados)` : '',
     retired > 0 ? `${retired} retirados por repetição, cobertura de CIDR ou exceção` : '',

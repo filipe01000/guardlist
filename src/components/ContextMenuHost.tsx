@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   ShieldOff,
   ShieldPlus,
+  Sparkles,
   Sun,
   Upload,
   Users
@@ -61,6 +62,8 @@ interface Props {
   onOpenShortcuts: () => void;
   onQuickSearch: (seed?: string) => void;
   onIndicatorAction: (action: IndicatorAction, indicator: string) => void;
+  aiEnabled: boolean;
+  onOpenAssistant: () => void;
 }
 
 /**
@@ -138,6 +141,7 @@ export function ContextMenuHost(props: Props) {
     const lookups: ActionMenuEntry = { label: 'Consultar fora', icon: Globe, children: externalLookupEntries(value, type) };
     const items: ActionMenuEntry[] = [{ type: 'heading', label: value, detail: TYPE_LABEL[type] }];
     if (!inModal) {
+      if (p.aiEnabled) items.push({ label: 'Perguntar à IA', icon: Sparkles, title: 'Resumo, reputação e recomendação', onSelect: () => p.onIndicatorAction('ai', value) });
       items.push(
         { label: 'Abrir dossiê do indicador', icon: ScanSearch, onSelect: () => p.onIndicatorAction('dossier', value) },
         { label: 'Onde está bloqueado?', icon: Search, hint: 'Ctrl K', onSelect: () => p.onQuickSearch(value) },
@@ -159,6 +163,7 @@ export function ContextMenuHost(props: Props) {
     const items: ActionMenuEntry[] = [
       { type: 'heading', label: page?.label ?? 'GuardList', detail: 'Página' },
       { label: 'Consultar IPs…', icon: Search, hint: 'Ctrl K', onSelect: () => p.onQuickSearch() },
+      ...(p.aiEnabled ? [{ label: 'Assistente IA', icon: Sparkles, hint: 'Ctrl J', onSelect: () => p.onOpenAssistant() }] : []),
       { label: 'Atualizar dados', icon: RefreshCw, onSelect: () => p.onRefresh() }
     ];
     if (p.previousTab !== p.currentTab) {
