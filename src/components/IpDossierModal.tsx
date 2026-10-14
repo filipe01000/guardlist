@@ -101,7 +101,7 @@ export const IpDossierModal: React.FC<IpDossierModalProps> = ({
                   {ctiData.type}
                 </span>
                 <span className="text-sm" title={ctiData.country.name}>
-                  {ctiData.country.flag} {ctiData.country.code}
+                  {ctiData.country.code}
                 </span>
               </div>
               <p className="text-xs text-slate-400 flex flex-wrap items-center gap-2 mt-1 mobile-safe-text">

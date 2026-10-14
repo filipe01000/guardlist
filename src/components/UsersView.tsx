@@ -335,7 +335,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
       <section className="data-panel" aria-labelledby="team-title">
         <header className="data-panel__header">
           <h2 id="team-title">Equipe</h2>
-          <span>{users.filter((u) => u.active).length} ativos</span>
+          <span>{(() => { const n = users.filter((u) => u.active).length; return `${n} ${n === 1 ? 'ativo' : 'ativos'}`; })()}</span>
         </header>
 
         {loading ? (
@@ -347,13 +347,13 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="data-table" style={{ minWidth: 1140 }}>
+            <table className="data-table" style={{ minWidth: 1040 }}>
               <colgroup>
                 <col />
-                <col style={{ width: '160px' }} />
-                <col style={{ width: '150px' }} />
-                <col style={{ width: '150px' }} />
-                <col style={{ width: '460px' }} />
+                <col style={{ width: '200px' }} />
+                <col style={{ width: '120px' }} />
+                <col style={{ width: '145px' }} />
+                <col style={{ width: '420px' }} />
               </colgroup>
               <thead>
                 <tr>
@@ -375,7 +375,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                       </td>
                       <td>
                         <select
-                          className="field h-8 min-h-0 w-[140px] text-[0.74rem]"
+                          className="field h-8 min-h-0 w-[170px] text-[0.74rem]"
                           value={user.role}
                           onChange={(e) => handleUpdate(user, { role: e.target.value as SessionUser['role'] })}
                           aria-label={`Papel de ${user.displayName}`}
@@ -400,7 +400,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                       <td className="font-mono text-[0.72rem] whitespace-nowrap">{formatDate(user.lastLoginAt)}</td>
                       <td>
                         {isSelf ? (
-                          <span className="block text-right text-[11px] text-slate-500">Senha e sessões: clique no seu nome no menu</span>
+                          <span className="block text-right text-[11px] text-slate-500 whitespace-nowrap" title="Senha e sessões ficam em Minha conta (clique no seu nome no menu)">Gerencie em Minha conta</span>
                         ) : (
                           <div className="flex justify-end gap-1">
                             {user.lockedUntil && (

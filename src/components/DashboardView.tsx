@@ -117,7 +117,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       if (daysSince === null) urgencyScore = 1000;
       else if (isLate) urgencyScore = 500 + daysSince;
       else if (isNearDeadline) urgencyScore = 200 + (3 - daysUntilDue);
-      else urgencyScore = 50 - daysSince;
+      else urgencyScore = 50 + daysSince;
 
       return {
         client,
@@ -313,7 +313,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <th className="py-3 px-3 text-right">CIDRs</th>
                     <th className="py-3 px-3">Última revisão</th>
                     <th className="py-3 px-3">Situação</th>
-                    <th className="py-3 px-4 text-right">Ações</th>
+                    <th className="py-3 px-3 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -337,9 +337,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <span className="text-slate-500 ml-2">{daysSince === null ? '' : `há ${daysSince}d`}</span>
                       </td>
                       <td className="py-2.5 px-3">{statusChip(isLate, isNearDeadline)}</td>
-                      <td className="py-2.5 px-4">
+                      <td className="py-2.5 px-3">
                         <div className="flex items-center justify-end gap-1">
-                          <button type="button" className="btn btn--sm" onClick={() => onNavigateToImport(client.id)}>Importar</button>
+                          <button type="button" className="btn btn--sm btn--icon btn--quiet" onClick={() => onNavigateToImport(client.id)} title="Importar" aria-label={`Importar lista de ${client.name}`}>
+                            <Upload aria-hidden="true" />
+                          </button>
                           <button type="button" className="btn btn--sm btn--icon btn--quiet" onClick={() => onQuickExportTxt(client)} title="Baixar .txt" aria-label={`Baixar .txt de ${client.name}`}>
                             <Download aria-hidden="true" />
                           </button>

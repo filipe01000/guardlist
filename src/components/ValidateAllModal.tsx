@@ -60,7 +60,7 @@ export const ValidateAllModal: React.FC<ValidateAllModalProps> = ({ open, onClos
     <Modal
       open={open}
       onClose={onClose}
-      size="lg"
+      size="xl"
       title="Validação de todas as listas"
       subtitle="Repetidos, IPs já contidos em um CIDR da mesma lista, conflitos com exceções e bloqueios parados para revisão."
       footer={
@@ -104,7 +104,7 @@ export const ValidateAllModal: React.FC<ValidateAllModalProps> = ({ open, onClos
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.clientId} className="is-clickable" onClick={() => { onClose(); onOpenList(r.clientId); }}>
-                    <td>
+                    <td className="whitespace-nowrap">
                       <span className="data-table__primary">{r.name}</span>
                       {fixable(r) === 0 && <CheckCircle2 className="inline w-3.5 h-3.5 ml-1.5 text-emerald-400" aria-label="Lista limpa" />}
                     </td>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
+import { X, Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
 import { Client, BlocklistEntry, IndicatorType, ClientSnapshot, EntryComment } from '../types';
 import { Modal } from './Modal';
 import type { ShowToast } from '../App';
@@ -1023,12 +1023,12 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                     )}
                   </button>
                 </th>
-                <th className="py-3 px-4 w-52">Indicador</th>
-                <th className="py-3 px-3 w-56">Domínio / hostname</th>
-                <th className="py-3 px-3 w-32 text-center">Ocorrências · 90d</th>
+                <th className="py-3 px-4 w-44">Indicador</th>
+                <th className="py-3 px-3 w-44">Domínio / hostname</th>
+                <th className="py-3 px-3 w-24 text-center" title="Ocorrências nos últimos 90 dias">90 dias</th>
                 <th className="py-3 px-3 w-24">Tipo</th>
                 <th className="py-3 px-3 w-28">Incluído em</th>
-                <th className="py-3 px-3 w-36">Fonte / Ticket</th>
+                <th className="py-3 px-3 w-28">Fonte / Ticket</th>
                 <th className="py-3 px-3 w-28">Status</th>
                 <th className="py-3 px-4">Observações</th>
                 <th className="py-3 px-4 w-28 text-right">Ações</th>
@@ -1093,7 +1093,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                               e.stopPropagation();
                               openDossier(item.indicator);
                             }}
-                            className={`text-xs font-bold hover:text-blue-300 hover:underline transition cursor-pointer text-left ${item.isReservedAlert ? 'text-amber-400' : 'text-white'}`}
+                            className={`text-xs font-bold hover:text-blue-300 hover:underline transition cursor-pointer text-left whitespace-nowrap ${item.isReservedAlert ? 'text-amber-400' : 'text-white'}`}
                             title="Clique para abrir a Ficha Técnica / Dossiê CTI Completo"
                           >
                             {item.indicator}
@@ -1137,7 +1137,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                       </td>
 
                       {/* Domínio / hostname proveniente do AbuseIPDB */}
-                      <td className="py-2.5 px-3 font-sans min-w-48">
+                      <td className="py-2.5 px-3 font-sans">
                         {item.type === 'Domain' ? (
                           <span className="text-slate-200 text-[11px]">{item.indicator}</span>
                         ) : !isIp ? (
@@ -1148,7 +1148,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                             Consultando…
                           </span>
                         ) : intelligence?.status === 'ok' ? (
-                          <div className="max-w-56 leading-tight">
+                          <div className="max-w-44 leading-tight">
                             <span className="block text-slate-200 text-[11px] truncate" title={primaryHostname || 'Sem hostname associado'}>
                               {primaryHostname || 'Sem hostname associado'}
                             </span>
@@ -1190,7 +1190,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                       {/* Tipo */}
                       <td className="py-2.5 px-3 font-sans">
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 font-bold border border-slate-700 text-slate-300">
-                          {item.type}
+                          {item.type.replace('_', ' ')}
                         </span>
                       </td>
 
@@ -1226,7 +1226,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                       </td>
 
                       {/* Observação */}
-                      <td className="py-2.5 px-4 font-sans text-slate-400 text-xs truncate max-w-xs" title={item.notes}>
+                      <td className="py-2.5 px-4 font-sans text-slate-400 text-xs truncate max-w-[110px]" title={item.notes}>
                         {item.notes || '-'}
                       </td>
 
@@ -1352,9 +1352,11 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               </div>
               <button
                 onClick={() => setShowBatchMatchModal(false)}
-                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded"
+                className="btn btn--sm btn--icon btn--quiet"
+              aria-label="Fechar"
+              title="Fechar"
               >
-                Fechar
+                <X aria-hidden="true" />
               </button>
             </div>
 
@@ -1381,7 +1383,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               <button
                 type="button"
                 onClick={() => setBatchMatchInput('')}
-                className="text-xs text-slate-400 hover:text-white"
+                className="btn btn--quiet"
               >
                 Limpar
               </button>
@@ -1390,7 +1392,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowBatchMatchModal(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white"
+                  className="btn btn--quiet"
                 >
                   Fechar
                 </button>
@@ -1398,7 +1400,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                   type="button"
                   onClick={handleExecuteBatchMatch}
                   disabled={fullListBusy || !batchMatchInput.trim()}
-                  className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow"
+                  className="btn btn--primary"
                 >
                   {fullListBusy ? 'Localizando…' : 'Marcar na tabela'}
                 </button>
@@ -1421,14 +1423,16 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               </div>
               <button
                 onClick={() => setShowSnapshotsModal(false)}
-                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded"
+                className="btn btn--sm btn--icon btn--quiet"
+              aria-label="Fechar"
+              title="Fechar"
               >
-                Fechar
+                <X aria-hidden="true" />
               </button>
             </div>
 
             <p className="text-xs text-slate-300">
-              A cada importação ou limpeza, um snapshot de segurança é criado automaticamente. Você pode reverter qualquer erro restaurando uma versão anterior com 1 clique.
+              A cada importação ou limpeza, o GuardList salva uma versão da lista. Para desfazer um erro, restaure a versão anterior.
             </p>
 
             {/* Criar Ponto de Restauração Manual */}
@@ -1438,11 +1442,11 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 placeholder="Nome do ponto manual (ex: Backup antes de atualizar firewall)"
                 value={newSnapshotLabel}
                 onChange={(e) => setNewSnapshotLabel(e.target.value)}
-                className="flex-1 bg-slate-900 text-white p-2 rounded-lg border border-slate-700 focus:outline-none"
+                className="field flex-1"
               />
               <button
                 onClick={handleCreateManualSnapshot}
-                className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-3 py-2 rounded-lg transition whitespace-nowrap"
+                className="btn btn--primary whitespace-nowrap"
               >
                 Salvar versão atual
               </button>
@@ -1452,7 +1456,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
             <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
               {snapshots.length === 0 ? (
                 <div className="py-8 text-center text-slate-500 text-xs">
-                  Nenhum snapshot gravado para este cliente ainda. Eles são criados automaticamente a cada importação.
+                  Nenhuma versão salva para este cliente ainda. Elas são criadas automaticamente a cada importação ou limpeza.
                 </div>
               ) : (
                 snapshots.map((snap) => (
@@ -1471,7 +1475,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                       </div>
                       <span className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
                         <Clock className="w-3 h-3 text-slate-500" />
-                        Criado em: {new Date(snap.createdAt).toLocaleString('pt-BR')}
+                        Salva em {new Date(snap.createdAt).toLocaleString('pt-BR')}
                       </span>
                     </div>
 
@@ -1479,16 +1483,16 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                       <button
                         disabled={isRestoringSnapshot}
                         onClick={() => handleRestoreSnapshot(snap)}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow"
+                        className="btn btn--sm btn--primary"
                       >
                         <Undo2 className="w-3.5 h-3.5" />
-                        Restaurar / Desfazer
+                        Restaurar
                       </button>
 
                       <button
                         onClick={() => handleDeleteSnapshotItem(snap.id)}
                         className="p-1.5 text-slate-500 hover:text-rose-400 rounded hover:bg-slate-900 transition"
-                        title="Excluir este snapshot"
+                        title="Excluir esta versão"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1540,7 +1544,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                   setShowClearAllModal(false);
                   setClearConfirmName('');
                 }}
-                className="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white"
+                className="btn btn--quiet"
               >
                 Cancelar
               </button>
@@ -1548,7 +1552,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                 type="button"
                 disabled={clearConfirmName.trim().toUpperCase() !== currentClient?.name.toUpperCase()}
                 onClick={handleConfirmClearAll}
-                className="disabled-action bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow"
+                className="btn btn--destructive"
               >
                 Zerar lista
               </button>
@@ -1671,9 +1675,11 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               </div>
               <button
                 onClick={() => setShowDuplicateModal(false)}
-                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded"
+                className="btn btn--sm btn--icon btn--quiet"
+              aria-label="Fechar"
+              title="Fechar"
               >
-                Fechar
+                <X aria-hidden="true" />
               </button>
             </div>
 
@@ -1741,9 +1747,11 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               </div>
               <button
                 onClick={() => setShowNanoModal(false)}
-                className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded"
+                className="btn btn--sm btn--icon btn--quiet"
+              aria-label="Fechar"
+              title="Fechar"
               >
-                Fechar
+                <X aria-hidden="true" />
               </button>
             </div>
 
@@ -1765,7 +1773,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleCopyNanoText}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow"
+                  className="btn btn--primary"
                 >
                   {copiedNano ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
                   {copiedNano ? 'Copiado' : 'Copiar texto NANO'}
@@ -1773,7 +1781,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
 
                 <button
                   onClick={handleExportNanoTxt}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-medium transition flex items-center gap-1.5"
+                  className="btn"
                 >
                   <Download className="w-4 h-4" />
                   Baixar .txt
@@ -1802,13 +1810,13 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setEditingEntry(null)}
-                className="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white"
+                className="btn btn--quiet"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleSaveNotes}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold"
+                className="btn btn--primary"
               >
                 Salvar
               </button>
@@ -1831,13 +1839,13 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 onClick={() => setDeleteConfirmId(null)}
-                className="px-3 py-1.5 rounded-lg text-xs text-slate-400 hover:text-white"
+                className="btn btn--quiet"
               >
                 Cancelar
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold"
+                className="btn btn--destructive"
               >
                 Excluir definitivamente
               </button>

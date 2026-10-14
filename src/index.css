@@ -80,11 +80,14 @@ body {
   background-attachment: fixed;
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
+/* Na camada base: assim as classes utilitárias (text-xs, font-bold...) continuam valendo. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 }
 
 button,

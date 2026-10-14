@@ -44,7 +44,7 @@ const LineChart: React.FC<{ points: Evolution['points'] }> = ({ points }) => {
         </circle>
       ))}
       {points.map((p, i) => (i % step === 0 && points.length - 1 - i >= step / 2) || i === points.length - 1 ? (
-        <text key={`l-${p.date}`} x={x(i)} y={H - 8} textAnchor="middle">{formatDateBR(p.date).slice(0, 5)}</text>
+        <text key={`l-${p.date}`} x={x(i)} y={H - 8} textAnchor={i === points.length - 1 ? 'end' : i === 0 ? 'start' : 'middle'}>{formatDateBR(p.date).slice(0, 5)}</text>
       ) : null)}
     </svg>
   );

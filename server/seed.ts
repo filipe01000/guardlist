@@ -28,7 +28,7 @@ export async function seedDemoData(db: Database): Promise<void> {
         lastUpdateDate: lastUpdate,
         targetFirewall: profile.firewall,
         preferredExportFormat: profile.format,
-        notes: `Firewall ${profile.firewall} • Formato: ${profile.format.toUpperCase()}`
+        notes: `Firewall ${profile.firewall} • Exportação ${profile.format === 'nano' ? 'NANO' : 'em texto simples'}`
       };
       await q('INSERT INTO clients (id, data, updated_by) VALUES ($1, $2::jsonb, $3) ON CONFLICT (id) DO NOTHING', [
         client.id,

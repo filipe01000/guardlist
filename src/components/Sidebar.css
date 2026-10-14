@@ -302,11 +302,11 @@
   content: "";
   position: absolute;
   top: 50%;
-  right: 0;
+  left: 0;
   translate: 0 -50%;
-  width: 8px;
-  height: 16px;
-  border-radius: 12px 0 0 12px;
+  width: 3px;
+  height: 22px;
+  border-radius: 0 3px 3px 0;
   background: var(--accent);
 }
 

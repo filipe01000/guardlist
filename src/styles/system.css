@@ -122,6 +122,18 @@
   color: var(--danger);
 }
 
+.btn--destructive {
+  border-color: transparent;
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn--destructive:hover {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--danger) 85%, #000);
+  color: #fff;
+}
+
 .btn--icon {
   width: 38px;
   padding: 0;
@@ -316,7 +328,7 @@
   text-align: center;
 }
 
-.empty-state svg {
+.empty-state > svg {
   width: 28px;
   height: 28px;
   color: var(--line-strong);
@@ -668,6 +680,16 @@ select.field {
   font-weight: 620;
   text-align: left;
   white-space: nowrap;
+}
+
+.data-table th.text-right,
+.data-table td.text-right {
+  text-align: right;
+}
+
+.data-table th.text-center,
+.data-table td.text-center {
+  text-align: center;
 }
 
 .data-table td {
@@ -1057,7 +1079,25 @@ select.field {
 }
 
 .list-table {
-  min-width: 1180px;
+  min-width: 1040px;
+}
+
+/* Espaçamento lateral mais justo: a tabela inteira cabe numa tela de 1440px. */
+.list-table th,
+.list-table td {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* Coluna de ações presa à direita: continua visível quando a tabela rola na horizontal.
+   A cor vem da linha (tr), para não destoar do resto. */
+.list-table th:last-child,
+.list-table td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background-color: inherit;
+  box-shadow: -10px 0 12px -10px rgb(0 0 0 / 0.45);
 }
 
 .list-table th,

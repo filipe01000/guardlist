@@ -109,7 +109,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({ clients, showToast, onRe
         }
       />
 
-      <div className="action-bar">
+      {items.length > 0 && <div className="action-bar">
         <div className="action-bar__group">
           <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
             <input type="checkbox" checked={allSelected} onChange={() => setSelected(allSelected ? new Set() : new Set(visibleIds))} />
@@ -126,7 +126,7 @@ export const ReviewView: React.FC<ReviewViewProps> = ({ clients, showToast, onRe
             Remover {selected.size || ''}
           </button>
         </div>
-      </div>
+      </div>}
 
       <section className="data-panel">
         {loading ? (
