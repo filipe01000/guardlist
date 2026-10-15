@@ -212,3 +212,79 @@
   .cb-grid { grid-template-columns: 1fr; }
   .cb-col .cb-output, .cb-placeholder { min-height: 240px; }
 }
+
+/* ---------- Cliente do caso e situação de cada indicador ---------- */
+.cb-client {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cb-client > svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
+.cb-col .cb-client .field.is-invalid { border-color: color-mix(in srgb, var(--warning) 60%, var(--line)); box-shadow: none; }
+
+.cb-recent,
+.cb-muted {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.cb-muted { margin-top: 8px; }
+.cb-muted svg { width: 13px; height: 13px; }
+
+.cb-for {
+  margin-left: 6px;
+  color: var(--accent);
+  font-style: normal;
+  font-weight: 650;
+}
+
+.cb-table {
+  display: grid;
+  gap: 2px;
+  max-height: 210px;
+  margin-top: 10px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+.cb-row-item {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto minmax(0, 1.4fr);
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.cb-row-item.is-repeat { background: color-mix(in srgb, var(--danger) 9%, transparent); }
+.cb-row-item code {
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cb-row-item .chip { font-size: 0.66rem; white-space: nowrap; }
+.cb-case-cell { min-width: 0; font-size: 0.72rem; }
+.cb-repeat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--danger);
+  font-weight: 600;
+}
+.cb-repeat svg { flex: none; width: 12px; height: 12px; }
+.cb-new { color: var(--muted); }
+
+.cb-check-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.cb-spin { width: 14px; height: 14px; color: var(--accent); }
+.cb-accept { margin-top: 8px; color: var(--text-soft); }
+.cb-foot-hint.is-warn { color: var(--danger); font-weight: 600; }

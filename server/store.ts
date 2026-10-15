@@ -1440,6 +1440,94 @@ export function createStore(db: Database) {
       };
     },
 
+    // ---------- Casos enviados ao cliente ----------
+
+    // Para cada indicador do caso: situação na lista do cliente e se já foi informado num caso anterior
+    // (o mesmo indicador, ou um IP dentro de um CIDR já informado). O caso do próprio ticket não conta.
+    async checkClientCase(_actor: Actor, clientId: string, indicators: unknown, ticket?: unknown) {
+      const id = asString(clientId, 'clientId');
+      const list = [...new Set(asArray<unknown>(indicators, 'indicators')
+        .filter((x): x is string => typeof x === 'string')
+        .map((x) => normalizeIndicator(x))
+        .filter(Boolean))].slice(0, 5000);
+      const currentTicket = typeof ticket === 'string' ? ticket.trim().toLowerCase() : '';
+      const [entryRows, caseRows] = await Promise.all([
+        db.query<{ data: BlocklistEntry }>('SELECT data FROM entries WHERE client_id = $1', [id]),
+        db.query<{ ticket: string; indicators: string[]; display_name: string | null; created_by: string | null; created_at: string }>(
+          'SELECT ticket, indicators, display_name, created_by, created_at FROM client_cases WHERE client_id = $1 ORDER BY created_at DESC LIMIT 1000',
+          [id]
+        )
+      ]);
+      type R = NonNullable<ReturnType<typeof toRange>>;
+      const contains = (outer: R | null, inner: R | null) =>
+        Boolean(outer && inner && outer.family === inner.family && outer.start <= inner.start && inner.end <= outer.end);
+      const entries = entryRows.map((r) => r.data);
+      const activeExact = new Set(entries.filter((e) => e.status === 'active').map((e) => e.indicator.toLowerCase()));
+      const activeNets = entries
+        .filter((e) => e.status === 'active')
+        .map((e) => ({ indicator: e.indicator, range: toRange(e.indicator) }))
+        .filter((n) => n.range && n.range.end > n.range.start);
+      const removed = new Set(entries.filter((e) => e.status === 'removed').map((e) => e.indicator.toLowerCase()));
+      const previous = caseRows
+        .filter((c) => c.ticket.trim().toLowerCase() !== currentTicket)
+        .flatMap((c) => (c.indicators || []).map((value) => ({ value: String(value).toLowerCase(), range: toRange(String(value)), c })));
+
+      const items = list.map((indicator) => {
+        const range = toRange(indicator);
+        let status: 'listed' | 'covered' | 'removed' | 'missing' = 'missing';
+        let via: string | undefined;
+        if (activeExact.has(indicator)) status = 'listed';
+        else {
+          const net = activeNets.find((n) => contains(n.range, range));
+          if (net) {
+            status = 'covered';
+            via = net.indicator;
+          } else if (removed.has(indicator)) status = 'removed';
+        }
+        const hit = previous.find((p) => p.value === indicator) ?? previous.find((p) => p.range && p.range.end > p.range.start && contains(p.range, range));
+        return {
+          indicator,
+          list: status,
+          via,
+          previousCase: hit
+            ? { ticket: hit.c.ticket, at: new Date(hit.c.created_at).toISOString(), by: hit.c.display_name || hit.c.created_by || '', via: hit.value !== indicator ? hit.value : undefined }
+            : null
+        };
+      });
+      const recentCases = caseRows.slice(0, 5).map((c) => ({
+        ticket: c.ticket,
+        at: new Date(c.created_at).toISOString(),
+        by: c.display_name || c.created_by || '',
+        count: (c.indicators || []).length
+      }));
+      return { items, recentCases };
+    },
+
+    // Registra o caso (ao copiar o texto). O mesmo ticket no mesmo cliente soma os indicadores.
+    async saveClientCase(actor: Actor, clientId: string, ticket: unknown, indicators: unknown) {
+      const id = asString(clientId, 'clientId');
+      const t = String(ticket ?? '').trim().slice(0, 60);
+      if (!t) throw new StoreError('Informe o ticket TLD.');
+      const list = [...new Set(asArray<unknown>(indicators, 'indicators')
+        .filter((x): x is string => typeof x === 'string')
+        .map((x) => normalizeIndicator(x))
+        .filter((x) => x && classifyIndicator(x).isValid))].slice(0, 5000);
+      if (!list.length) throw new StoreError('Nenhum indicador válido no caso.');
+      const client = (await db.query<{ data: Client }>('SELECT data FROM clients WHERE id = $1', [id]))[0]?.data;
+      if (!client) throw new StoreError('Cliente não encontrado.', 404);
+      await db.query(
+        `INSERT INTO client_cases (client_id, ticket, indicators, created_by, display_name) VALUES ($1, $2, $3::jsonb, $4, $5)
+         ON CONFLICT (client_id, ticket) DO UPDATE SET
+           indicators = (SELECT jsonb_agg(DISTINCT x) FROM jsonb_array_elements(client_cases.indicators || EXCLUDED.indicators) AS x),
+           updated_at = now()`,
+        [id, t, JSON.stringify(list), actor.username, actor.displayName]
+      );
+      await db.query('INSERT INTO audit_log (username, action, detail) VALUES ($1, $2, $3::jsonb)', [
+        actor.username, 'case.save', JSON.stringify({ clientId: id, name: client.name, ticket: t, count: list.length })
+      ]);
+      return { ticket: t, count: list.length, clientName: client.name };
+    },
+
     async isEmpty() {
       const rows = await db.query<{ n: number }>('SELECT count(*)::int AS n FROM clients');
       return (rows[0]?.n ?? 0) === 0;
@@ -1453,6 +1541,8 @@ export type Store = ReturnType<typeof createStore>;
 // Operações que o navegador pode chamar por /api/data/:op. As demais são internas.
 export const PUBLIC_OPS = [
   'initializeDatabaseIfEmpty',
+  'checkClientCase',
+  'saveClientCase',
   'getAllClients',
   'saveClient',
   'renameClient',

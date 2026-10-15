@@ -11,9 +11,9 @@ export type IndicatorAction = 'dossier' | 'where' | 'block' | 'exception' | 'ai'
 
 export const OPEN_CASE_EVENT = 'guardlist:open-case';
 
-/** Abre o gerador do caso para o cliente, já com estes indicadores. */
-export function requestCaseBuilder(indicators: string[] = []) {
-  window.dispatchEvent(new CustomEvent(OPEN_CASE_EVENT, { detail: { text: indicators.join('\n') } }));
+/** Abre o gerador do caso para o cliente, já com estes indicadores (e o cliente, se souber). */
+export function requestCaseBuilder(indicators: string[] = [], clientId?: string) {
+  window.dispatchEvent(new CustomEvent(OPEN_CASE_EVENT, { detail: { text: indicators.join('\n'), clientId } }));
 }
 
 /** Se o assistente de IA está ligado neste servidor (definido pelo App ao carregar). */

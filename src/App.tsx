@@ -12,6 +12,7 @@ import { IndicatorActionModal, type IndicatorActionMode } from './components/Ind
 import { IpDossierModal } from './components/IpDossierModal';
 import { INDICATOR_ACTION_EVENT, OPEN_CASE_EVENT, aiAvailability, type IndicatorAction } from './components/contextActions';
 import { CaseBuilderModal } from './components/CaseBuilderModal';
+import { TopBar } from './components/TopBar';
 import { AiAssistant, type AiRequest } from './components/AiAssistant';
 import { Client, AppSettings, ImportOutcome, SessionUser, DashboardStats, BlocklistEntry } from './types';
 import {
@@ -136,9 +137,12 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   const [ai, setAi] = useState<{ configured: boolean; model: string | null }>({ configured: false, model: null });
   const [isAiOpen, setIsAiOpen] = useState(false);
   // Gerador do texto do caso enviado ao cliente.
-  const [caseBuilder, setCaseBuilder] = useState<{ text: string } | null>(null);
+  const [caseBuilder, setCaseBuilder] = useState<{ text: string; clientId?: string } | null>(null);
   useEffect(() => {
-    const onOpen = (e: Event) => setCaseBuilder({ text: (e as CustomEvent<{ text?: string }>).detail?.text ?? '' });
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<{ text?: string; clientId?: string }>).detail;
+      setCaseBuilder({ text: detail?.text ?? '', clientId: detail?.clientId });
+    };
     window.addEventListener(OPEN_CASE_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_CASE_EVENT, onOpen);
   }, []);
@@ -448,14 +452,17 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
         currentUser={currentUser}
         onLogout={onLogout}
         onChangePassword={() => setIsAccountOpen(true)}
-        onOpenAssistant={ai.configured ? () => setIsAiOpen((v) => !v) : undefined}
-        isAssistantOpen={isAiOpen}
-        onOpenCaseBuilder={() => setCaseBuilder({ text: '' })}
         pendingApprovals={isAdmin ? notifications.pendingApprovals : 0}
       />
 
       {/* Conteúdo Principal */}
       <main id="main-content" tabIndex={-1} className="studio-main flex-1">
+        <TopBar
+          onSearch={openQuickSearch}
+          onOpenCaseBuilder={() => setCaseBuilder({ text: '' })}
+          onOpenAssistant={ai.configured ? () => setIsAiOpen((v) => !v) : undefined}
+          isAssistantOpen={isAiOpen}
+        />
         {dataLoadError && (
           <div className="banner" role="alert">
             <AlertTriangle aria-hidden="true" />
@@ -637,6 +644,9 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       <CaseBuilderModal
         open={caseBuilder !== null}
         initialText={caseBuilder?.text}
+        initialClientId={caseBuilder?.clientId ?? (currentTab === 'client-list' ? selectedClientId : undefined)}
+        clients={clients}
+        onEntriesChanged={refreshAllData}
         onClose={() => setCaseBuilder(null)}
         currentUser={currentUser}
         aiEnabled={ai.configured}

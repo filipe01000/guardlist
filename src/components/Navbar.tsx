@@ -1,6 +1,10 @@
 import React, { useEffect, useId, useState } from 'react';
-import { FileSignature, Sparkles,
+import {
   Building2,
+  ChevronDown,
+  Radar,
+  Settings2,
+  ShieldBan,
   HardDrive,
   History,
   LayoutDashboard,
@@ -39,26 +43,48 @@ interface NavbarProps {
   onLogout?: () => void;
   onChangePassword?: () => void;
   pendingApprovals?: number;
-  /** Abre o assistente de IA (só existe quando o servidor tem IA configurada). */
-  onOpenAssistant?: () => void;
-  isAssistantOpen?: boolean;
-  /** Abre o gerador do texto do caso para o cliente. */
-  onOpenCaseBuilder?: () => void;
 }
 
-const navItems: Array<{ id: AppTab; label: string; icon: React.ElementType }> = [
-  { id: 'dashboard', label: 'Painel geral', icon: LayoutDashboard },
-  { id: 'intelligence', label: 'Inteligência de IPs', icon: Radio },
-  { id: 'import', label: 'Importação semanal', icon: UploadCloud },
-  { id: 'client-list', label: 'Listas dos clientes', icon: ListFilter },
-  { id: 'review', label: 'Revisão de bloqueios', icon: ClipboardCheck },
-  { id: 'history', label: 'Histórico semanal', icon: History },
-  { id: 'reports', label: 'Relatórios', icon: FileSpreadsheet },
-  { id: 'clients', label: 'Gerenciar clientes', icon: Building2 },
-  { id: 'backup', label: 'Backup e ajustes', icon: HardDrive }
+type NavItem = { id: AppTab; label: string; icon: React.ElementType; adminOnly?: boolean };
+type NavGroup = { id: string; label: string; icon: React.ElementType; items: NavItem[] };
+
+// Painel geral sozinho no topo; o resto em grupos de telas relacionadas.
+const homeItem: NavItem = { id: 'dashboard', label: 'Painel geral', icon: LayoutDashboard };
+const navGroups: NavGroup[] = [
+  {
+    id: 'blocks',
+    label: 'Bloqueios',
+    icon: ShieldBan,
+    items: [
+      { id: 'client-list', label: 'Listas dos clientes', icon: ListFilter },
+      { id: 'import', label: 'Importação semanal', icon: UploadCloud },
+      { id: 'review', label: 'Revisão de bloqueios', icon: ClipboardCheck },
+      { id: 'history', label: 'Histórico semanal', icon: History }
+    ]
+  },
+  {
+    id: 'analysis',
+    label: 'Análise',
+    icon: Radar,
+    items: [
+      { id: 'intelligence', label: 'Inteligência de IPs', icon: Radio },
+      { id: 'reports', label: 'Relatórios', icon: FileSpreadsheet }
+    ]
+  },
+  {
+    id: 'manage',
+    label: 'Gestão',
+    icon: Settings2,
+    items: [
+      { id: 'clients', label: 'Gerenciar clientes', icon: Building2 },
+      { id: 'admin', label: 'Administração', icon: ShieldCheck, adminOnly: true },
+      { id: 'backup', label: 'Backup e ajustes', icon: HardDrive }
+    ]
+  }
 ];
 
-const adminItem = { id: 'admin' as AppTab, label: 'Administração', icon: ShieldCheck };
+const GROUPS_KEY = 'guardlist-nav-groups';
+const groupOf = (tab: AppTab) => navGroups.find((g) => g.items.some((i) => i.id === tab))?.id;
 
 function initials(name: string): string {
   const parts = name.split(/[\s._-]+/).filter(Boolean);
@@ -78,18 +104,41 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentUser,
   onLogout,
   onChangePassword,
-  pendingApprovals = 0,
-  onOpenAssistant,
-  isAssistantOpen,
-  onOpenCaseBuilder
+  pendingApprovals = 0
 }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 1023px)').matches);
   const menuId = useId();
   const [tip, setTip] = useState<{ text: string; top: number; left: number } | null>(null);
-  // Administração aparece só para administradores, antes de Backup e ajustes.
-  const visibleItems = currentUser?.role === 'admin' ? [...navItems.slice(0, -1), adminItem, navItems[navItems.length - 1]] : navItems;
-  const activeRow = Math.max(0, visibleItems.findIndex((item) => item.id === currentTab));
+  const isAdmin = currentUser?.role === 'admin';
+  // Grupos abertos: lembra a escolha; o grupo da tela atual sempre abre.
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(GROUPS_KEY) || 'null') as string[] | null;
+      if (Array.isArray(saved)) return new Set(saved);
+    } catch {
+      // Preferência opcional.
+    }
+    return new Set(['blocks']);
+  });
+  useEffect(() => {
+    const group = groupOf(currentTab);
+    if (group) setOpenGroups((prev) => (prev.has(group) ? prev : new Set(prev).add(group)));
+  }, [currentTab]);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(GROUPS_KEY, JSON.stringify([...openGroups]));
+    } catch {
+      // Preferência opcional.
+    }
+  }, [openGroups]);
+  const toggleGroup = (id: string) =>
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const displayName = currentUser?.displayName || 'Uso local';
   const roleLabel = currentUser ? (currentUser.role === 'admin' ? 'Administrador' : 'Analista') : 'Sem login ativo';
   const themeTarget = theme === 'dark' ? 'Modo claro' : 'Modo escuro';
@@ -146,6 +195,24 @@ export const Navbar: React.FC<NavbarProps> = ({
     setTip({ text: target.dataset.tip || '', top: rect.top + rect.height / 2, left: rect.right + 14 });
   };
   const hideTip = () => setTip(null);
+
+  const renderRow = ({ id, label, icon: Icon }: NavItem, nested = false) => (
+    <button
+      type="button"
+      className={`gl-row ${nested ? 'gl-sub-row' : ''} ${currentTab === id ? 'active' : ''}`}
+      onClick={() => go(id)}
+      aria-current={currentTab === id ? 'page' : undefined}
+      data-tip={id === 'backup' ? `${label} · ${backupLabel}` : label}
+      aria-label={id === 'backup' ? `${label}. ${backupLabel}` : label}
+    >
+      <Icon aria-hidden="true" />
+      <span className="label">{label}</span>
+      {id === 'backup' && isBackupOutdated && <span className="nav-status-dot" aria-hidden="true" />}
+      {id === 'admin' && pendingApprovals > 0 && (
+        <span className="nav-badge" aria-label={`${pendingApprovals} aprovações pendentes`}>{pendingApprovals}</span>
+      )}
+    </button>
+  );
 
   return (
     <>
@@ -222,62 +289,40 @@ export const Navbar: React.FC<NavbarProps> = ({
             <KeyRound className="gl-profile-key label" aria-hidden="true" />
           </button>
 
-          <button type="button" className="gl-row gl-search" onClick={() => { setMobileOpen(false); onOpenQuickSearch(); }} data-tip="Consultar IP (Ctrl/⌘ K)" aria-label="Consultar IP">
-            <Search aria-hidden="true" />
-            <span className="label">Consultar IP</span>
-            <kbd className="label">Ctrl K</kbd>
-          </button>
-
-          {onOpenCaseBuilder && (
-            <button
-              type="button"
-              className="gl-row gl-search"
-              onClick={() => { setMobileOpen(false); onOpenCaseBuilder(); }}
-              data-tip="Gerar caso para o cliente"
-              aria-label="Gerar caso para o cliente"
-            >
-              <FileSignature aria-hidden="true" />
-              <span className="label">Gerar caso</span>
-            </button>
-          )}
-
-          {onOpenAssistant && (
-            <button
-              type="button"
-              className={`gl-row gl-search gl-ai ${isAssistantOpen ? 'active' : ''}`}
-              onClick={() => { setMobileOpen(false); onOpenAssistant(); }}
-              data-tip="Assistente IA (Ctrl J)"
-              aria-label="Assistente IA"
-              aria-pressed={isAssistantOpen}
-            >
-              <Sparkles aria-hidden="true" />
-              <span className="label">Assistente IA</span>
-              <kbd className="label">Ctrl J</kbd>
-            </button>
-          )}
-
-          <ul className="gl-nav" style={{ '--active-row': activeRow } as React.CSSProperties}>
-            <li className="gl-indicator" aria-hidden="true" />
-            {visibleItems.map(({ id, label, icon: Icon }) => (
-              <li key={id}>
-                <button
-                  type="button"
-                  className={`gl-row ${currentTab === id ? 'active' : ''}`}
-                  onClick={() => go(id)}
-                  aria-current={currentTab === id ? 'page' : undefined}
-                  data-tip={id === 'backup' ? `${label} · ${backupLabel}` : label}
-                  aria-label={id === 'backup' ? `${label}. ${backupLabel}` : label}
-                >
-                  <Icon aria-hidden="true" />
-                  <span className="label">{label}</span>
-                  {id === 'backup' && isBackupOutdated && <span className="nav-status-dot" aria-hidden="true" />}
-                  {id === 'admin' && pendingApprovals > 0 && (
-                    <span className="nav-badge" aria-label={`${pendingApprovals} aprovações pendentes`}>{pendingApprovals}</span>
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <nav className="gl-nav" aria-label="Seções">
+            {renderRow(homeItem)}
+            {navGroups.map((group) => {
+              const items = group.items.filter((i) => !i.adminOnly || isAdmin);
+              const isOpen = openGroups.has(group.id);
+              const hasActive = items.some((i) => i.id === currentTab);
+              const approvals = items.some((i) => i.id === 'admin') ? pendingApprovals : 0;
+              const backupWarn = items.some((i) => i.id === 'backup') && isBackupOutdated;
+              const GroupIcon = group.icon;
+              const listId = `${menuId}-${group.id}`;
+              return (
+                <div key={group.id} className={`gl-group ${isOpen ? 'is-open' : ''} ${hasActive ? 'has-active' : ''}`}>
+                  <button
+                    type="button"
+                    className="gl-row gl-group-head"
+                    onClick={() => toggleGroup(group.id)}
+                    aria-expanded={isOpen}
+                    aria-controls={listId}
+                  >
+                    <GroupIcon aria-hidden="true" />
+                    <span className="label">{group.label}</span>
+                    {!isOpen && approvals > 0 && <span className="nav-badge" aria-label={`${approvals} aprovações pendentes`}>{approvals}</span>}
+                    {!isOpen && !approvals && backupWarn && <span className="nav-status-dot" aria-hidden="true" />}
+                    <ChevronDown className="gl-chev label" aria-hidden="true" />
+                  </button>
+                  <div className="gl-sub-wrap">
+                    <ul className="gl-sub" id={listId}>
+                      {items.map((item) => <li key={item.id}>{renderRow(item, true)}</li>)}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })}
+          </nav>
 
           <hr className="gl-divider" />
 

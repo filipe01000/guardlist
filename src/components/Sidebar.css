@@ -531,3 +531,94 @@ button.gl-profile:focus-visible .gl-profile-key {
     justify-content: center;
   }
 }
+
+/* ---------- Navegação em grupos ---------- */
+
+/* Linha ativa: faixa de destaque na própria linha (substitui o indicador deslizante). */
+.gl-nav .gl-row.active {
+  background: var(--sb-band);
+  color: var(--sb-band-text);
+}
+
+.gl-nav .gl-row.active::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  translate: 0 -50%;
+  width: 3px;
+  height: 22px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+.gl-group-head .gl-chev {
+  flex: 0 0 auto !important;
+  width: 16px !important;
+  height: 16px !important;
+  color: var(--muted);
+  transition: rotate 0.2s ease;
+}
+
+.gl-group.is-open > .gl-group-head .gl-chev { rotate: 180deg; }
+.gl-group.has-active > .gl-group-head { color: var(--text); }
+
+/* Abre e fecha sem saltos: a altura anima de 0 até o conteúdo. */
+.gl-sub-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s ease;
+}
+
+.gl-group.is-open > .gl-sub-wrap { grid-template-rows: 1fr; }
+
+.gl-sub {
+  position: relative;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+}
+
+/* Linha-guia ligando os itens ao grupo. */
+.gl-sub::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: calc(var(--sb-pad) + 10px);
+  width: 1px;
+  background: var(--sb-divider);
+}
+
+.gl-sub-row {
+  height: calc(var(--sb-row) * 0.88);
+  padding-left: calc(var(--sb-pad) + 24px);
+  gap: 12px;
+  font-size: 0.83rem;
+  font-weight: 560;
+}
+
+.gl-sidebar .gl-sub-row svg {
+  width: calc(var(--sb-icon) - 4px);
+  height: calc(var(--sb-icon) - 4px);
+}
+
+.gl-group-head .nav-badge,
+.gl-group-head .nav-status-dot { margin-left: auto; }
+
+/* Menu recolhido (só ícones): sem cabeçalhos de grupo; todas as telas visíveis, separadas por grupo. */
+@media (min-width: 1024px) {
+  .gl-sidebar.collapsed .gl-group-head { display: none; }
+  .gl-sidebar.collapsed .gl-sub-wrap { grid-template-rows: 1fr; }
+  .gl-sidebar.collapsed .gl-sub::before { display: none; }
+  .gl-sidebar.collapsed .gl-group { border-top: 1px solid var(--sb-divider); margin-top: 6px; padding-top: 6px; }
+  .gl-sidebar.collapsed .gl-sub-row { height: var(--sb-row); padding-left: var(--sb-pad); }
+  .gl-sidebar.collapsed .gl-sub-row svg { width: var(--sb-icon); height: var(--sb-icon); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-sub-wrap,
+  .gl-group-head .gl-chev { transition: none; }
+}

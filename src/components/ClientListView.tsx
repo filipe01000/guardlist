@@ -953,7 +953,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
           <div className="flex flex-wrap items-center gap-1.5">
             <button type="button" onClick={() => handleBulkToggleStatus('removed')} className="btn btn--sm">Marcar como removido</button>
             <button type="button" onClick={() => handleBulkToggleStatus('active')} className="btn btn--sm">Reativar</button>
-            <button type="button" onClick={() => requestCaseBuilder(getSelectedEntries().map((e) => e.indicator))} className="btn btn--sm" title="Texto do caso para o cliente com os itens marcados">
+            <button type="button" onClick={() => requestCaseBuilder(getSelectedEntries().map((e) => e.indicator), selectedClientId)} className="btn btn--sm" title="Texto do caso para o cliente com os itens marcados">
               <FileSignature aria-hidden="true" />
               Gerar caso
             </button>

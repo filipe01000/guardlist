@@ -1,0 +1,121 @@
+/* Barra do topo da área principal (TopBar.tsx). */
+
+.gl-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -6px 0 20px;
+  padding: 10px 0;
+  background: color-mix(in srgb, var(--app-bg) 86%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.gl-topbar__search {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  max-width: 520px;
+  height: 40px;
+  padding: 0 10px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gl-topbar__search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.gl-topbar__search > svg {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  color: var(--muted);
+}
+
+.gl-topbar__search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.86rem;
+  outline: none;
+}
+
+.gl-topbar__search input::placeholder { color: var(--muted); }
+
+.gl-topbar__search kbd {
+  flex: none;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+}
+
+.gl-topbar__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.gl-topbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.gl-topbar__btn svg { width: 17px; height: 17px; }
+.gl-topbar__btn:hover { border-color: var(--line-strong); color: var(--text); }
+.gl-topbar__btn--ai svg { color: var(--accent); }
+.gl-topbar__btn.is-on {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.gl-topbar__btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 1023px) {
+  .gl-topbar { margin-top: 0; }
+  .gl-topbar__search kbd { display: none; }
+}
+
+@media (max-width: 640px) {
+  .gl-topbar { gap: 8px; }
+  .gl-topbar__btn { padding: 0 11px; }
+  .gl-topbar__btn span { display: none; }
+}
+
+/* O campo fica "dentro" da caixa: sem o fundo e a borda que o app dá a todos os inputs. */
+.app-shell .gl-topbar__search input,
+.app-shell .gl-topbar__search input:hover,
+.app-shell .gl-topbar__search input:focus,
+.app-shell .ai-drawer__form textarea,
+.app-shell .ai-drawer__form textarea:hover,
+.app-shell .ai-drawer__form textarea:focus {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}

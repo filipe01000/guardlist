@@ -227,3 +227,30 @@ test('ID de outro cliente não pode ser sobrescrito nem deslocado por importBatc
   assert.deepEqual(await store.getHistoryRecords(admin, 'a'), []);
   assert.deepEqual(await store.getClientSnapshots(admin, 'a'), []);
 });
+
+test('casos do cliente: avisa IP já informado (exato ou dentro de CIDR) e situação na lista', async (t) => {
+  const { store } = await setup(t);
+  completed(await store.importBatch(admin, payload('a', 'case-seed', [entry('a-1', 'a', '203.0.113.5'), entry('a-net', 'a', '198.51.100.0/24')])));
+  await store.saveClientCase(analyst, 'a', 'TLD-1', ['203.0.113.5', '192.0.2.0/24']);
+  // Mesmo ticket soma os indicadores, sem repetir.
+  const again = await store.saveClientCase(analyst, 'a', 'TLD-1', ['203.0.113.5', '192.0.2.77']);
+  assert.equal(again.clientName, 'Cliente a');
+
+  const check = await store.checkClientCase(analyst, 'a', ['203.0.113.5', '192.0.2.9', '198.51.100.7', '8.8.8.8'], 'TLD-2');
+  const by = Object.fromEntries(check.items.map((i) => [i.indicator, i]));
+  assert.equal(by['203.0.113.5'].list, 'listed');
+  assert.equal(by['203.0.113.5'].previousCase?.ticket, 'TLD-1');
+  assert.equal(by['192.0.2.9'].previousCase?.via, '192.0.2.0/24');
+  assert.equal(by['198.51.100.7'].list, 'covered');
+  assert.equal(by['198.51.100.7'].via, '198.51.100.0/24');
+  assert.equal(by['198.51.100.7'].previousCase, null);
+  assert.equal(by['8.8.8.8'].list, 'missing');
+  assert.equal(check.recentCases[0].count, 3);
+
+  // O próprio ticket não conta como caso anterior; outro cliente não enxerga os casos deste.
+  const same = await store.checkClientCase(analyst, 'a', ['203.0.113.5'], 'TLD-1');
+  assert.equal(same.items[0].previousCase, null);
+  const other = await store.checkClientCase(analyst, 'b', ['203.0.113.5'], 'TLD-9');
+  assert.equal(other.items[0].previousCase, null);
+  await assert.rejects(store.saveClientCase(analyst, 'a', '  ', ['1.2.3.4']), StoreError);
+});

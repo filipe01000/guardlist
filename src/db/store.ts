@@ -294,3 +294,21 @@ export async function streamAi(
     try { onEvent(JSON.parse(pending) as AiEvent); } catch { /* ignora */ }
   }
 }
+
+// ---------- Casos enviados ao cliente ----------
+export interface CaseCheckItem {
+  indicator: string;
+  /** Situação na lista do cliente. */
+  list: 'listed' | 'covered' | 'removed' | 'missing';
+  via?: string;
+  /** Caso anterior em que o indicador (ou um CIDR que o contém) já foi informado. */
+  previousCase: { ticket: string; at: string; by: string; via?: string } | null;
+}
+export interface CaseCheck {
+  items: CaseCheckItem[];
+  recentCases: Array<{ ticket: string; at: string; by: string; count: number }>;
+}
+export const checkClientCase = (clientId: string, indicators: string[], ticket?: string) =>
+  call<CaseCheck>('checkClientCase', clientId, indicators, ticket);
+export const saveClientCase = (clientId: string, ticket: string, indicators: string[]) =>
+  call<{ ticket: string; count: number; clientName: string }>('saveClientCase', clientId, ticket, indicators);

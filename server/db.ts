@@ -134,6 +134,20 @@ CREATE TABLE IF NOT EXISTS cti_cache (
   fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Casos enviados aos clientes (texto gerado no GuardList): evita informar o mesmo IP duas vezes.
+CREATE TABLE IF NOT EXISTS client_cases (
+  id BIGSERIAL PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  ticket TEXT NOT NULL,
+  indicators JSONB NOT NULL,
+  created_by TEXT,
+  display_name TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (client_id, ticket)
+);
+CREATE INDEX IF NOT EXISTS client_cases_client_idx ON client_cases (client_id, created_at DESC);
+
 -- Última execução das rotinas automáticas (backup diário, relatório mensal).
 CREATE TABLE IF NOT EXISTS job_runs (
   job TEXT PRIMARY KEY,
