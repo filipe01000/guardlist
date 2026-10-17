@@ -473,6 +473,23 @@ export function createStore(db: Database) {
     },
 
     // Exceções do cliente: o que nunca pode ser bloqueado. Ao salvar, itens ativos em conflito são retirados.
+    // Imagem de capa do cliente: data URL de imagem pequena (o navegador já reduz antes de enviar).
+    async setClientLogo(actor: Actor, clientId: string, logo: unknown) {
+      return db.tx(async (q) => {
+        const client = await getClient(q, asString(clientId, 'clientId'));
+        if (!client) throw new StoreError('Cliente não encontrado.', 404);
+        let value: string | undefined;
+        if (logo !== null && logo !== undefined && logo !== '') {
+          value = String(logo);
+          if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value)) throw new StoreError('Envie uma imagem PNG, JPEG ou WebP.');
+          if (value.length > 400_000) throw new StoreError('Imagem grande demais (máximo 400 KB depois de reduzida).');
+        }
+        await putClient(q, { ...client, logo: value, updatedAt: new Date().toISOString() }, actor);
+        await audit(q, actor, 'client.logo', { clientId: client.id, name: client.name, removed: !value });
+        return null;
+      });
+    },
+
     async updateClientExceptions(actor: Actor, clientId: string, input: unknown) {
       requireAdmin(actor);
       const raw = asArray<{ indicator?: unknown; reason?: unknown }>(input, 'exceptions').slice(0, 1000);
@@ -1615,6 +1632,7 @@ export type Store = ReturnType<typeof createStore>;
 export const PUBLIC_OPS = [
   'initializeDatabaseIfEmpty',
   'checkClientCase',
+  'setClientLogo',
   'getImportReport',
   'listImportReportIds',
   'saveClientCase',

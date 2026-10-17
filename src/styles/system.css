@@ -1,4 +1,4 @@
-/* Componentes compartilhados da bancada: cabeçalho de página, botões, chips, painéis e movimento. */
+﻿/* Componentes compartilhados da bancada: cabeÃ§alho de pÃ¡gina, botÃµes, chips, painÃ©is e movimento. */
 
 :root {
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -8,7 +8,7 @@
   --dur-view: 320ms;
 }
 
-/* ---------- Cabeçalho de página ---------- */
+/* ---------- CabeÃ§alho de pÃ¡gina ---------- */
 
 .page-header {
   display: flex;
@@ -44,7 +44,7 @@
   flex-wrap: wrap;
 }
 
-/* ---------- Botões ---------- */
+/* ---------- BotÃµes ---------- */
 
 .btn {
   display: inline-flex;
@@ -190,7 +190,7 @@
   color: var(--danger);
 }
 
-/* ---------- Painéis da coluna lateral do painel geral ---------- */
+/* ---------- PainÃ©is da coluna lateral do painel geral ---------- */
 
 .dash-layout {
   display: grid;
@@ -352,7 +352,7 @@
 
 /* ---------- Movimento ---------- */
 
-/* Troca de tela: entra subindo levemente a partir de um estado já visível. */
+/* Troca de tela: entra subindo levemente a partir de um estado jÃ¡ visÃ­vel. */
 .view-enter {
   animation: view-in var(--dur-view) var(--ease-out) both;
 }
@@ -367,7 +367,7 @@
   from { transform: scaleX(0); }
 }
 
-/* Troca de tema: o novo tema se revela em círculo a partir do botão (View Transitions). */
+/* Troca de tema: o novo tema se revela em cÃ­rculo a partir do botÃ£o (View Transitions). */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
@@ -387,7 +387,7 @@
   }
 }
 
-/* Superfícies do navegador seguem o tema. */
+/* SuperfÃ­cies do navegador seguem o tema. */
 ::selection {
   background: color-mix(in srgb, var(--accent) 35%, transparent);
   color: var(--text);
@@ -626,7 +626,7 @@ select.field {
   font-weight: 620;
 }
 
-/* ---------- Painéis e tabelas de dados ---------- */
+/* ---------- PainÃ©is e tabelas de dados ---------- */
 
 .data-panel {
   border: 1px solid var(--line);
@@ -895,7 +895,7 @@ select.field {
 .tabs__tab.has-warn .tabs__count { color: var(--warning); }
 .tabs__tab.has-danger .tabs__count { color: var(--danger); }
 
-/* ---------- Cartões de escolha (rádio) ---------- */
+/* ---------- CartÃµes de escolha (rÃ¡dio) ---------- */
 
 .choice-card {
   display: flex;
@@ -1000,7 +1000,7 @@ select.field {
   background: var(--surface-raised);
 }
 
-/* ---------- Diálogos ---------- */
+/* ---------- DiÃ¡logos ---------- */
 
 .modal-backdrop {
   background: rgba(5, 8, 14, 0.62);
@@ -1034,7 +1034,7 @@ select.field {
   }
 }
 
-/* ---------- Barra de ações e seleção da lista ---------- */
+/* ---------- Barra de aÃ§Ãµes e seleÃ§Ã£o da lista ---------- */
 
 .action-bar {
   display: flex;
@@ -1082,15 +1082,15 @@ select.field {
   min-width: 1040px;
 }
 
-/* Espaçamento lateral mais justo: a tabela inteira cabe numa tela de 1440px. */
+/* EspaÃ§amento lateral mais justo: a tabela inteira cabe numa tela de 1440px. */
 .list-table th,
 .list-table td {
   padding-left: 10px;
   padding-right: 10px;
 }
 
-/* Coluna de ações presa à direita: continua visível quando a tabela rola na horizontal.
-   A cor vem da linha (tr), para não destoar do resto. */
+/* Coluna de aÃ§Ãµes presa Ã  direita: continua visÃ­vel quando a tabela rola na horizontal.
+   A cor vem da linha (tr), para nÃ£o destoar do resto. */
 .list-table th:last-child,
 .list-table td:last-child {
   position: sticky;
@@ -1108,7 +1108,7 @@ select.field {
   white-space: nowrap;
 }
 
-/* ---------- Barras semanais do histórico ---------- */
+/* ---------- Barras semanais do histÃ³rico ---------- */
 
 .week-bars {
   display: grid;
@@ -1209,7 +1209,7 @@ select.field {
   color: var(--success);
 }
 
-/* Seção recolhível. */
+/* SeÃ§Ã£o recolhÃ­vel. */
 .disclosure > summary {
   display: flex;
   align-items: center;
@@ -1253,7 +1253,7 @@ select.field {
   vertical-align: -1px;
 }
 
-/* Edição de cliente na própria linha. */
+/* EdiÃ§Ã£o de cliente na prÃ³pria linha. */
 .client-row.is-editing {
   align-items: flex-start;
   background: color-mix(in srgb, var(--surface-raised) 70%, transparent);
@@ -1293,7 +1293,7 @@ select.field {
   text-decoration-color: currentColor;
 }
 
-/* ---------- Filtros de relatório ---------- */
+/* ---------- Filtros de relatÃ³rio ---------- */
 
 .report-filters {
   display: grid;
@@ -1335,7 +1335,7 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
   filter: invert(1);
 }
 
-/* ---------- Usuários: formulário e escolha de senha ---------- */
+/* ---------- UsuÃ¡rios: formulÃ¡rio e escolha de senha ---------- */
 
 .new-user-form {
   display: grid;
@@ -1432,7 +1432,7 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
 .client-ledger-table th { font-size: 0.75rem; }
 .list-table { font-size: 0.8125rem; }
 
-/* ---------- Painel: filtros por situação e cards compactos dos clientes ---------- */
+/* ---------- Painel: filtros por situaÃ§Ã£o e cards compactos dos clientes ---------- */
 .dash-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1478,7 +1478,7 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
 .dash-filter.is-near span { color: var(--warning); }
 .dash-filter.is-ok span { color: var(--success); }
 
-/* Cards dos clientes no estilo "perfil": avatar, selo de situação, etiquetas e rodapé com ações. */
+/* Cards dos clientes no estilo "perfil": avatar, selo de situaÃ§Ã£o, etiquetas e rodapÃ© com aÃ§Ãµes. */
 .cl-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
@@ -1491,9 +1491,9 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
   --cl-tone: var(--success);
   display: flex;
   flex-direction: column;
-  gap: 14px;
   min-width: 0;
-  padding: 18px 18px 14px;
+  overflow: hidden;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface);
@@ -1518,7 +1518,7 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
   transform: translateY(-3px);
 }
 
-/* Durante a troca de filtro, cada card tem nome próprio: o navegador anima a mudança de posição. */
+/* Durante a troca de filtro, cada card tem nome prÃ³prio: o navegador anima a mudanÃ§a de posiÃ§Ã£o. */
 :root[data-vt="cards"] .cl-card { view-transition-name: var(--vt); animation: none; }
 :root[data-vt="cards"]::view-transition-group(*) {
   animation-duration: 0.42s;
@@ -1531,6 +1531,85 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
 
 @keyframes cl-out { to { opacity: 0; transform: scale(0.94); } }
 @keyframes cl-in { from { opacity: 0; transform: scale(0.94); } }
+
+/* Capa: logo do cliente (proporÃ§Ã£o fixa, todas alinhadas) ou as iniciais, com o selo por cima. */
+.cl-card__cover {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 2 / 1;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--cl-tone) 10%, var(--surface-subtle));
+  overflow: hidden;
+}
+/* Capa translúcida: a logo fica esmaecida e se funde ao card; ganha nitidez ao passar o mouse. */
+.cl-card__cover.has-logo { background: color-mix(in srgb, var(--surface) 70%, #ffffff 30%); }
+.cl-card__cover img {
+  width: 100%;
+  height: 100%;
+  padding: 12px 16px;
+  object-fit: contain;
+  opacity: 0.38;
+  filter: saturate(1.15) blur(0.3px);
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease, filter 0.4s ease;
+}
+.cl-card:hover .cl-card__cover img { opacity: 0.7; filter: none; transform: scale(1.04); }
+/* Logos muito pequenas (favicon): tamanho fixo e nítido no centro, sem esticar. */
+.cl-card__cover img.is-small { width: 56px; height: 56px; margin-bottom: 18px; padding: 0; image-rendering: auto; }
+.cl-card__cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 30%, color-mix(in srgb, var(--surface) 92%, transparent) 100%);
+  pointer-events: none;
+}
+
+/* Nome sobre a capa, com degradê e brilho suave. */
+.cl-card__title {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  left: 16px;
+  z-index: 1;
+  overflow: hidden;
+  background: linear-gradient(100deg, var(--text) 10%, color-mix(in srgb, var(--accent) 70%, var(--text)) 55%, var(--text) 95%);
+  background-size: 200% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-size: 1.12rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  filter: drop-shadow(0 2px 10px color-mix(in srgb, var(--accent) 35%, transparent));
+  transition: background-position 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cl-card:hover .cl-card__title { background-position: 0 0; }
+.cl-card__initials {
+  margin-bottom: 18px;
+  color: color-mix(in srgb, var(--cl-tone) 55%, var(--text));
+  font-size: 2.6rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  opacity: 0.22;
+}
+.cl-card__cover .cl-card__status {
+  z-index: 1;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 4px 12px -6px rgb(0 0 0 / 0.5);
+}
+.cl-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 12px;
+}
 
 .cl-card__top {
   display: flex;
@@ -1653,7 +1732,7 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
   .cl-card, .cl-card:hover { transition: none; transform: none; animation: none; }
 }
 
-/* ---------- Relatórios: barras por dia ---------- */
+/* ---------- RelatÃ³rios: barras por dia ---------- */
 .day-bars {
   display: flex;
   align-items: flex-end;
@@ -1722,3 +1801,61 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
   background: var(--accent);
 }
 .day-bars__legend b { background: var(--danger); }
+
+/* ---------- Capa do cliente (Gerenciar clientes) ---------- */
+.client-row__cover {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 72px;
+  height: 36px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.client-row__cover:hover { border-color: var(--accent); }
+.client-row__cover img { width: 100%; height: 100%; padding: 3px 5px; background: #fff; object-fit: contain; }
+
+.logo-preview {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+  border: 1px dashed var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface-subtle);
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.logo-preview img { width: 100%; height: 100%; padding: 14px 20px; background: #fff; object-fit: contain; }
+
+/* Capa sempre em azul-noite (nos dois temas): as logos dos sites costumam ser feitas para fundo
+   escuro, e o nome em degradê claro fica legível em qualquer tema. */
+.cl-card__cover,
+.cl-card__cover.has-logo {
+  background:
+    radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--cl-tone) 26%, transparent), transparent 60%),
+    linear-gradient(160deg, #10284f 0%, #081733 100%);
+  border-bottom-color: rgb(255 255 255 / 0.06);
+}
+.cl-card__cover::after {
+  background: linear-gradient(180deg, transparent 35%, rgb(6 16 36 / 0.85) 100%);
+}
+.cl-card__cover img { opacity: 0.42; }
+.cl-card__initials { color: #cfe2ff; opacity: 0.2; }
+.cl-card__title {
+  background-image: linear-gradient(100deg, #ffffff 10%, #8fd0ff 55%, #ffffff 95%);
+  filter: drop-shadow(0 2px 10px rgb(46 166 255 / 0.4));
+}
+.cl-card__cover .cl-card__status {
+  border-color: rgb(255 255 255 / 0.12);
+  background: rgb(8 20 42 / 0.72);
+  color: #dbe7f7;
+  backdrop-filter: blur(6px);
+}

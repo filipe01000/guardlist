@@ -14,6 +14,8 @@ export interface Client {
   updatedAt: string; // ISO string
   lastUpdateDate: string | null; // Data da última importação/atualização (YYYY-MM-DD)
   notes?: string;
+  /** Imagem de capa do cliente (data URL PNG/JPEG/WebP, reduzida no navegador). */
+  logo?: string;
   targetFirewall?: string; // Ex: 'FortiGate 100F', 'pfSense CE', 'Mikrotik RouterOS', 'Palo Alto PA-440', etc.
   preferredExportFormat?: 'nano' | 'raw_txt' | 'csv';
   lastVariation?: {

@@ -319,3 +319,5 @@ export const saveClientCase = (clientId: string, ticket: string, indicators: str
 export const getImportReport = (historyId: string) =>
   call<{ history: ImportHistoryRecord; report: import('../utils/importReport').ImportReportData | null }>('getImportReport', historyId);
 export const listImportReportIds = (clientId?: string) => call<string[]>('listImportReportIds', clientId);
+export const setClientLogo = (clientId: string, logo: string | null) => call<null>('setClientLogo', clientId, logo);
+export const fetchLogoFromSite = (site: string) => http<{ dataUrl: string; source: string }>('POST', '/api/logo/fetch', { site });

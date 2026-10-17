@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Archive, ArchiveRestore, Check, X, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Archive, ArchiveRestore, Check, X, Trash2, ImageIcon } from 'lucide-react';
+import { ClientLogoModal } from './ClientLogoModal';
 import { Client } from '../types';
 import { saveClient, updateClient, archiveClient, deleteClient } from '../db/store';
 import { PageHeader } from './PageHeader';
@@ -19,6 +20,7 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
 }) => {
   const [newClientName, setNewClientName] = useState('');
   const [newClientNotes, setNewClientNotes] = useState('');
+  const [logoClient, setLogoClient] = useState<Client | null>(null);
   const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [editNameText, setEditNameText] = useState('');
   const [editNotesText, setEditNotesText] = useState('');
@@ -240,6 +242,9 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
 
             return (
               <li key={client.id} className={`client-row ${client.isArchived ? 'is-archived' : ''} ${isEditing ? 'is-editing' : ''}`}>
+                <button type="button" className="client-row__cover" onClick={() => setLogoClient(client)} title="Trocar a capa" aria-label={`Capa de ${client.name}`}>
+                  {client.logo ? <img src={client.logo} alt="" /> : <span>{client.name.slice(0, 2)}</span>}
+                </button>
                 <div className="min-w-0 flex-1">
                   {isEditing ? (
                     <form
@@ -316,6 +321,15 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
+                      onClick={() => setLogoClient(client)}
+                      className="btn btn--sm btn--icon btn--quiet"
+                      title="Capa do cliente (logo)"
+                      aria-label={`Capa de ${client.name}`}
+                    >
+                      <ImageIcon aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => (isEditing ? handleCancelEdit() : handleStartEdit(client))}
                       className="btn btn--sm btn--icon btn--quiet"
                       title="Editar nome e observações"
@@ -351,6 +365,8 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
           })}
         </ul>
       </section>
+
+      <ClientLogoModal client={logoClient} onClose={() => setLogoClient(null)} onSaved={onRefreshClients} />
     </div>
   );
 };

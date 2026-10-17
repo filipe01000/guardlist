@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createSessionToken, readSession, setSessionCookie } from './auth.ts';
 import { aiConfigured, aiSettings, createAi, type AiEvent } from './server/ai.ts';
+import { fetchLogoFromSite, LogoError } from './server/logo.ts';
 import { createCti, ctiConfigured } from './server/cti.ts';
 import { classifyIndicator, normalizeIndicator } from './src/utils/validator.ts';
 import { openDatabase } from './server/db.ts';
@@ -496,6 +497,17 @@ app.post('/api/ai/case-reason', aiLimit, express.json({ limit: '256kb' }), (req,
   const input = { ips: pick(req.body?.ips), cidrs: pick(req.body?.cidrs), domains: pick(req.body?.domains), note: typeof req.body?.note === 'string' ? req.body.note : undefined };
   if (!input.ips.length && !input.cidrs.length && !input.domains.length) return res.status(400).json({ error: 'Valide os indicadores antes de pedir o texto.' });
   return streamAi(res, (emit, signal) => ai.writeCaseReason(res.locals.actor as Actor, input, emit, signal));
+});
+
+// Logo do cliente a partir do site dele (o navegador reduz e grava com setClientLogo).
+const logoLimit = rateLimit('busca de logo', 10);
+app.post('/api/logo/fetch', logoLimit, jsonSmall, async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json(await fetchLogoFromSite(String(req.body?.site ?? '')));
+  } catch (error) {
+    return res.status(400).json({ error: error instanceof LogoError ? error.message : 'Não foi possível buscar a logo.' });
+  }
 });
 
 // Origem pública do app (links e logo nos e-mails).

@@ -289,17 +289,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     onContextMenu={openActionMenuAt}
                     style={{ '--i': Math.min(index, 12), '--vt': vtName(client.id) } as React.CSSProperties}
                   >
-                    <header className="cl-card__top">
-                      <span className="cl-card__avatar" aria-hidden="true">{clientInitials(client.name)}</span>
+                    <div className={`cl-card__cover${client.logo ? ' has-logo' : ''}`}>
+                      {client.logo ? (
+                        <img
+                          src={client.logo}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          onLoad={(e) => e.currentTarget.classList.toggle('is-small', e.currentTarget.naturalWidth < 80)}
+                        />
+                      ) : (
+                        <span className="cl-card__initials" aria-hidden="true">{clientInitials(client.name)}</span>
+                      )}
                       <span className="cl-card__status">
                         <i aria-hidden="true" />
                         {isLate || isNearDeadline ? due.text : 'Em dia'}
                       </span>
-                    </header>
-
-                    <div className="cl-card__id">
-                      <h3 title={client.name}>{client.name}</h3>
+                      <h3 className="cl-card__title" title={client.name}>{client.name}</h3>
                     </div>
+                    <div className="cl-card__body">
 
                     <ul className="cl-card__tags" aria-label={`Resumo de ${client.name}`}>
                       <li><strong>{total.toLocaleString('pt-BR')}</strong> ativos</li>
@@ -327,6 +335,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {client.lastUpdateDate ? `Revisado ${formatDateBR(client.lastUpdateDate).slice(0, 5)}` : 'Nunca revisado'}
                       </span>
                     </footer>
+                    </div>
                   </article>
                 );
               })}
