@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileSignature, Search, Sparkles } from 'lucide-react';
 import './TopBar.css';
 
@@ -14,9 +14,17 @@ interface Props {
 /** Barra fixa no topo da área principal: consulta de IP e as ferramentas do dia a dia. */
 export const TopBar: React.FC<Props> = ({ onSearch, onOpenCaseBuilder, onOpenAssistant, isAssistantOpen }) => {
   const [value, setValue] = useState('');
+  // Só ganha o vidro fosco quando a página rola por baixo dela; parada no topo, deixa o fundo de cadeados aparecer.
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setStuck(window.scrollY > 8);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   return (
-    <div className="gl-topbar">
+    <div className={`gl-topbar${stuck ? ' is-stuck' : ''}`}>
       <form
         className="gl-topbar__search"
         role="search"
