@@ -29,7 +29,7 @@ interface Props {
 
 const STORAGE_KEY = 'guardlist-ai-chat';
 const SUGGESTIONS = [
-  'Quais clientes estão atrasados ou vencem esta semana?',
+  'Quais clientes estão atrasados ou vencem logo?',
   'Quais IPs aparecem em mais clientes?',
   'O que está parado para revisão?',
   'Resuma as últimas importações.'

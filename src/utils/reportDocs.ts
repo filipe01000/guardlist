@@ -21,6 +21,21 @@ export function reportFileSlug(report: ReportData): string {
   return `relatorio-${slug}_${report.from}_a_${report.to}`;
 }
 
+/** "média de 3,3 por dia · 12 de 14 dias com inclusões · pico em 14/10/2026 (46)" */
+export function dailySummaryText(report: ReportData): string {
+  const d = report.dailySummary;
+  if (!d || !d.days) return '';
+  const fmt = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  const parts = [`média de ${fmt(d.avgAddedPerDay)} por dia`, `${d.activeDays} de ${d.days} dias com inclusões`];
+  if (d.peak && d.peak.added > 0) parts.push(`pico em ${formatDateBR(d.peak.date)} (${fmt(d.peak.added)})`);
+  return parts.join(' · ');
+}
+
+/** Só os dias com algum movimento, do mais recente ao mais antigo. */
+export function movingDays(report: ReportData) {
+  return (report.daily ?? []).filter((d) => d.added || d.removed || d.imports).slice().reverse();
+}
+
 export function reportCsv(report: ReportData): string {
   const isClient = Boolean(report.clientId);
   const client = isClient ? report.clients[0] : null;
@@ -33,6 +48,11 @@ export function reportCsv(report: ReportData): string {
   rows.push(['Importações', report.totals.imports]);
   rows.push(['Indicadores incluídos', report.totals.added]);
   rows.push(['Indicadores removidos', report.totals.removed]);
+  if (report.dailySummary) {
+    rows.push(['Média de inclusões por dia', report.dailySummary.avgAddedPerDay]);
+    rows.push(['Dias com inclusões', `${report.dailySummary.activeDays} de ${report.dailySummary.days}`]);
+    if (report.dailySummary.peak?.added) rows.push(['Dia de pico', formatDateBR(report.dailySummary.peak.date), report.dailySummary.peak.added]);
+  }
   if (isClient) {
     rows.push(['Ativos hoje', report.totals.activeNow]);
     rows.push(['Situação', client ? REPORT_STATUS_LABEL[client.status] : '']);
@@ -53,10 +73,14 @@ export function reportCsv(report: ReportData): string {
     }
   }
   rows.push([]);
+  rows.push(['Bloqueios por dia']);
+  rows.push(['Data', 'Incluídos', 'Removidos', 'Importações', 'Clientes com inclusões']);
+  for (const d of movingDays(report)) rows.push([formatDateBR(d.date), d.added, d.removed, d.imports, d.clients]);
+  rows.push([]);
   rows.push(['Importações no período']);
-  rows.push(['Data', 'Semana', 'Cliente', 'Por', 'Novos', 'Descartados', 'Inválidos', 'Ticket', 'Observações']);
+  rows.push(['Data', 'Cliente', 'Por', 'Novos', 'Descartados', 'Inválidos', 'Ticket', 'Observações']);
   for (const r of report.imports) {
-    rows.push([formatDateTimeBR(r.date), r.isoWeek, r.clientName, r.importedBy || '', r.addedCount, r.duplicatesDiscarded + (r.coveredByCidrDiscarded || 0), r.invalidsDiscarded, r.sourceTicket || '', r.notes || '']);
+    rows.push([formatDateTimeBR(r.date), r.clientName, r.importedBy || '', r.addedCount, r.duplicatesDiscarded + (r.coveredByCidrDiscarded || 0), r.invalidsDiscarded, r.sourceTicket || '', r.notes || '']);
   }
   rows.push([]);
   rows.push(['Atividade por pessoa']);
@@ -102,6 +126,17 @@ export function reportHtml(report: ReportData, options: { logoUrl: string; forPr
         [3, 4, 5, 6]
       )}`;
 
+  // Barras por dia (impressas em PDF sem depender de imagens).
+  const days = report.daily ?? [];
+  const maxAdded = Math.max(1, ...days.map((d) => d.added));
+  const labelEvery = Math.max(1, Math.ceil(days.length / 15));
+  const dailySection = days.length > 1
+    ? `<h2>Bloqueios por dia</h2>
+  <p class="period">${esc(dailySummaryText(report))}</p>
+  <div class="bars">${days.map((d, i) => `<div class="bar" title="${esc(formatDateBR(d.date))}: ${d.added} incluídos, ${d.removed} removidos"><i style="height:${Math.round((d.added / maxAdded) * 100)}%"></i><span>${i % labelEvery === 0 ? esc(formatDateBR(d.date).slice(0, 5)) : ''}</span></div>`).join('')}</div>
+  ${table(['Data', 'Incluídos', 'Removidos', 'Importações', 'Clientes'], movingDays(report).map((d) => [esc(formatDateBR(d.date)), num(d.added), num(d.removed), num(d.imports), num(d.clients)]), [1, 2, 3, 4])}`
+    : '';
+
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(reportTitle(report))} · ${esc(reportPeriod(report))}</title>
 <style>
@@ -131,6 +166,10 @@ export function reportHtml(report: ReportData, options: { logoUrl: string; forPr
   .tag.ok { background: #e3f6ec; color: #17663f; } .tag.bad { background: #fde8e8; color: #9b1c1c; } .tag.warn { background: #fdf3dc; color: #8a5a00; }
   .empty { color: #7a8396; text-align: center; padding: 14px; }
   .notes { color: #3a4459; white-space: pre-line; margin: -6px 0 12px; }
+  .bars { display: flex; align-items: flex-end; gap: 2px; height: 90px; margin: 4px 0 12px; padding-bottom: 14px; border-bottom: 1px solid #dfe4ee; }
+  .bar { position: relative; flex: 1; height: 100%; display: flex; align-items: flex-end; }
+  .bar i { display: block; width: 100%; min-height: 1px; background: #1f6fd1; border-radius: 2px 2px 0 0; }
+  .bar span { position: absolute; bottom: -14px; left: 50%; transform: translateX(-50%); font-size: 8px; color: #7a8396; white-space: nowrap; }
   footer { margin-top: 22px; padding-top: 10px; border-top: 1px solid #dfe4ee; color: #7a8396; font-size: 10px; }
 </style></head>
 <body><div class="page">
@@ -142,10 +181,11 @@ export function reportHtml(report: ReportData, options: { logoUrl: string; forPr
   <p class="period">Período: ${esc(reportPeriod(report))}</p>
   ${client?.notes ? `<p class="notes">${esc(client.notes)}</p>` : ''}
   <div class="kpis">${kpis.map(([label, value, hint]) => `<div class="kpi"><span>${esc(label)}</span><strong>${esc(value)}</strong><small>${esc(hint)}</small></div>`).join('')}</div>
+  ${dailySection}
   ${mainSection}
   <h2>Importações no período</h2>
   ${table(['Data', 'Cliente', 'Por', 'Novos', 'Ticket'], report.imports.map((r) => [esc(formatDateTimeBR(r.date)), esc(r.clientName), esc(r.importedBy || '—'), num(r.addedCount), esc(r.sourceTicket || '—')]), [3])}
   ${report.activity.length ? `<h2>Atividade por pessoa</h2>${table(['Pessoa', 'Importações', 'Incluídos', 'Removidos'], report.activity.map((a) => [esc(a.name), num(a.imports), num(a.added), num(a.removed)]), [1, 2, 3])}` : ''}
-  <footer>Incluídos contam pela data de inclusão; removidos, pela data em que foram marcados. Documento gerado pelo GuardList.</footer>
+  <footer>Incluídos contam pela data de inclusão; removidos, pela data em que foram marcados. Os bloqueios entram diariamente: veja a seção "Bloqueios por dia". Documento gerado pelo GuardList.</footer>
 </div></body></html>`;
 }

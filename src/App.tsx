@@ -10,9 +10,10 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { ContextMenuHost } from './components/ContextMenuHost';
 import { IndicatorActionModal, type IndicatorActionMode } from './components/IndicatorActionModal';
 import { IpDossierModal } from './components/IpDossierModal';
-import { INDICATOR_ACTION_EVENT, OPEN_CASE_EVENT, aiAvailability, type IndicatorAction } from './components/contextActions';
+import { INDICATOR_ACTION_EVENT, OPEN_CASE_EVENT, OPEN_IMPORT_REPORT_EVENT, aiAvailability, type IndicatorAction } from './components/contextActions';
 import { CaseBuilderModal } from './components/CaseBuilderModal';
 import { TopBar } from './components/TopBar';
+import { ImportReportModal } from './components/ImportReportModal';
 import { AiAssistant, type AiRequest } from './components/AiAssistant';
 import { Client, AppSettings, ImportOutcome, SessionUser, DashboardStats, BlocklistEntry } from './types';
 import {
@@ -136,6 +137,14 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   // Assistente de IA: só aparece se o servidor tiver um servidor de IA configurado.
   const [ai, setAi] = useState<{ configured: boolean; model: string | null }>({ configured: false, model: null });
   const [isAiOpen, setIsAiOpen] = useState(false);
+  // Relatório detalhado de uma importação (aberto do histórico, dos relatórios ou depois de gravar).
+  const [importReportId, setImportReportId] = useState<string | null>(null);
+  useEffect(() => {
+    const onOpen = (e: Event) => setImportReportId((e as CustomEvent<{ historyId: string }>).detail.historyId);
+    window.addEventListener(OPEN_IMPORT_REPORT_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_IMPORT_REPORT_EVENT, onOpen);
+  }, []);
+
   // Gerador do texto do caso enviado ao cliente.
   const [caseBuilder, setCaseBuilder] = useState<{ text: string; clientId?: string } | null>(null);
   useEffect(() => {
@@ -640,6 +649,8 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
         onOpenAssistant={() => setIsAiOpen(true)}
         onOpenCaseBuilder={(indicators) => setCaseBuilder({ text: (indicators ?? []).join('\n') })}
       />
+
+      <ImportReportModal historyId={importReportId} onClose={() => setImportReportId(null)} />
 
       <CaseBuilderModal
         open={caseBuilder !== null}

@@ -1,0 +1,84 @@
+/* Relatório de uma importação (ImportReportModal.tsx). */
+
+.ir { display: grid; gap: 10px; }
+
+.ir-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+.ir-summary > div {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+.ir-summary span { display: block; color: var(--muted); font-size: 0.72rem; }
+.ir-summary strong { color: var(--text); font-size: 1.1rem; font-weight: 700; }
+.ir-summary strong.is-ok { color: var(--success); }
+
+.ir-source { color: var(--muted); font-size: 0.75rem; }
+
+.ir-section {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
+  border-radius: 0 10px 10px 0;
+  background: var(--surface);
+}
+.ir-section.is-ok { border-left-color: var(--success); }
+.ir-section.is-warn { border-left-color: var(--warning); }
+.ir-section.is-bad { border-left-color: var(--danger); }
+
+.ir-section summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.ir-section summary::-webkit-details-marker { display: none; }
+.ir-chev { width: 15px; height: 15px; color: var(--muted); transition: rotate 0.15s ease; rotate: -90deg; }
+.ir-section[open] .ir-chev { rotate: 0deg; }
+.ir-title { flex: 1; color: var(--text); font-size: 0.84rem; font-weight: 650; }
+.ir-count {
+  min-width: 26px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.ir-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 2px 14px;
+  max-height: 220px;
+  margin: 0;
+  padding: 2px 14px 12px 35px;
+  overflow-y: auto;
+  list-style: none;
+}
+.ir-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.75rem;
+}
+.ir-list code {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+.ir-list span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

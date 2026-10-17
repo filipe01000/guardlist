@@ -148,6 +148,15 @@ CREATE TABLE IF NOT EXISTS client_cases (
 );
 CREATE INDEX IF NOT EXISTS client_cases_client_idx ON client_cases (client_id, created_at DESC);
 
+-- Detalhe de cada importação (o que entrou, repetidos, dentro de CIDR, inválidos...), para o relatório por lista.
+CREATE TABLE IF NOT EXISTS import_reports (
+  history_id TEXT PRIMARY KEY,
+  client_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  data JSONB NOT NULL
+);
+CREATE INDEX IF NOT EXISTS import_reports_client_idx ON import_reports (client_id, created_at DESC);
+
 -- Última execução das rotinas automáticas (backup diário, relatório mensal).
 CREATE TABLE IF NOT EXISTS job_runs (
   job TEXT PRIMARY KEY,

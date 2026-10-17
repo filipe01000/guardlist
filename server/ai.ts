@@ -219,7 +219,7 @@ export function createAi(deps: { db: Database; store: Store; cti: Cti }) {
       });
     const recurring = stats.recurring.slice(0, 6).map((r) => `${r.indicator} (${r.count} clientes)`).join(', ');
     return [
-      `Hoje: ${new Date().toLocaleDateString('pt-BR')}. Prazo de manutenção semanal: ${sla} dias. Revisão de bloqueios parados após ${settings.reviewDays ?? 90} dias.`,
+      `Hoje: ${new Date().toLocaleDateString('pt-BR')}. Prazo de revisão de cada lista: ${sla} dias. Revisão de bloqueios parados após ${settings.reviewDays ?? 90} dias.`,
       `Totais: ${stats.totalActiveAcrossAll} bloqueios ativos (${stats.totalIpsAcrossAll} IPs, ${stats.totalCidrsAcrossAll} CIDRs) em ${lines.length} clientes; ${stats.totalCorrelatedIps} indicadores em 2+ clientes; ${stats.addedThisWeekCount} incluídos nesta semana.`,
       `Mais recorrentes: ${recurring || 'nenhum'}.`,
       'Clientes:',
@@ -274,7 +274,7 @@ export function createAi(deps: { db: Database; store: Store; cti: Cti }) {
       type: 'function',
       function: {
         name: 'historico_de_importacoes',
-        description: 'Últimas importações semanais gravadas (quem, quando, quantos incluídos e descartados).',
+        description: 'Últimas importações gravadas (quem, quando, quantos incluídos e descartados).',
         parameters: { type: 'object', properties: { cliente: { type: 'string', description: 'Opcional' }, limite: { type: 'number', description: 'Padrão 10' } } }
       }
     }

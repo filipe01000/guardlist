@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   FileText, AlertTriangle, XCircle, RotateCcw, Check, Trash2, Eye, ListChecks, ArrowLeft, Info, ShieldOff, Loader2,
-  ArrowDown01, Network, Hourglass
+  ArrowDown01, Network, Hourglass, Copy, FileSignature
 } from 'lucide-react';
 import {
   AppSettings, BlocklistEntry, Client, CtiSummary, ImportOutcome, ImportPreviewItem, ImportPreviewSummary, PendingImport
@@ -11,6 +11,8 @@ import { enrichIndicators, getClientActiveIndicatorsSet, listPendingImports, typ
 import { getIsoWeek, ipv4ToNumber, isValidIPv4 } from '../utils/validator';
 import { formatDateTimeBR } from '../utils/csv';
 import { PageHeader } from './PageHeader';
+import { buildImportReport } from '../utils/importReport';
+import { requestCaseBuilder } from './contextActions';
 import { CtiInline } from './CtiBits';
 
 interface WeeklyImportViewProps {
@@ -169,6 +171,18 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
   }, [preview, legitItems, skipLegit, includeReservedAlerts, importMode]);
 
   const newToSave = itemsToSave.filter((i) => i.category !== 'already_exists').length;
+  // Os que entram de fato na blocklist agora: vão para o caso do cliente.
+  const newIndicators = useMemo(() => itemsToSave.filter((i) => i.category !== 'already_exists').map((i) => i.indicator), [itemsToSave]);
+  const [copiedNew, setCopiedNew] = useState(false);
+  const copyNew = async () => {
+    try {
+      await navigator.clipboard.writeText(newIndicators.join('\n'));
+      setCopiedNew(true);
+      window.setTimeout(() => setCopiedNew(false), 1600);
+    } catch {
+      setSubmitError('Não foi possível copiar automaticamente. Use "Gerar caso" para levar os IPs.');
+    }
+  };
   const finalCount = importMode === 'replace' ? itemsToSave.length : newToSave;
   const needsApproval =
     !isAdmin &&
@@ -216,6 +230,12 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
         entries,
         todayStr: today,
         seen,
+        report: buildImportReport(preview, {
+          mode: importMode,
+          source: fileName ?? undefined,
+          saved: new Set(itemsToSave.map((i) => i.indicator)),
+          legitSkipped: skipLegit ? legitItems.map((i) => i.indicator) : []
+        }),
         history: {
           id: `hist-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           isoWeek: getIsoWeek(),
@@ -268,8 +288,8 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Importação semanal"
-        description="Cole os indicadores da semana ou carregue o arquivo. Nada é gravado antes da pré-visualização, e a deduplicação considera só o cliente escolhido."
+        title="Importação"
+        description="Cole os indicadores ou carregue o arquivo. Nada é gravado antes da pré-visualização, e a deduplicação considera só o cliente escolhido."
         actions={
           <button type="button" onClick={onBack} className="btn">
             <ArrowLeft aria-hidden="true" />
@@ -417,7 +437,21 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" className="btn" disabled={newIndicators.length === 0} onClick={copyNew} title="Copia os indicadores novos que vão para a blocklist (um por linha)">
+                {copiedNew ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
+                {copiedNew ? 'Copiados' : `Copiar ${newIndicators.length} novos`}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={newIndicators.length === 0}
+                onClick={() => requestCaseBuilder(newIndicators, selectedClient?.id)}
+                title="Abre o gerador de caso com os indicadores novos deste lote"
+              >
+                <FileSignature aria-hidden="true" />
+                Gerar caso
+              </button>
               <button type="button" onClick={() => setPreview(null)} className="btn">
                 <RotateCcw aria-hidden="true" />
                 Editar lista

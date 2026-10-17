@@ -89,8 +89,10 @@ export interface ImportBatchPayload {
   history: Partial<ImportHistoryRecord>;
   todayStr: string;
   seen: string[];
-  /** Bloqueio avulso: não conta como a manutenção semanal do cliente. */
+  /** Bloqueio avulso: não conta como a manutenção do cliente. */
   adHoc?: boolean;
+  /** Detalhe da pré-visualização, guardado como relatório da importação. */
+  report?: import('../utils/importReport').ImportReportData;
 }
 export const importBatch = (payload: ImportBatchPayload) => call<ImportOutcome>('importBatch', payload);
 export const listPendingImports = () => call<PendingImport[]>('listPendingImports');
@@ -312,3 +314,8 @@ export const checkClientCase = (clientId: string, indicators: string[], ticket?:
   call<CaseCheck>('checkClientCase', clientId, indicators, ticket);
 export const saveClientCase = (clientId: string, ticket: string, indicators: string[]) =>
   call<{ ticket: string; count: number; clientName: string }>('saveClientCase', clientId, ticket, indicators);
+
+// ---------- Relatório de cada importação ----------
+export const getImportReport = (historyId: string) =>
+  call<{ history: ImportHistoryRecord; report: import('../utils/importReport').ImportReportData | null }>('getImportReport', historyId);
+export const listImportReportIds = (clientId?: string) => call<string[]>('listImportReportIds', clientId);

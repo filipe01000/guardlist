@@ -3,17 +3,19 @@ import { Download, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 import { Client } from '../types';
 import { getReport, ReportData } from '../db/store';
 import { formatDateBR, formatDateTimeBR } from '../utils/csv';
-import { reportCsv, reportFileSlug, reportHtml } from '../utils/reportDocs';
+import { dailySummaryText, reportCsv, reportFileSlug, reportHtml } from '../utils/reportDocs';
 import { triggerDownload } from '../utils/exporter';
 import { PageHeader } from './PageHeader';
+import { requestImportReport } from './contextActions';
 
 interface ReportsViewProps {
   clients: Client[];
 }
 
-type Preset = 'this-week' | 'last-week' | 'this-month' | 'last-month' | '90d' | 'custom';
+type Preset = 'today' | 'this-week' | 'last-week' | 'this-month' | 'last-month' | '90d' | 'custom';
 
 const PRESETS: Array<{ id: Preset; label: string }> = [
+  { id: 'today', label: 'Hoje' },
   { id: 'this-week', label: 'Esta semana' },
   { id: 'last-week', label: 'Semana passada' },
   { id: 'this-month', label: 'Este mês' },
@@ -36,6 +38,8 @@ function presetRange(preset: Exclude<Preset, 'custom'>): { from: string; to: str
   const monday = new Date(today);
   monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
   switch (preset) {
+    case 'today':
+      return { from: ymd(today), to: ymd(today) };
     case 'this-week':
       return { from: ymd(monday), to: ymd(today) };
     case 'last-week': {
@@ -235,6 +239,31 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ clients }) => {
             )}
           </div>
 
+          {report.daily?.length > 1 && (
+            <section className="data-panel" aria-labelledby="report-daily-title">
+              <header className="data-panel__header">
+                <h2 id="report-daily-title">Bloqueios por dia</h2>
+                <span>{dailySummaryText(report)}</span>
+              </header>
+              <div className="day-bars" role="img" aria-label={`Inclusões por dia: ${dailySummaryText(report)}`}>
+                {(() => {
+                  const max = Math.max(1, ...report.daily.map((d) => d.added));
+                  const every = Math.max(1, Math.ceil(report.daily.length / 14));
+                  return report.daily.map((d, i) => (
+                    <div key={d.date} className="day-bars__col" title={`${formatDateBR(d.date)}: ${d.added} incluídos · ${d.removed} removidos · ${d.imports} importações`}>
+                      <div className="day-bars__track">
+                        <i style={{ height: `${(d.added / max) * 100}%` }} />
+                        {d.removed > 0 && <b style={{ height: `${Math.min(100, (d.removed / max) * 100)}%` }} />}
+                      </div>
+                      <span>{i % every === 0 || i === report.daily.length - 1 ? formatDateBR(d.date).slice(0, 5) : ''}</span>
+                    </div>
+                  ));
+                })()}
+              </div>
+              <div className="day-bars__legend"><i /> incluídos <b /> removidos</div>
+            </section>
+          )}
+
           {isClientReport && client?.notes && (
             <p className="text-xs text-slate-400 whitespace-pre-line -mt-2">{client.notes}</p>
           )}
@@ -332,9 +361,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ clients }) => {
               ) : (
                 <ul className="rail-list pt-2">
                   {report.imports.map((r) => (
-                    <li key={r.id} className="rail-row cursor-default">
-                      <strong>{r.clientName}</strong>
-                      <span className="is-muted">+{r.addedCount} · {formatDateTimeBR(r.date)}{r.importedBy ? ` · ${r.importedBy}` : ''}</span>
+                    <li key={r.id}>
+                      <button type="button" className="rail-row" onClick={() => requestImportReport(r.id)} title="Abrir o relatório desta importação">
+                        <strong>{r.clientName}</strong>
+                        <span className="is-muted">+{r.addedCount} · {formatDateTimeBR(r.date)}{r.importedBy ? ` · ${r.importedBy}` : ''}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>

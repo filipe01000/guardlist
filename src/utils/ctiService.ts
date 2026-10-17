@@ -240,7 +240,7 @@ export function getIpCtiRecord(
       date: match.addedDate,
       clientName: match.clientName,
       event: 'inclusao',
-      description: `IP inserido na blocklist semanal do firewall (${match.ticket || 'Rotina Semanal'}).`,
+      description: `IP inserido na blocklist do firewall (${match.ticket || 'rotina'}).`,
       source: match.ticket || 'TI / SOC Operação'
     });
   }

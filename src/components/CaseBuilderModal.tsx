@@ -420,7 +420,7 @@ export const CaseBuilderModal: React.FC<Props> = ({ open, onClose, initialText, 
                         </button>
                       )}
                       {missing.length > 0 && (
-                        <button type="button" className="btn btn--sm" onClick={addMissing} disabled={adding} title="Bloqueio avulso: não conta como a manutenção semanal">
+                        <button type="button" className="btn btn--sm" onClick={addMissing} disabled={adding} title="Bloqueio avulso: não muda a data de revisão do cliente">
                           {adding ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Plus aria-hidden="true" />}
                           Adicionar {missing.length} à lista de {client.name}
                         </button>

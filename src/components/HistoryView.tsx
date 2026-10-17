@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { History, Upload } from 'lucide-react';
+import { FileSearch, History, Upload } from 'lucide-react';
 import { Client, ImportHistoryRecord } from '../types';
 import { getHistoryRecords } from '../db/store';
 import { PageHeader } from './PageHeader';
+import { requestImportReport } from './contextActions';
 
 interface HistoryViewProps {
   clients: Client[];
@@ -52,7 +53,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Histórico semanal"
+        title="Histórico de importações"
         description="Cada importação gravada, com o que entrou e o que foi descartado."
         actions={
           <select
@@ -76,7 +77,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
             <strong>Nenhuma importação registrada</strong>
             <p>
               {selectedClientId === 'ALL'
-                ? 'Quando a primeira lista da semana for gravada, ela aparece aqui com o resumo do que entrou e do que foi descartado.'
+                ? 'Quando a primeira lista for gravada, ela aparece aqui com o resumo e o relatório do que entrou e do que foi descartado.'
                 : 'Este cliente ainda não tem importações gravadas.'}
             </p>
             {onStartImport && (
@@ -118,7 +119,6 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
               <table className="data-table" style={{ minWidth: 980 }}>
                 <colgroup>
                   <col style={{ width: '136px' }} />
-                  <col style={{ width: '92px' }} />
                   <col style={{ width: '120px' }} />
                   <col style={{ width: '130px' }} />
                   <col style={{ width: '70px' }} />
@@ -126,11 +126,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
                   <col style={{ width: '84px' }} />
                   <col style={{ width: '110px' }} />
                   <col />
+                  <col style={{ width: '86px' }} />
                 </colgroup>
                 <thead>
                   <tr>
                     <th>Data</th>
-                    <th>Semana</th>
                     <th>Cliente</th>
                     <th>Por</th>
                     <th className="text-right">Novos</th>
@@ -138,13 +138,13 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
                     <th className="text-right">Inválidos</th>
                     <th>Ticket</th>
                     <th>Observações</th>
+                    <th className="text-right">Relatório</th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.map((r) => (
                     <tr key={r.id}>
                       <td className="font-mono whitespace-nowrap">{new Date(r.date).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                      <td><span className="data-tag">{r.isoWeek}</span></td>
                       <td className="font-mono font-semibold text-white">{r.clientName}</td>
                       <td className="truncate" title={r.importedBy}>{r.importedBy || '—'}</td>
                       <td className="text-right font-mono tabular-nums text-emerald-400">+{r.addedCount}</td>
@@ -152,6 +152,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
                       <td className="text-right font-mono tabular-nums">{r.invalidsDiscarded}</td>
                       <td className="font-mono">{r.sourceTicket || '—'}</td>
                       <td><span className="data-table__clamp" title={r.notes}>{r.notes || '—'}</span></td>
+                      <td className="text-right">
+                        <button type="button" className="btn btn--sm btn--quiet" onClick={() => requestImportReport(r.id)} title="O que entrou, repetidos, dentro de CIDR, inválidos e o resto">
+                          <FileSearch aria-hidden="true" /> Ver
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -335,6 +335,15 @@ export interface ReportChangeRow {
   currentStatus: 'active' | 'removed';
 }
 
+export interface ReportDayRow {
+  date: string;
+  added: number;
+  removed: number;
+  imports: number;
+  /** Clientes que receberam inclusões no dia. */
+  clients: number;
+}
+
 export interface ReportData {
   from: string;
   to: string;
@@ -342,6 +351,16 @@ export interface ReportData {
   generatedAt: string;
   generatedBy: string;
   slaDays: number;
+  /** Um item por dia do período. */
+  daily: ReportDayRow[];
+  dailySummary: {
+    days: number;
+    /** Dias com pelo menos um indicador incluído. */
+    activeDays: number;
+    avgAddedPerDay: number;
+    avgAddedPerActiveDay: number;
+    peak: { date: string; added: number } | null;
+  };
   totals: { clients: number; added: number; removed: number; imports: number; late: number; activeNow: number };
   clients: ReportClientRow[];
   changes: ReportChangeRow[];

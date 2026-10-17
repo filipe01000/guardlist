@@ -197,8 +197,10 @@ interface ImportPayload {
   history: ImportHistoryRecord;
   todayStr: string;
   seen: string[];
-  /** Bloqueio avulso (menu de ações): não conta como a manutenção semanal do cliente. */
+  /** Bloqueio avulso (menu de ações): não conta como a manutenção do cliente. */
   adHoc?: boolean;
+  /** Detalhe da pré-visualização (relatório da importação). */
+  report?: Record<string, unknown>;
 }
 
 function parseImportPayload(raw: unknown): ImportPayload {
@@ -211,7 +213,11 @@ function parseImportPayload(raw: unknown): ImportPayload {
   const history = (input.history && typeof input.history === 'object' ? input.history : {}) as ImportHistoryRecord;
   const todayStr = /^\d{4}-\d{2}-\d{2}$/.test(String(input.todayStr)) ? String(input.todayStr) : new Date().toISOString().slice(0, 10);
   const seen = Array.isArray(input.seen) ? input.seen.filter((x): x is string => typeof x === 'string').slice(0, 100_000) : [];
-  return { clientId, mode: input.mode === 'replace' ? 'replace' : 'append', entries, history, todayStr, seen, adHoc: input.adHoc === true };
+  // Relatório da importação: aceito como veio, com limite de tamanho (o detalhe é só informativo).
+  const report = input.report && typeof input.report === 'object' && !Array.isArray(input.report) && JSON.stringify(input.report).length < 6_000_000
+    ? (input.report as Record<string, unknown>)
+    : undefined;
+  return { clientId, mode: input.mode === 'replace' ? 'replace' : 'append', entries, history, todayStr, seen, adHoc: input.adHoc === true, report };
 }
 
 // Grava um lote já aprovado: respeita as exceções do cliente, salva uma versão antes, atualiza "visto por último",
@@ -239,6 +245,7 @@ async function executeImport(q: Query, author: Actor, payload: ImportPayload, ex
 
   let added = 0;
   let removed = 0;
+  const removedIndicators: string[] = [];
   const now = new Date().toISOString();
   const existing = new Map(currentActive.map((e) => [e.indicator.toLowerCase(), e]));
   if (mode === 'replace') {
@@ -254,6 +261,7 @@ async function executeImport(q: Query, author: Actor, payload: ImportPayload, ex
           notes: (old.notes ? `${old.notes} • ` : '') + `Removido na sincronização semanal (${todayStr})`
         });
         removed++;
+        removedIndicators.push(old.indicator);
       }
     }
     for (const entry of list) {
@@ -308,6 +316,13 @@ async function executeImport(q: Query, author: Actor, payload: ImportPayload, ex
     'INSERT INTO history (id, client_id, happened_at, data, created_by) VALUES ($1, $2, $3, $4::jsonb, $5) ON CONFLICT (id) DO NOTHING',
     [historyId, clientId, now, JSON.stringify(record), author.username]
   );
+  if (payload.report) {
+    const report = { ...payload.report, removed: removedIndicators, result: { added, retired, removed, blockedByException, totalBefore: previousTotal, totalAfter } };
+    await q(
+      'INSERT INTO import_reports (history_id, client_id, data) VALUES ($1, $2, $3::jsonb) ON CONFLICT (history_id) DO UPDATE SET data = EXCLUDED.data',
+      [historyId, clientId, JSON.stringify(report)]
+    );
+  }
   await audit(q, author, 'entries.import', { clientId, name: client.name, added, removed, mode, blockedByException });
   return { status: 'done', added, retired, removed, blockedByException, snapshotId: snap.id, historyId };
 }
@@ -1418,6 +1433,41 @@ export function createStore(db: Database) {
         byUser.set(row.username, entry);
       }
 
+      // Visão por dia: incluídos, removidos e importações em cada data do período (horário de Brasília).
+      const localDay = (iso: string) => new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+      const dayList: string[] = [];
+      for (let d = new Date(`${from}T12:00:00Z`); d.toISOString().slice(0, 10) <= to && dayList.length < 400; d.setUTCDate(d.getUTCDate() + 1)) {
+        dayList.push(d.toISOString().slice(0, 10));
+      }
+      const byDay = new Map(dayList.map((date) => [date, { date, added: 0, removed: 0, imports: 0, clients: new Set<string>() }]));
+      for (const r of addedRows) {
+        const bucket = byDay.get(r.data.addedDate);
+        if (bucket) {
+          bucket.added++;
+          bucket.clients.add(r.data.clientId);
+        }
+      }
+      for (const r of removedRows) {
+        const bucket = byDay.get(localDay(String(r.data.removedAt || r.updated_at)));
+        if (bucket) bucket.removed++;
+      }
+      for (const r of historyRows) {
+        const bucket = byDay.get(localDay(r.data.date));
+        if (bucket) bucket.imports++;
+      }
+      const daily = [...byDay.values()].map(({ clients: touched, ...rest }) => ({ ...rest, clients: touched.size }));
+      const addedTotal = daily.reduce((n, d) => n + d.added, 0);
+      const activeDays = daily.filter((d) => d.added > 0).length;
+      const peak = daily.reduce<(typeof daily)[number] | null>((best, d) => (d.added > (best?.added ?? 0) ? d : best), null);
+      const round1 = (n: number) => Math.round(n * 10) / 10;
+      const dailySummary = {
+        days: daily.length,
+        activeDays,
+        avgAddedPerDay: daily.length ? round1(addedTotal / daily.length) : 0,
+        avgAddedPerActiveDay: activeDays ? round1(addedTotal / activeDays) : 0,
+        peak: peak ? { date: peak.date, added: peak.added } : null
+      };
+
       return {
         from,
         to,
@@ -1425,6 +1475,8 @@ export function createStore(db: Database) {
         generatedAt: new Date().toISOString(),
         generatedBy: actor.displayName,
         slaDays: sla,
+        daily,
+        dailySummary,
         totals: {
           clients: perClient.length,
           added: perClient.reduce((n, c) => n + c.addedInPeriod, 0),
@@ -1438,6 +1490,27 @@ export function createStore(db: Database) {
         imports: historyRows.map((r) => r.data),
         activity: [...byUser.values()].sort((a, b) => b.imports - a.imports || b.added - a.added)
       };
+    },
+
+    // Relatório de uma importação: o registro do histórico e o detalhe item por item (se houver).
+    async getImportReport(_actor: Actor, historyId: string) {
+      const id = asString(historyId, 'historyId');
+      const [historyRows, reportRows] = await Promise.all([
+        db.query<{ data: ImportHistoryRecord }>('SELECT data FROM history WHERE id = $1', [id]),
+        db.query<{ data: Record<string, unknown> }>('SELECT data FROM import_reports WHERE history_id = $1', [id])
+      ]);
+      const history = historyRows[0]?.data;
+      if (!history) throw new StoreError('Importação não encontrada.', 404);
+      return { history, report: reportRows[0]?.data ?? null };
+    },
+
+    // Quais importações têm relatório detalhado (para mostrar o botão só onde existe).
+    async listImportReportIds(_actor: Actor, clientId?: string) {
+      const rows = await db.query<{ history_id: string }>(
+        `SELECT history_id FROM import_reports ${typeof clientId === 'string' && clientId ? 'WHERE client_id = $1' : ''} ORDER BY created_at DESC LIMIT 2000`,
+        typeof clientId === 'string' && clientId ? [clientId] : []
+      );
+      return rows.map((r) => r.history_id);
     },
 
     // ---------- Casos enviados ao cliente ----------
@@ -1542,6 +1615,8 @@ export type Store = ReturnType<typeof createStore>;
 export const PUBLIC_OPS = [
   'initializeDatabaseIfEmpty',
   'checkClientCase',
+  'getImportReport',
+  'listImportReportIds',
   'saveClientCase',
   'getAllClients',
   'saveClient',

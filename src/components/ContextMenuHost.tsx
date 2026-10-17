@@ -36,10 +36,10 @@ import { detectEntity, externalLookupEntries, TYPE_LABEL, type ContextEntity, ty
 export const PAGES: Array<{ tab: AppTab; label: string; icon: typeof Search; key?: string; adminOnly?: boolean }> = [
   { tab: 'dashboard', label: 'Painel geral', icon: LayoutDashboard, key: 'D' },
   { tab: 'intelligence', label: 'Inteligência de IPs', icon: Radio, key: 'T' },
-  { tab: 'import', label: 'Importação semanal', icon: Upload, key: 'I' },
+  { tab: 'import', label: 'Importação', icon: Upload, key: 'I' },
   { tab: 'client-list', label: 'Listas dos clientes', icon: ListChecks, key: 'L' },
   { tab: 'review', label: 'Revisão de bloqueios', icon: ClipboardCheck, key: 'R' },
-  { tab: 'history', label: 'Histórico semanal', icon: History, key: 'H' },
+  { tab: 'history', label: 'Histórico', icon: History, key: 'H' },
   { tab: 'reports', label: 'Relatórios', icon: BarChart3, key: 'P' },
   { tab: 'clients', label: 'Gerenciar clientes', icon: Users },
   { tab: 'admin', label: 'Administração', icon: ShieldCheck, key: 'A', adminOnly: true },
@@ -130,7 +130,7 @@ export function ContextMenuHost(props: Props) {
         items: [
           { type: 'heading', label: c.name, detail: 'Cliente' },
           { label: 'Abrir lista do cliente', icon: ListChecks, onSelect: () => p.onOpenList(c.id) },
-          { label: 'Importar lista da semana', icon: Upload, onSelect: () => p.onImport(c.id) },
+          { label: 'Importar bloqueios', icon: Upload, onSelect: () => p.onImport(c.id) },
           { type: 'divider' },
           { label: 'Baixar .txt', icon: Download, onSelect: () => p.onExportTxt(c) },
           { label: 'Baixar .txt NANO', icon: FileText, onSelect: () => p.onExportNano(c) },

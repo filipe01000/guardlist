@@ -16,6 +16,13 @@ export function requestCaseBuilder(indicators: string[] = [], clientId?: string)
   window.dispatchEvent(new CustomEvent(OPEN_CASE_EVENT, { detail: { text: indicators.join('\n'), clientId } }));
 }
 
+export const OPEN_IMPORT_REPORT_EVENT = 'guardlist:open-import-report';
+
+/** Abre o relatório detalhado de uma importação. */
+export function requestImportReport(historyId: string) {
+  window.dispatchEvent(new CustomEvent(OPEN_IMPORT_REPORT_EVENT, { detail: { historyId } }));
+}
+
 /** Se o assistente de IA está ligado neste servidor (definido pelo App ao carregar). */
 export const aiAvailability = { enabled: false };
 

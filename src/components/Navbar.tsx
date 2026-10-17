@@ -57,9 +57,9 @@ const navGroups: NavGroup[] = [
     icon: ShieldBan,
     items: [
       { id: 'client-list', label: 'Listas dos clientes', icon: ListFilter },
-      { id: 'import', label: 'Importação semanal', icon: UploadCloud },
+      { id: 'import', label: 'Importação', icon: UploadCloud },
       { id: 'review', label: 'Revisão de bloqueios', icon: ClipboardCheck },
-      { id: 'history', label: 'Histórico semanal', icon: History }
+      { id: 'history', label: 'Histórico', icon: History }
     ]
   },
   {

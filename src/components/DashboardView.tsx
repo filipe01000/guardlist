@@ -94,7 +94,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       return 'cards';
     }
   });
-  const [onlyLateFilter, setOnlyLateFilter] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'late' | 'near' | 'ok'>('all');
   const [history, setHistory] = useState<ImportHistoryRecord[]>([]);
 
   useEffect(() => {
@@ -137,10 +137,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const sortedClients = useMemo(() => {
     const list = [...enrichedClients].sort((a, b) => b.urgencyScore - a.urgencyScore);
-    return onlyLateFilter ? list.filter((c) => c.isLate) : list;
-  }, [enrichedClients, onlyLateFilter]);
+    if (statusFilter === 'late') return list.filter((c) => c.isLate);
+    if (statusFilter === 'near') return list.filter((c) => !c.isLate && c.isNearDeadline);
+    if (statusFilter === 'ok') return list.filter((c) => !c.isLate && !c.isNearDeadline);
+    return list;
+  }, [enrichedClients, statusFilter]);
 
   const lateCount = enrichedClients.filter((c) => c.isLate).length;
+  const nearCount = enrichedClients.filter((c) => !c.isLate && c.isNearDeadline).length;
+  const okCount = enrichedClients.length - lateCount - nearCount;
+  const onlyLateFilter = statusFilter === 'late';
   const upToDateCount = enrichedClients.length - lateCount;
 
   const agenda = useMemo(
@@ -166,7 +172,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="workspace-overview">
       <PageHeader
         title="Painel geral"
-        description="Situação da manutenção semanal de cada cliente, ordenada por urgência."
+        description="Situação das listas de cada cliente, das mais urgentes para as em dia."
         actions={
           <button type="button" className="btn" onClick={() => setIsValidateOpen(true)} title="Procura repetidos, IPs dentro de CIDR e conflitos com exceções em todos os clientes">
             <ShieldCheck aria-hidden="true" />
@@ -192,7 +198,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
         <button
           type="button"
-          onClick={() => setOnlyLateFilter(!onlyLateFilter)}
+          onClick={() => setStatusFilter(onlyLateFilter ? 'all' : 'late')}
           className={`workspace-summary__item workspace-summary__action ${lateCount > 0 ? 'has-warning' : ''} ${onlyLateFilter ? 'is-active' : ''}`}
           aria-pressed={onlyLateFilter}
         >
@@ -206,7 +212,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <small>Presentes em 2 ou mais clientes</small>
         </button>
         <div className="workspace-summary__item">
-          <span>Adicionados na semana</span>
+          <span>Adicionados em 7 dias</span>
           <strong>+{addedThisWeekCount}</strong>
           <small>{nextExpiring ? `Próximo prazo: ${nextExpiring.client.name}` : 'Nenhum prazo próximo'}</small>
         </div>
@@ -214,94 +220,79 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       <div className="dash-layout">
         <section aria-labelledby="queue-title">
-          <div className="client-ledger-heading flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-4">
-            <div>
-              <h2 id="queue-title" className="text-lg font-bold text-white tracking-[-0.02em]">Fila de manutenção</h2>
-              <p className="text-xs text-slate-400 mt-1">Atrasados primeiro, depois os prazos mais próximos.</p>
+          <div className="dash-toolbar">
+            <h2 id="queue-title" className="sr-only">Clientes</h2>
+            <div className="dash-filters" role="group" aria-label="Filtrar clientes por situação">
+              {([
+                ['all', 'Todos', activeClients.length, ''],
+                ['late', 'Atrasados', lateCount, 'is-late'],
+                ['near', 'Vencem logo', nearCount, 'is-near'],
+                ['ok', 'Em dia', okCount, 'is-ok']
+              ] as const).map(([id, label, count, tone]) => (
+                <button key={id} type="button" className={`dash-filter ${tone}`} aria-pressed={statusFilter === id} onClick={() => setStatusFilter(id)} disabled={id !== 'all' && count === 0}>
+                  {label}
+                  <span>{count}</span>
+                </button>
+              ))}
             </div>
-            <div className="flex items-center gap-2">
-              {onlyLateFilter && (
-                <button type="button" className="btn btn--sm btn--quiet" onClick={() => setOnlyLateFilter(false)}>
-                  Mostrar todos ({activeClients.length})
-                </button>
-              )}
-              <div className="segmented" role="group" aria-label="Modo de visualização">
-                <button type="button" aria-pressed={viewMode === 'cards'} onClick={() => setViewMode('cards')}>
-                  <LayoutGrid aria-hidden="true" /> Cards
-                </button>
-                <button type="button" aria-pressed={viewMode === 'table'} onClick={() => setViewMode('table')}>
-                  <TableIcon aria-hidden="true" /> Tabela
-                </button>
-              </div>
+            <div className="segmented" role="group" aria-label="Modo de visualização">
+              <button type="button" aria-pressed={viewMode === 'cards'} onClick={() => setViewMode('cards')}>
+                <LayoutGrid aria-hidden="true" /> Cards
+              </button>
+              <button type="button" aria-pressed={viewMode === 'table'} onClick={() => setViewMode('table')}>
+                <TableIcon aria-hidden="true" /> Tabela
+              </button>
             </div>
           </div>
 
           {sortedClients.length === 0 ? (
             <div className="rail-panel empty-state">
               <Calendar aria-hidden="true" />
-              <strong>{activeClients.length === 0 ? 'Cadastre seu primeiro cliente' : 'Nenhum cliente atrasado'}</strong>
-              <p>{activeClients.length === 0 ? 'Crie um cliente para importar e acompanhar sua lista de bloqueios.' : `Todos os clientes estão dentro do prazo de ${slaDays} dias.`}</p>
-              <button type="button" className="btn btn--sm" onClick={activeClients.length === 0 ? onManageClients : () => setOnlyLateFilter(false)}>{activeClients.length === 0 ? 'Gerenciar clientes' : 'Mostrar todos'}</button>
+              <strong>{activeClients.length === 0 ? 'Cadastre seu primeiro cliente' : 'Nenhum cliente nesta situação'}</strong>
+              <p>{activeClients.length === 0 ? 'Crie um cliente para importar e acompanhar sua lista de bloqueios.' : 'Escolha outro filtro para ver os demais clientes.'}</p>
+              <button type="button" className="btn btn--sm" onClick={activeClients.length === 0 ? onManageClients : () => setStatusFilter('all')}>{activeClients.length === 0 ? 'Gerenciar clientes' : 'Mostrar todos'}</button>
             </div>
           ) : viewMode === 'cards' ? (
-            <div key="cards" className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-3">
-              {sortedClients.map(({ client, daysSince, total, ips, cidrs, isLate, isNearDeadline }) => (
-                <article
-                  key={client.id}
-                  className={`client-tile ${isLate ? 'is-late' : isNearDeadline ? 'is-near' : ''}`}
-                >
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <h3 className="font-bold text-white text-base">{client.name}</h3>
-                    {statusChip(isLate, isNearDeadline)}
-                  </div>
+            <div key="cards" className="cl-grid">
+              {sortedClients.map(({ client, daysSince, total, ips, cidrs, isLate, isNearDeadline }) => {
+                const tone = isLate ? 'is-late' : isNearDeadline ? 'is-near' : 'is-ok';
+                return (
+                  <article key={client.id} className={`cl-card ${tone}`} data-client-id={client.id} onContextMenu={openActionMenuAt}>
+                    <header className="cl-card__head">
+                      <h3 title={client.notes || client.name}>{client.name}</h3>
+                      {statusChip(isLate, isNearDeadline)}
+                    </header>
 
-                  <div className="client-tile__metrics" aria-label={`Resumo de ${client.name}`}>
-                    <div><span>Total</span><strong>{total.toLocaleString('pt-BR')}</strong></div>
-                    <div><span>IPs</span><strong>{ips.toLocaleString('pt-BR')}</strong></div>
-                    <div><span>CIDRs</span><strong>{cidrs.toLocaleString('pt-BR')}</strong></div>
-                  </div>
+                    <div className="cl-card__count">
+                      <strong>{total.toLocaleString('pt-BR')}</strong>
+                      <span>ativos</span>
+                      <small>{ips.toLocaleString('pt-BR')} IPs · {cidrs.toLocaleString('pt-BR')} CIDRs</small>
+                    </div>
 
-                  <div className="client-tile__review">
-                    <span className="client-tile__review-label">
-                      <Calendar aria-hidden="true" /> Última revisão
-                    </span>
-                    <span className="client-tile__review-value">
-                      <strong>{client.lastUpdateDate ? formatDateBR(client.lastUpdateDate) : 'Nunca'}</strong>
-                      <small className={isLate ? 'text-rose-400' : isNearDeadline ? 'text-amber-400' : 'text-slate-400'}>
-                        {daysSince === null ? 'Pendente' : daysSince === 0 ? 'Hoje' : `Há ${daysSince} dias`}
-                      </small>
-                    </span>
-                  </div>
+                    <p className="cl-card__review">
+                      <Calendar aria-hidden="true" />
+                      <span>{client.lastUpdateDate ? `Revisado ${formatDateBR(client.lastUpdateDate)}` : 'Nunca revisado'}</span>
+                      {daysSince !== null && <em className={tone}>{daysSince === 0 ? 'hoje' : `há ${daysSince} ${daysSince === 1 ? 'dia' : 'dias'}`}</em>}
+                    </p>
 
-                  <div className="client-tile__actions">
-                    <button type="button" className={`btn btn--sm ${isLate || isNearDeadline ? 'btn--primary' : ''}`} onClick={() => onNavigateToImport(client.id)}>
-                      <Upload aria-hidden="true" /> Importar
-                    </button>
-                    <button type="button" className="btn btn--sm" onClick={() => onNavigateToList(client.id)}>
-                      <List aria-hidden="true" /> Lista
-                    </button>
-                    <span className="flex-1" />
-                    <button
-                      type="button"
-                      className="btn btn--sm btn--icon btn--quiet"
-                      onClick={() => onQuickExportTxt(client)}
-                      title="Baixar .txt para o firewall (1 indicador por linha)"
-                      aria-label={`Baixar .txt de ${client.name}`}
-                    >
-                      <Download aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn--sm btn--icon btn--quiet"
-                      onClick={() => onQuickExportNanoTxt(client)}
-                      title="Baixar .txt no formato NANO (IPs e redes separados)"
-                      aria-label={`Baixar .txt NANO de ${client.name}`}
-                    >
-                      <FileText aria-hidden="true" />
-                    </button>
-                  </div>
-                </article>
-              ))}
+                    <footer className="cl-card__actions">
+                      <button type="button" className="btn btn--sm" onClick={() => onNavigateToImport(client.id)}>
+                        <Upload aria-hidden="true" /> Importar
+                      </button>
+                      <button type="button" className="btn btn--sm btn--quiet" onClick={() => onNavigateToList(client.id)}>
+                        <List aria-hidden="true" /> Lista
+                      </button>
+                      <ActionMenu
+                        label={`Mais ações de ${client.name}`}
+                        items={[
+                          { label: 'Baixar .txt', icon: Download, onSelect: () => onQuickExportTxt(client) },
+                          { label: 'Baixar .txt NANO', icon: FileText, onSelect: () => onQuickExportNanoTxt(client) }
+                        ]}
+                      />
+                    </footer>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div key="table" className="client-ledger-table overflow-x-auto">
@@ -343,7 +334,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         <ActionMenu
                           label={`Ações de ${client.name}`}
                           items={[
-                            { label: 'Importar lista da semana', icon: Upload, onSelect: () => onNavigateToImport(client.id) },
+                            { label: 'Importar bloqueios', icon: Upload, onSelect: () => onNavigateToImport(client.id) },
                             { label: 'Abrir lista do cliente', icon: ListChecks, onSelect: () => onNavigateToList(client.id) },
                             { type: 'divider' },
                             { label: 'Baixar .txt', icon: Download, onSelect: () => onQuickExportTxt(client) },
@@ -359,10 +350,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           )}
         </section>
 
-        <aside className="dash-rail" aria-label="Resumo da semana">
+        <aside className="dash-rail" aria-label="Prazos e recorrência">
           <section className="rail-panel">
             <header>
-              <h2>Esta semana</h2>
+              <h2>Próximos prazos</h2>
               <small>Prazo de {slaDays} dias</small>
             </header>
             <ul className="rail-list">
@@ -415,7 +406,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </header>
             {history.length === 0 ? (
               <p className="rail-empty">
-                As importações aparecem aqui assim que a primeira lista da semana for gravada.
+                As importações aparecem aqui assim que a primeira lista for gravada.
               </p>
             ) : (
               <ul className="rail-list">
