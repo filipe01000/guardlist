@@ -18,6 +18,7 @@ import type { ShowToast } from '../App';
 import { Client, DashboardStats, ImportHistoryRecord } from '../types';
 import { getDaysSince } from '../utils/validator';
 import { formatDateBR } from '../utils/csv';
+import { coverBackground } from '../utils/imageToCover';
 import { getHistoryRecords } from '../db/store';
 import { PageHeader } from './PageHeader';
 
@@ -284,28 +285,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 return (
                   <article
                     key={client.id}
+                    aria-label={client.name}
+                    title={client.name}
                     className={`cl-card ${tone}`}
                     data-client-id={client.id}
                     onContextMenu={openActionMenuAt}
                     style={{ '--i': Math.min(index, 12), '--vt': vtName(client.id) } as React.CSSProperties}
                   >
                     <div className={`cl-card__cover${client.logo ? ' has-logo' : ''}`}>
+                      <div className="cl-card__logo">
                       {client.logo ? (
                         <img
                           src={client.logo}
                           alt=""
                           loading="lazy"
                           decoding="async"
-                          onLoad={(e) => e.currentTarget.classList.toggle('is-small', e.currentTarget.naturalWidth < 80)}
+                          onLoad={(e) => {
+                            const img = e.currentTarget;
+                            img.classList.toggle('is-small', img.naturalWidth < 80);
+                            // A capa assume a cor de fundo da própria logo (branca, azul-marinho...).
+                            const bg = coverBackground(img);
+                            const cover = img.closest('.cl-card__cover') as HTMLElement | null;
+                            if (cover) {
+                              cover.classList.toggle('has-bg', Boolean(bg));
+                              if (bg) cover.style.setProperty('--cover-bg', bg);
+                            }
+                          }}
                         />
                       ) : (
-                        <span className="cl-card__initials" aria-hidden="true">{clientInitials(client.name)}</span>
+                        <span className="cl-card__initials">{client.name}</span>
                       )}
+                      </div>
                       <span className="cl-card__status">
                         <i aria-hidden="true" />
                         {isLate || isNearDeadline ? due.text : 'Em dia'}
                       </span>
-                      <h3 className="cl-card__title" title={client.name}>{client.name}</h3>
                     </div>
                     <div className="cl-card__body">
 
