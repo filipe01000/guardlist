@@ -281,7 +281,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {sortedClients.map(({ client, daysSince, daysUntilDue, total, ips, cidrs, isLate, isNearDeadline }, index) => {
                 const tone = isLate ? 'is-late' : isNearDeadline ? 'is-near' : 'is-ok';
                 const due = dueLabel(daysSince, daysUntilDue);
-                const subtitle = (client.notes || '').split(/[•\n]/)[0].trim() || 'Sem firewall cadastrado';
                 return (
                   <article
                     key={client.id}
@@ -300,7 +299,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     <div className="cl-card__id">
                       <h3 title={client.name}>{client.name}</h3>
-                      <p title={client.notes || undefined}>{subtitle}</p>
                     </div>
 
                     <ul className="cl-card__tags" aria-label={`Resumo de ${client.name}`}>
