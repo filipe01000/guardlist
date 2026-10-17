@@ -45,15 +45,22 @@ export default function LockGrid() {
       }
     };
 
+    // Tons por tema: no claro, aço mais escuro e ciano mais fechado para aparecer sobre o fundo claro.
+    const PALETTES = {
+      dark: { base: '91, 120, 150', lit: '34, 211, 238', red: '248, 113, 113', min: 0.07 },
+      light: { base: '71, 96, 128', lit: '8, 145, 178', red: '220, 38, 38', min: 0.09 },
+    };
+    let palette = PALETTES.dark;
+
     const drawLock = (lock: Lock) => {
       const near = Math.max(0, 1 - Math.hypot(lock.x - mouseX, lock.y - mouseY) / RADIUS);
       const glow = Math.max(near, lock.glow);
-      const alpha = 0.07 + glow * 0.55;
+      const alpha = palette.min + glow * 0.55;
       const color = lock.red
-        ? `rgba(248, 113, 113, ${alpha + 0.05})`
+        ? `rgba(${palette.red}, ${alpha + 0.05})`
         : glow > 0.05
-          ? `rgba(34, 211, 238, ${alpha})`
-          : `rgba(91, 120, 150, ${alpha + 0.04})`;
+          ? `rgba(${palette.lit}, ${alpha})`
+          : `rgba(${palette.base}, ${alpha + 0.04})`;
       const lift = lock.open * 4;
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
@@ -70,7 +77,7 @@ export default function LockGrid() {
 
     const render = (time: number) => {
       ctx.clearRect(0, 0, width, height);
-      if (document.documentElement.dataset.theme === 'light') return;
+      palette = document.documentElement.dataset.theme === 'light' ? PALETTES.light : PALETTES.dark;
       const animate = !reduceMotion.matches;
       if (animate) {
         if (Math.random() < 0.05) {
@@ -118,7 +125,10 @@ export default function LockGrid() {
     window.addEventListener('resize', onResize);
     document.addEventListener('visibilitychange', start);
     reduceMotion.addEventListener('change', start);
+    const themeWatch = new MutationObserver(start);
+    themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => {
+      themeWatch.disconnect();
       cancelAnimationFrame(frame);
       window.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerleave', onLeave);

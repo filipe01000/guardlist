@@ -73,7 +73,7 @@ body {
 
 /* Brilho azul suave no fundo escuro, como um céu noturno: só no tema escuro. */
 /* Fica no html (e não no body) para o fundo de cadeados, em z-index negativo, aparecer por cima dele. */
-:root:not([data-theme="light"]) body {
+:root body {
   background: transparent;
 }
 
@@ -138,10 +138,10 @@ a {
 
 .app-shell {
   min-width: 0;
-  background: var(--app-bg);
+  background: transparent;
 }
 
-/* Fundo de cadeados: fica atrás de tudo e não recebe cliques. No escuro, a casca do app fica transparente para ele aparecer. */
+/* Fundo de cadeados: fica atrás de tudo e não recebe cliques. A casca do app e o body ficam transparentes para ele aparecer nos dois temas. */
 .lock-grid {
   position: fixed;
   inset: 0;
@@ -151,9 +151,6 @@ a {
   pointer-events: none;
 }
 
-:root:not([data-theme="light"]) .app-shell {
-  background: transparent;
-}
 
 .studio-footer {
   border-color: var(--line);
@@ -501,8 +498,7 @@ a {
   margin-bottom: 18px;
 }
 
-:root[data-theme="light"] html,
-:root[data-theme="light"] body {
+:root[data-theme="light"] {
   background: var(--app-bg);
 }
 
