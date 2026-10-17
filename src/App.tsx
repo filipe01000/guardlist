@@ -2,6 +2,7 @@ import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 
 import { flushSync } from 'react-dom';
 import { Navbar, type AppTab } from './components/Navbar';
 import { PageBoundary } from './components/PageBoundary';
+import LockGrid from './components/LockGrid';
 import { AccountModal } from './components/AccountModal';
 import { DashboardView } from './components/DashboardView';
 import { QuickSearchModal } from './components/QuickSearchView';
@@ -420,6 +421,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''} min-h-screen text-slate-100 flex flex-col font-sans`}>
+      <LockGrid />
       <a className="skip-link" href="#main-content">Ir para o conteúdo</a>
       {toast && (
         <div key={toast.id} className={`toast toast--${toast.type}`} role="status" aria-live="polite">
