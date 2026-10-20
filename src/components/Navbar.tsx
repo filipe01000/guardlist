@@ -21,13 +21,14 @@ import {
   ClipboardCheck,
   ShieldCheck,
   UploadCloud,
-  X
+  X,
+  Fingerprint
 } from 'lucide-react';
 import { SessionUser } from '../types';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import './Sidebar.css';
 
-export type AppTab = 'dashboard' | 'import' | 'client-list' | 'review' | 'intelligence' | 'history' | 'reports' | 'clients' | 'admin' | 'backup';
+export type AppTab = 'dashboard' | 'import' | 'client-list' | 'review' | 'intelligence' | 'ip-analysis' | 'history' | 'reports' | 'clients' | 'admin' | 'backup';
 
 interface NavbarProps {
   currentTab: AppTab;
@@ -67,6 +68,7 @@ const navGroups: NavGroup[] = [
     label: 'Análise',
     icon: Radar,
     items: [
+      { id: 'ip-analysis', label: 'Análise de IP', icon: Fingerprint },
       { id: 'intelligence', label: 'Inteligência de IPs', icon: Radio },
       { id: 'reports', label: 'Relatórios', icon: FileSpreadsheet }
     ]

@@ -1,6 +1,6 @@
 import { isIP } from 'node:net';
 import type { Database } from './db.ts';
-import type { CtiSummary, CtiVerdict } from '../src/types/index.ts';
+import type { CtiSummary, CtiVerdict, IpAnalysis } from '../src/types/index.ts';
 
 // Reputação de IPs para triagem na importação e para os gráficos. Consulta AbuseIPDB, GreyNoise e OTX
 // com poucas requisições simultâneas e guarda o resultado em cti_cache, para não gastar a cota de novo.
@@ -54,7 +54,8 @@ function decide(summary: Omit<CtiSummary, 'verdict' | 'verdictReason'>): { verdi
   return { verdict: 'medium' };
 }
 
-async function lookup(ip: string): Promise<CtiSummary> {
+// verbose: pede ao AbuseIPDB também as denúncias (usado só na página de análise, uma consulta por vez).
+async function lookupFull(ip: string, verbose: boolean): Promise<{ summary: CtiSummary; detail: IpAnalysis['detail'] }> {
   const abuseKey = process.env.ABUSEIPDB_API_KEY;
   const greyKey = process.env.GREYNOISE_API_KEY;
   const otxKey = process.env.OTX_API_KEY;
@@ -63,7 +64,7 @@ async function lookup(ip: string): Promise<CtiSummary> {
 
   const [abuse, grey, otx] = await Promise.all([
     abuseKey
-      ? getJson(`https://api.abuseipdb.com/api/v2/check?ipAddress=${encoded}&maxAgeInDays=90`, { Accept: 'application/json', Key: abuseKey }).catch(() => null)
+      ? getJson(`https://api.abuseipdb.com/api/v2/check?ipAddress=${encoded}&maxAgeInDays=90${verbose ? '&verbose' : ''}`, { Accept: 'application/json', Key: abuseKey }).catch(() => null)
       : Promise.resolve(null),
     greyKey
       ? getJson(`https://api.greynoise.io/v3/community/${encoded}`, { Accept: 'application/json', key: greyKey }).catch(() => null)
@@ -98,7 +99,31 @@ async function lookup(ip: string): Promise<CtiSummary> {
     otxPulses: o ? Number(o.pulse_info?.count ?? 0) : null,
     errors: errors.length ? errors : undefined
   };
-  return { ...base, ...decide(base) };
+  const detail: IpAnalysis['detail'] = a
+    ? {
+        countryName: typeof a.countryName === 'string' ? a.countryName : null,
+        isTor: Boolean(a.isTor),
+        isWhitelisted: typeof a.isWhitelisted === 'boolean' ? a.isWhitelisted : null,
+        isPublic: typeof a.isPublic === 'boolean' ? a.isPublic : null,
+        hostnames: Array.isArray(a.hostnames) ? a.hostnames.filter((h: unknown) => typeof h === 'string').slice(0, 10) : [],
+        distinctUsers: typeof a.numDistinctUsers === 'number' ? a.numDistinctUsers : null,
+        reports: (Array.isArray(a.reports) ? a.reports : [])
+          .slice()
+          .sort((x: any, y: any) => String(y?.reportedAt).localeCompare(String(x?.reportedAt)))
+          .slice(0, 50)
+          .map((r: any) => ({
+            reportedAt: String(r?.reportedAt ?? ''),
+            comment: typeof r?.comment === 'string' ? r.comment.slice(0, 600) : '',
+            categories: Array.isArray(r?.categories) ? r.categories.filter((c: unknown) => typeof c === 'number') : [],
+            reporterCountryCode: typeof r?.reporterCountryCode === 'string' ? r.reporterCountryCode : null
+          }))
+      }
+    : null;
+  return { summary: { ...base, ...decide(base) }, detail };
+}
+
+async function lookup(ip: string): Promise<CtiSummary> {
+  return (await lookupFull(ip, false)).summary;
 }
 
 export function ctiConfigured() {
@@ -160,6 +185,25 @@ export function createCti(db: Database) {
         if (hit) results[ip] = hit.data;
       }
       return { results, pending: Math.max(toFetch.length - limit, 0), configured };
+    },
+
+    // Consulta detalhada de um IP, sempre na hora (a página é aberta sob demanda); atualiza o cache do resumo.
+    async analyze(indicator: string): Promise<IpAnalysis> {
+      const ip = String(indicator ?? '').trim().toLowerCase();
+      if (isIP(ip) === 0) throw Object.assign(new Error('Informe um endereço IP válido.'), { status: 400 });
+      const configured = ctiConfigured();
+      if (!Object.values(configured).some(Boolean)) {
+        return { configured, detail: null, summary: { indicator: ip, fetchedAt: new Date().toISOString(), verdict: 'unknown', score: null, totalReports: null, lastReportedAt: null, domain: null, isp: null, asn: null, countryCode: null, usageType: null, greyNoise: null, otxPulses: null } };
+      }
+      const { summary, detail } = await lookupFull(ip, true);
+      if (!(summary.score === null && summary.greyNoise === null && summary.otxPulses === null)) {
+        await db.query(
+          `INSERT INTO cti_cache (indicator, data, fetched_at) VALUES ($1, $2::jsonb, now())
+           ON CONFLICT (indicator) DO UPDATE SET data = EXCLUDED.data, fetched_at = now()`,
+          [ip, JSON.stringify(summary)]
+        );
+      }
+      return { configured, summary, detail };
     },
 
     async testKeys() {

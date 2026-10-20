@@ -256,6 +256,22 @@ export interface CtiSummary {
   errors?: string[];
 }
 
+/** Análise detalhada de um IP (página Análise de IP): o resumo de sempre mais o que só a consulta detalhada traz. */
+export interface IpAnalysis {
+  summary: CtiSummary;
+  configured: { abuseIpDb: boolean; greyNoise: boolean; otx: boolean };
+  detail: {
+    countryName: string | null;
+    isTor: boolean;
+    isWhitelisted: boolean | null;
+    isPublic: boolean | null;
+    hostnames: string[];
+    distinctUsers: number | null;
+    /** Denúncias mais recentes do AbuseIPDB (até 50). */
+    reports: Array<{ reportedAt: string; comment: string; categories: number[]; reporterCountryCode: string | null }>;
+  } | null;
+}
+
 export interface EntryComment {
   id: number;
   entryId: string;

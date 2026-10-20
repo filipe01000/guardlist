@@ -7,7 +7,7 @@ import type { ActionMenuEntry } from './ActionMenu';
 // ---------- Pedidos de ação vindos de qualquer tela (ex.: menu de uma linha) ----------
 
 export const INDICATOR_ACTION_EVENT = 'guardlist:indicator-action';
-export type IndicatorAction = 'dossier' | 'where' | 'block' | 'exception' | 'ai';
+export type IndicatorAction = 'dossier' | 'where' | 'block' | 'exception' | 'ai' | 'analyze';
 
 export const OPEN_CASE_EVENT = 'guardlist:open-case';
 

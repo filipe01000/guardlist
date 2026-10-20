@@ -37,6 +37,7 @@ const AdminView = lazy(() => import('./components/AdminView').then(m => ({ defau
 const ReportsView = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
 const WeeklyImportView = lazy(() => import('./components/WeeklyImportView').then(m => ({ default: m.WeeklyImportView })));
 const ClientListView = lazy(() => import('./components/ClientListView').then(m => ({ default: m.ClientListView })));
+const IpAnalysisView = lazy(() => import('./components/IpAnalysisView').then(m => ({ default: m.IpAnalysisView })));
 const IntelligenceView = lazy(() => import('./components/IntelligenceView').then(m => ({ default: m.IntelligenceView })));
 const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
 const ClientManagerView = lazy(() => import('./components/ClientManagerView').then(m => ({ default: m.ClientManagerView })));
@@ -291,6 +292,8 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [isAdmin]);
 
+  const [ipAnalysisSeed, setIpAnalysisSeed] = useState<string | undefined>(undefined);
+
   const openQuickSearch = useCallback((seed?: string) => {
     setQuickSearchSeed(seed ?? '');
     setIsQuickSearchOpen(true);
@@ -301,6 +304,9 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       openQuickSearch(indicator);
     } else if (action === 'ai') {
       if (aiEnabledRef.current) askAi({ kind: 'indicator', indicator });
+    } else if (action === 'analyze') {
+      setIpAnalysisSeed(indicator);
+      setCurrentTab('ip-analysis');
     } else if (action === 'dossier') {
       const entries = await getIndicatorEntries(indicator).catch(() => [] as BlocklistEntry[]);
       setDossier({ indicator, entries });
@@ -535,6 +541,15 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             showToast={showToast}
             onOpenReview={() => setCurrentTab('review')}
             onManageClients={() => setCurrentTab('clients')}
+          />
+        )}
+
+        {currentTab === 'ip-analysis' && (
+          <IpAnalysisView
+            clients={clients}
+            seed={ipAnalysisSeed}
+            isAdmin={isAdmin}
+            onNavigateToClientList={handleNavigateToList}
           />
         )}
 

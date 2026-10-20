@@ -1,0 +1,122 @@
+/* Página Análise de IP (IpAnalysisView.tsx). */
+
+.ipa {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.ipa__search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.ipa__search > svg { width: 18px; height: 18px; color: var(--muted); flex: none; }
+
+.ipa__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 15px;
+}
+
+.ipa__empty { padding: 48px 16px; }
+
+.ipa__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 24px;
+  padding: 22px;
+}
+
+.ipa__hero-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+.ipa__ip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.ipa__reason { margin: -6px 0 0; color: var(--muted); font-size: 13px; }
+
+.ipa__score-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--muted); }
+.ipa__score-head strong { font-size: 22px; color: var(--text); }
+
+.ipa__bar {
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--surface-subtle);
+  overflow: hidden;
+}
+
+.ipa__bar i { display: block; height: 100%; border-radius: inherit; transition: width 0.5s ease; }
+.ipa__bar i[data-level="low"] { background: var(--success); }
+.ipa__bar i[data-level="medium"] { background: var(--warning); }
+.ipa__bar i[data-level="high"] { background: var(--danger); }
+
+.ipa__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.ipa__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin: 0;
+}
+
+.ipa__facts dt { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--muted); }
+.ipa__facts dd { margin: 3px 0 0; font-size: 13.5px; color: var(--text); overflow-wrap: anywhere; }
+.ipa__facts small { color: var(--muted); }
+
+.ipa__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+
+.ipa__list { list-style: none; margin: 0; padding: 6px 16px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ipa__list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 13px; }
+.ipa__list small { color: var(--muted); }
+
+.ipa__link { border: 0; padding: 0; background: none; color: var(--accent); font-weight: 600; cursor: pointer; }
+.ipa__link:hover { text-decoration: underline; }
+
+.ipa__tag--exception { color: var(--danger); }
+
+.ipa__muted { color: var(--muted); }
+.ipa__pad { margin: 0; padding: 8px 16px 16px; font-size: 13px; }
+
+.ipa__cats { list-style: none; margin: 0; padding: 6px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+.ipa__cats li {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.ipa__cats i { display: block; height: 8px; border-radius: 999px; background: var(--accent); opacity: 0.75; }
+.ipa__cats strong { text-align: right; }
+
+.ipa__chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.ipa__comment { font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+.ipa__reports td { vertical-align: top; }
+
+@media (max-width: 1100px) {
+  .ipa__hero { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 760px) {
+  .ipa__grid { grid-template-columns: minmax(0, 1fr); }
+  .ipa__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ipa__cats li { grid-template-columns: 110px minmax(0, 1fr) 30px; }
+}

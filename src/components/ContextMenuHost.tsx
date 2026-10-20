@@ -25,7 +25,8 @@ import {
   Sparkles,
   Sun,
   Upload,
-  Users
+  Users,
+  Fingerprint
 } from 'lucide-react';
 import type { Client } from '../types';
 import type { ShowToast } from '../App';
@@ -35,6 +36,7 @@ import { detectEntity, externalLookupEntries, TYPE_LABEL, type ContextEntity, ty
 
 export const PAGES: Array<{ tab: AppTab; label: string; icon: typeof Search; key?: string; adminOnly?: boolean }> = [
   { tab: 'dashboard', label: 'Painel geral', icon: LayoutDashboard, key: 'D' },
+  { tab: 'ip-analysis', label: 'Análise de IP', icon: Fingerprint },
   { tab: 'intelligence', label: 'Inteligência de IPs', icon: Radio, key: 'T' },
   { tab: 'import', label: 'Importação', icon: Upload, key: 'I' },
   { tab: 'client-list', label: 'Listas dos clientes', icon: ListChecks, key: 'L' },
@@ -145,6 +147,7 @@ export function ContextMenuHost(props: Props) {
     if (!inModal) {
       if (p.aiEnabled) items.push({ label: 'Perguntar à IA', icon: Sparkles, title: 'Resumo, reputação e recomendação', onSelect: () => p.onIndicatorAction('ai', value) });
       items.push(
+        ...(type === 'IPv4' || type === 'IPv6' ? [{ label: 'Analisar IP', icon: Fingerprint, title: 'Reputação, denúncias e onde está no GuardList', onSelect: () => p.onIndicatorAction('analyze', value) }] : []),
         { label: 'Abrir dossiê do indicador', icon: ScanSearch, onSelect: () => p.onIndicatorAction('dossier', value) },
         { label: 'Onde está bloqueado?', icon: Search, hint: 'Ctrl K', onSelect: () => p.onQuickSearch(value) },
         { type: 'divider' },
