@@ -25,10 +25,13 @@ interface WeeklyImportViewProps {
   settings: AppSettings;
 }
 
-type PreviewTab = ImportPreviewItem['category'];
+// 'legit' e 'malicious' são abas filtradas pela reputação dos IPs novos, não categorias do importador.
+type PreviewTab = ImportPreviewItem['category'] | 'legit' | 'malicious';
 
 const TABS: Array<[PreviewTab, string, '' | 'ok' | 'warn' | 'danger']> = [
   ['new', 'Novos', 'ok'],
+  ['malicious', 'Maliciosos', 'danger'],
+  ['legit', 'Legítimos', ''],
   ['dup_in_file', 'Repetidos no arquivo', ''],
   ['already_exists', 'Já na lista', ''],
   ['covered_by_cidr', 'Cobertos por CIDR', ''],
@@ -155,6 +158,31 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
     () => (preview ? preview.items.filter((i) => i.category === 'new' && cti[i.indicator]?.verdict === 'legit') : []),
     [preview, cti]
   );
+
+  // IPs novos com reputação ruim, os piores primeiro.
+  const maliciousItems = useMemo(() => {
+    if (!preview) return [];
+    const bad = preview.items.filter((i) => i.category === 'new' && (cti[i.indicator]?.verdict === 'high' || cti[i.indicator]?.verdict === 'medium'));
+    return bad.sort((a, b) => (cti[b.indicator]?.score ?? 0) - (cti[a.indicator]?.score ?? 0) || (cti[b.indicator]?.totalReports ?? 0) - (cti[a.indicator]?.totalReports ?? 0));
+  }, [preview, cti]);
+
+  const itemsOfTab = (tab: PreviewTab) => {
+    if (!preview) return [];
+    if (tab === 'legit') return legitItems;
+    if (tab === 'malicious') return maliciousItems;
+    return preview.items.filter((i) => i.category === tab);
+  };
+
+  const [copiedTab, setCopiedTab] = useState(false);
+  const copyTab = async (tab: PreviewTab) => {
+    try {
+      await navigator.clipboard.writeText(itemsOfTab(tab).map((i) => i.indicator).join('\n'));
+      setCopiedTab(true);
+      window.setTimeout(() => setCopiedTab(false), 1600);
+    } catch {
+      setSubmitError('Não foi possível copiar automaticamente.');
+    }
+  };
 
   // Itens que serão gravados
   const itemsToSave = useMemo(() => {
@@ -283,7 +311,7 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
     });
   };
 
-  const countOf = (tab: PreviewTab) => (preview ? preview.items.filter((i) => i.category === tab).length : 0);
+  const countOf = (tab: PreviewTab) => itemsOfTab(tab).length;
 
   return (
     <div className="space-y-6">
@@ -526,7 +554,7 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
           </div>
 
           <div className="tabs" role="tablist" aria-label="Categorias da pré-visualização">
-            {TABS.filter(([id]) => id !== 'exception' || countOf('exception') > 0).map(([id, label, tone]) => {
+            {TABS.filter(([id]) => !['exception', 'legit', 'malicious'].includes(id) || countOf(id) > 0).map(([id, label, tone]) => {
               const count = countOf(id);
               return (
                 <button
@@ -555,6 +583,23 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
             </div>
           )}
 
+          {(activeTab === 'legit' || activeTab === 'malicious') && (
+            <div className={`notice ${activeTab === 'malicious' ? 'notice--danger' : ''}`}>
+              {activeTab === 'malicious' ? <AlertTriangle aria-hidden="true" /> : <Info aria-hidden="true" />}
+              <p>
+                {activeTab === 'malicious'
+                  ? 'IPs novos com reputação de alto ou médio risco, os piores primeiro. Eles serão gravados.'
+                  : skipLegit
+                    ? 'IPs novos que parecem de serviços legítimos (Google, Cloudflare, Microsoft…). Não serão gravados.'
+                    : 'IPs novos que parecem de serviços legítimos. A opção "Não gravar os legítimos" está desligada, então eles serão gravados.'}
+              </p>
+              <button type="button" className="btn btn--sm" onClick={() => copyTab(activeTab)}>
+                <Copy aria-hidden="true" />
+                {copiedTab ? 'Copiados' : `Copiar ${countOf(activeTab)}`}
+              </button>
+            </div>
+          )}
+
           {activeTab === 'exception' && (
             <div className="notice notice--danger">
               <ShieldOff aria-hidden="true" />
@@ -576,7 +621,7 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
           <div className="rounded-xl border border-slate-800 overflow-hidden">
             <div key={activeTab} className="view-enter max-h-[460px] overflow-y-auto p-1.5 font-mono text-xs">
               {(() => {
-                const currentItems = preview.items.filter(i => i.category === activeTab);
+                const currentItems = itemsOfTab(activeTab);
                 if (currentItems.length === 0) {
                   return (
                     <div className="empty-state">
