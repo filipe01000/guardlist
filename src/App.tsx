@@ -111,7 +111,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   const [totalActiveAcrossAll, setTotalActiveAcrossAll] = useState<number>(0);
   const [totalIpsAcrossAll, setTotalIpsAcrossAll] = useState<number>(0);
   const [totalCidrsAcrossAll, setTotalCidrsAcrossAll] = useState<number>(0);
-  const [addressStats, setAddressStats] = useState<Pick<DashboardStats, 'addressCounts' | 'totalAddresses' | 'ipv6Networks' | 'uniqueSingleIps' | 'uniqueCidrs'>>({ addressCounts: {}, totalAddresses: 0, ipv6Networks: 0, uniqueSingleIps: 0, uniqueCidrs: 0 });
+  const [ipStats, setIpStats] = useState<Pick<DashboardStats, 'ipTotals' | 'ipTotalsSum'>>({ ipTotals: {}, ipTotalsSum: { ips: 0, cidrs: 0, withCidrs: 0, ipv6Networks: 0 } });
   const [totalCorrelatedIps, setTotalCorrelatedIps] = useState<number>(0);
   const [addedThisWeekCount, setAddedThisWeekCount] = useState<number>(0);
   const [recurring, setRecurring] = useState<DashboardStats['recurring']>([]);
@@ -207,7 +207,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       setTotalActiveAcrossAll(stats.totalActiveAcrossAll);
       setTotalIpsAcrossAll(stats.totalIpsAcrossAll);
       setTotalCidrsAcrossAll(stats.totalCidrsAcrossAll);
-      setAddressStats({ addressCounts: stats.addressCounts ?? {}, totalAddresses: stats.totalAddresses ?? 0, ipv6Networks: stats.ipv6Networks ?? 0, uniqueSingleIps: stats.uniqueSingleIps ?? 0, uniqueCidrs: stats.uniqueCidrs ?? 0 });
+      setIpStats({ ipTotals: stats.ipTotals ?? {}, ipTotalsSum: stats.ipTotalsSum ?? { ips: 0, cidrs: 0, withCidrs: 0, ipv6Networks: 0 } });
       setTotalCorrelatedIps(stats.totalCorrelatedIps);
       setAddedThisWeekCount(stats.addedThisWeekCount);
       setRecurring(stats.recurring);
@@ -526,7 +526,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             totalActiveAcrossAll={totalActiveAcrossAll}
             totalIpsAcrossAll={totalIpsAcrossAll}
             totalCidrsAcrossAll={totalCidrsAcrossAll}
-            addressStats={addressStats}
+            ipStats={ipStats}
             totalCorrelatedIps={totalCorrelatedIps}
             addedThisWeekCount={addedThisWeekCount}
             recurring={recurring}
@@ -577,6 +577,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             clients={clients}
             selectedClientId={selectedClientId}
             onSelectClient={setSelectedClientId}
+            ipTotals={ipStats.ipTotals}
             onRefreshStats={refreshAllData}
             onAddIndicators={handleNavigateToImport}
             showToast={showToast}

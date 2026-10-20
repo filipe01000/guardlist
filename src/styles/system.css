@@ -1903,3 +1903,13 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Card do cliente clicável: abre a lista do cliente. */
+.cl-card {
+  cursor: pointer;
+}
+
+.cl-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}

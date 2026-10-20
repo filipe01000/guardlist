@@ -733,3 +733,21 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Contagem de IPs no topo da lista do cliente: IPs, CIDRs e, se pedido, o total com CIDRs. */
+.client-ip-totals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 26px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.client-ip-totals > div { display: flex; align-items: baseline; gap: 8px; }
+.client-ip-totals dt { color: var(--muted); font-size: 0.78rem; font-weight: 600; }
+.client-ip-totals dd { margin: 0; color: var(--text); font-family: var(--font-mono); font-size: 1.15rem; font-weight: 650; }
+.client-ip-totals .ip-totals__toggle { margin: 0 0 0 auto; align-self: center; }

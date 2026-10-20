@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FileSignature, X, Globe, ShieldPlus, Sparkles, Search, ArrowUpDown, Trash2, Edit3, Copy, Check, Download, AlertTriangle, ShieldCheck, RotateCcw, ScanSearch, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, Terminal, History, Undo2, CheckSquare, Square, ListChecks, Radio, RefreshCw, Plus, MessageSquare, ShieldOff, Send } from 'lucide-react';
-import { Client, BlocklistEntry, IndicatorType, ClientSnapshot, EntryComment } from '../types';
+import { Client, BlocklistEntry, IndicatorType, ClientSnapshot, EntryComment, ClientIpTotals } from '../types';
 import { Modal } from './Modal';
 import ActionMenu, { openActionMenuAt } from './ActionMenu';
 import { aiAvailability, externalLookupEntries, requestCaseBuilder, requestIndicatorAction } from './contextActions';
@@ -8,6 +8,7 @@ import type { ShowToast } from '../App';
 import { formatDateBR, formatDateTimeBR } from '../utils/csv';
 import { IpDossierModal } from './IpDossierModal';
 import { PageHeader } from './PageHeader';
+import { useCidrTotalPref } from '../utils/cidrTotalPref';
 import { 
   getClientEntries, 
   getClientEntriesPage,
@@ -51,6 +52,8 @@ interface ClientListViewProps {
   clients: Client[];
   selectedClientId: string;
   onSelectClient: (clientId: string) => void;
+  /** Conta de IPs de cada cliente (IPs, CIDRs e total com CIDRs), vinda do servidor. */
+  ipTotals: Record<string, ClientIpTotals>;
   onRefreshStats: () => void;
   onAddIndicators: (clientId: string) => void;
   showToast: ShowToast;
@@ -61,6 +64,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   clients,
   selectedClientId,
   onSelectClient,
+  ipTotals,
   onRefreshStats,
   onAddIndicators,
   showToast,
@@ -86,6 +90,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [totalFiltered, setTotalFiltered] = useState(0);
   const [totalClient, setTotalClient] = useState(0);
+  const [showCidrTotal, toggleCidrTotal] = useCidrTotalPref();
   const requestVersion = useRef(0);
   const selectedEntryCache = useRef(new Map<string, BlocklistEntry>());
   const [fullListBusy, setFullListBusy] = useState(false);
@@ -761,6 +766,28 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
           </>
         }
       />
+
+      {currentClient && ipTotals[currentClient.id] && (
+        <dl className="client-ip-totals" aria-label={`Contagem de IPs de ${currentClient.name}`}>
+          <div title="IPs informados um a um, sem contar o que está dentro dos CIDRs">
+            <dt>IPs</dt>
+            <dd>{ipTotals[currentClient.id].ips.toLocaleString('pt-BR')}</dd>
+          </div>
+          <div title="Quantidade de redes CIDR na lista">
+            <dt>CIDRs</dt>
+            <dd>{ipTotals[currentClient.id].cidrs.toLocaleString('pt-BR')}</dd>
+          </div>
+          {showCidrTotal && (
+            <div title="Endereços IPv4 cobertos contando o tamanho de cada CIDR, sem repetir sobreposição">
+              <dt>Total com CIDRs</dt>
+              <dd>{ipTotals[currentClient.id].withCidrs.toLocaleString('pt-BR')}</dd>
+            </div>
+          )}
+          <button type="button" className="ip-totals__toggle" onClick={toggleCidrTotal} aria-pressed={showCidrTotal}>
+            {showCidrTotal ? 'Ocultar total com CIDRs' : 'Mostrar total com CIDRs'}
+          </button>
+        </dl>
+      )}
 
       <div className="action-bar">
         <div className="action-bar__group">

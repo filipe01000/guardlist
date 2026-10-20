@@ -1165,10 +1165,18 @@ export function createStore(db: Database) {
         if (list) list.push(row.indicator);
         else byClient.set(row.client_id, [row.indicator]);
       }
-      const addressCounts: Record<string, number> = {};
-      for (const [clientId, list] of byClient) addressCounts[clientId] = countAddresses(list).ipv4;
-      const total = countAddresses(active.map((row) => row.indicator));
-      return { ...rows[0].result, addressCounts, totalAddresses: total.ipv4, ipv6Networks: total.ipv6Networks, uniqueSingleIps: total.singleIps, uniqueCidrs: total.cidrs };
+      const ipTotals: DashboardStats['ipTotals'] = {};
+      const ipTotalsSum = { ips: 0, cidrs: 0, withCidrs: 0, ipv6Networks: 0 };
+      for (const [clientId, list] of byClient) {
+        const count = countAddresses(list);
+        const totals = { ips: count.singleIps, cidrs: count.cidrs, withCidrs: count.ipv4, ipv6Networks: count.ipv6Networks };
+        ipTotals[clientId] = totals;
+        ipTotalsSum.ips += totals.ips;
+        ipTotalsSum.cidrs += totals.cidrs;
+        ipTotalsSum.withCidrs += totals.withCidrs;
+        ipTotalsSum.ipv6Networks += totals.ipv6Networks;
+      }
+      return { ...rows[0].result, ipTotals, ipTotalsSum };
     },
 
     async getCorrelationPage(_actor: Actor, params: CorrelationPageParams = {}): Promise<CorrelationPage> {

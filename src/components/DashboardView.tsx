@@ -16,6 +16,7 @@ import ActionMenu, { openActionMenuAt } from './ActionMenu';
 import { ValidateAllModal } from './ValidateAllModal';
 import type { ShowToast } from '../App';
 import { Client, DashboardStats, ImportHistoryRecord } from '../types';
+import { useCidrTotalPref } from '../utils/cidrTotalPref';
 import { getDaysSince } from '../utils/validator';
 import { formatDateBR } from '../utils/csv';
 import { coverBackground } from '../utils/imageToCover';
@@ -31,7 +32,7 @@ interface DashboardViewProps {
   totalIpsAcrossAll: number;
   totalCidrsAcrossAll: number;
   /** Endereços IPv4 cobertos (CIDRs pelo tamanho), por cliente e no total, e as faixas IPv6 à parte. */
-  addressStats: Pick<DashboardStats, 'addressCounts' | 'totalAddresses' | 'ipv6Networks' | 'uniqueSingleIps' | 'uniqueCidrs'>;
+  ipStats: Pick<DashboardStats, 'ipTotals' | 'ipTotalsSum'>;
   totalCorrelatedIps: number;
   addedThisWeekCount: number;
   recurring: DashboardStats['recurring'];
@@ -49,7 +50,6 @@ interface DashboardViewProps {
 }
 
 const VIEW_MODE_KEY = 'guardlist-dashboard-view';
-const CIDR_TOTAL_KEY = 'guardlist.dashboard.cidrTotal';
 
 function dueLabel(daysSince: number | null, daysUntilDue: number): { text: string; tone: 'danger' | 'warn' | 'muted' } {
   if (daysSince === null) return { text: 'Sem importação', tone: 'danger' };
@@ -98,7 +98,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   totalActiveAcrossAll,
   totalIpsAcrossAll,
   totalCidrsAcrossAll,
-  addressStats,
+  ipStats,
   totalCorrelatedIps,
   addedThisWeekCount,
   recurring,
@@ -124,20 +124,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   });
   const [statusFilter, setStatusFilter] = useState<'all' | 'late' | 'near' | 'ok'>('all');
-  // Total contando os endereços dentro dos CIDRs: opcional, porque um /16 sozinho já vale 65.536 e distorce a leitura.
-  const [showCidrTotal, setShowCidrTotal] = useState(() => {
-    try {
-      return window.localStorage.getItem(CIDR_TOTAL_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
-  const toggleCidrTotal = () => {
-    setShowCidrTotal((on) => {
-      try { window.localStorage.setItem(CIDR_TOTAL_KEY, on ? '0' : '1'); } catch { /* preferência opcional */ }
-      return !on;
-    });
-  };
+  const [showCidrTotal, toggleCidrTotal] = useCidrTotalPref();
   const [history, setHistory] = useState<ImportHistoryRecord[]>([]);
 
   useEffect(() => {
@@ -169,9 +156,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         daysSince,
         daysUntilDue,
         total: activeCounts[client.id] || 0,
-        ips: ipCounts[client.id] || 0,
-        cidrs: cidrCounts[client.id] || 0,
-        addresses: addressStats.addressCounts[client.id] || 0,
+        ips: ipStats.ipTotals[client.id]?.ips ?? ipCounts[client.id] ?? 0,
+        cidrs: ipStats.ipTotals[client.id]?.cidrs ?? cidrCounts[client.id] ?? 0,
+        addresses: ipStats.ipTotals[client.id]?.withCidrs ?? 0,
         isLate,
         isNearDeadline,
         urgencyScore
@@ -238,18 +225,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="workspace-summary__item">
           <span>IPs bloqueados</span>
           <dl className="ip-totals">
-            <div title="IPs informados um a um, sem contar o que está dentro dos CIDRs; cada IP conta uma vez">
-              <dt>IPs, sem CIDRs</dt>
-              <dd>{addressStats.uniqueSingleIps.toLocaleString('pt-BR')}</dd>
+            <div title="Soma dos IPs de todos os clientes, sem contar o que está dentro dos CIDRs (o mesmo IP em dois clientes conta duas vezes)">
+              <dt>IPs somando os clientes</dt>
+              <dd>{ipStats.ipTotalsSum.ips.toLocaleString('pt-BR')}</dd>
             </div>
-            <div title="Quantidade de redes CIDR distintas nas listas">
+            <div title="Soma dos CIDRs de todos os clientes">
               <dt>CIDRs</dt>
-              <dd>{addressStats.uniqueCidrs.toLocaleString('pt-BR')}</dd>
+              <dd>{ipStats.ipTotalsSum.cidrs.toLocaleString('pt-BR')}</dd>
             </div>
             {showCidrTotal && (
-              <div title="Endereços IPv4 distintos: cada CIDR conta pelo tamanho, sem repetir sobreposições">
+              <div title="Soma dos clientes contando o tamanho de cada CIDR (dentro de cada cliente, sobreposições não contam duas vezes)">
                 <dt>Total com CIDRs</dt>
-                <dd>{addressStats.totalAddresses.toLocaleString('pt-BR')}</dd>
+                <dd>{ipStats.ipTotalsSum.withCidrs.toLocaleString('pt-BR')}</dd>
               </div>
             )}
           </dl>
@@ -258,7 +245,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </button>
           <small>
             {totalActiveAcrossAll.toLocaleString('pt-BR')} entradas ativas
-            {addressStats.ipv6Networks > 0 && ` · IPv6 à parte: ${addressStats.ipv6Networks} ${addressStats.ipv6Networks === 1 ? 'faixa' : 'faixas'}`}
+            {showCidrTotal && ipStats.ipTotalsSum.ipv6Networks > 0 && ` · IPv6 fora do total com CIDRs`}
           </small>
         </div>
         <button
@@ -330,6 +317,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     className={`cl-card ${tone}`}
                     data-client-id={client.id}
                     onContextMenu={openActionMenuAt}
+                    // Clicar no card abre a lista do cliente; os botões de dentro mantêm a própria ação.
+                    onClick={(e) => {
+                      if ((e.target as HTMLElement).closest('button, a, [role="menu"], [role="menuitem"]')) return;
+                      onNavigateToList(client.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        onNavigateToList(client.id);
+                      }
+                    }}
+                    tabIndex={0}
                     style={{ '--i': Math.min(index, 12), '--vt': vtName(client.id) } as React.CSSProperties}
                   >
                     <div className={`cl-card__cover${client.logo ? ' has-logo' : ''}`}>
@@ -412,7 +411,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
                   {sortedClients.map(({ client, daysSince, total, ips, cidrs, isLate, isNearDeadline }, idx) => (
-                    <tr key={client.id} className="hover:bg-slate-800/30 transition-colors" onContextMenu={openActionMenuAt}>
+                    <tr
+                      key={client.id}
+                      className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                      onContextMenu={openActionMenuAt}
+                      onClick={(e) => {
+                        if ((e.target as HTMLElement).closest('button, a, [role="menu"], [role="menuitem"]')) return;
+                        onNavigateToList(client.id);
+                      }}
+                    >
                       <td className="py-2.5 px-4 font-mono text-slate-500 tabular-nums">{idx + 1}</td>
                       <td className="py-2.5 px-4">
                         <button
