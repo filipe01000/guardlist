@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decide, parseBlock } from './cti.ts';
+import { decide, parseBlock, rejudge } from './cti.ts';
 import type { CtiSummary } from '../src/types/index.ts';
 
 type Base = Omit<CtiSummary, 'verdict' | 'verdictReason'>;
@@ -54,4 +54,11 @@ test('rede no AbuseIPDB: os piores IPs primeiro e linhas sem IP descartadas', ()
   });
   assert.equal(parsed.numPossibleHosts, 256);
   assert.deepEqual(parsed.reported.map((r) => [r.ip, r.score]), [['193.32.162.5', 100], ['193.32.162.0', 18]]);
+});
+
+test('reputação do cache é refeita com a regra atual (resumo antigo de Censys marcado como médio vira scanner)', () => {
+  const old: CtiSummary = { ...base({ domain: 'censys.com', isp: 'Censys, Inc.', otxPulses: 39 }), verdict: 'medium', verdictReason: 'regra antiga' };
+  const fresh = rejudge(old);
+  assert.equal(fresh.verdict, 'scanner');
+  assert.equal(fresh.domain, 'censys.com');
 });

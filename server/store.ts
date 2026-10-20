@@ -7,6 +7,7 @@ import type {
   ClientEntriesPageParams,
   ClientException,
   ClientSnapshot,
+  CtiSummary,
   CorrelationPage,
   CorrelationPageParams,
   DashboardStats,
@@ -17,6 +18,7 @@ import type {
 import { findExceptionConflicts, findRedundant, toRange } from '../src/utils/redundancy.ts';
 import { ipTotalsByClient, type IpTotals } from '../src/utils/addressCount.ts';
 import { classifyIndicator, normalizeIndicator } from '../src/utils/validator.ts';
+import { rejudge } from './cti.ts';
 import {
   type Actor,
   DEFAULT_SETTINGS,
@@ -697,7 +699,7 @@ export function createStore(db: Database) {
         missing: activeIps.filter((r) => !r.cti).map((r) => r.data.indicator).slice(0, 500),
         countries: tally((c) => c.countryCode),
         providers: tally((c) => c.asn || c.isp),
-        verdicts: tally((c) => c.verdict)
+        verdicts: tally((c) => rejudge(c as CtiSummary).verdict)
       };
     },
 

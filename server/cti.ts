@@ -178,6 +178,12 @@ export function ctiConfigured() {
 
 const answered = (summary: CtiSummary) => !(summary.score === null && summary.greyNoise === null && summary.otxPulses === null);
 
+/** Resumo do cache com o veredito refeito pela regra atual: mudar a regra vale na hora, sem esperar o cache vencer. */
+export function rejudge(summary: CtiSummary): CtiSummary {
+  const { verdict: _verdict, verdictReason: _reason, ...facts } = summary;
+  return { ...facts, ...decide(facts) };
+}
+
 export function createCti(db: Database) {
   async function cached(ips: string[]): Promise<Map<string, { data: CtiSummary; fetchedAt: number }>> {
     if (ips.length === 0) return new Map();
@@ -216,7 +222,7 @@ export function createCti(db: Database) {
       const toFetch: string[] = [];
       for (const ip of ips) {
         const hit = known.get(ip);
-        if (hit && !options.force && hit.fetchedAt > fresh) results[ip] = hit.data;
+        if (hit && !options.force && hit.fetchedAt > fresh) results[ip] = rejudge(hit.data);
         else toFetch.push(ip);
       }
       const batch = toFetch.slice(0, limit);
@@ -243,7 +249,7 @@ export function createCti(db: Database) {
       // Itens que ficaram de fora do lote ainda aparecem se houver cache antigo.
       for (const ip of toFetch.slice(limit)) {
         const hit = known.get(ip);
-        if (hit) results[ip] = hit.data;
+        if (hit) results[ip] = rejudge(hit.data);
       }
       return { results, pending: Math.max(toFetch.length - limit, 0), configured };
     },
@@ -260,7 +266,7 @@ export function createCti(db: Database) {
       }
       if (!options.force) {
         const hit = await recentAnalysis<IpAnalysis>(`ip:${ip}`);
-        if (hit) return { ...hit, cached: true };
+        if (hit) return { ...hit, summary: rejudge(hit.summary), cached: true };
       }
       const { summary, detail } = await lookupFull(ip, true);
       const result: IpAnalysis = { configured, summary, detail, fetchedAt: summary.fetchedAt };
