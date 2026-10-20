@@ -32,7 +32,7 @@ import type { Client } from '../types';
 import type { ShowToast } from '../App';
 import type { AppTab } from './Navbar';
 import { MenuPanel, useMenuDismiss, type ActionMenuEntry, type DismissReason, type MenuAnchor } from './ActionMenu';
-import { detectEntity, externalLookupEntries, TYPE_LABEL, type ContextEntity, type IndicatorAction } from './contextActions';
+import { detectEntity, externalLookupEntries, openIpAnalysisTab, TYPE_LABEL, type ContextEntity, type IndicatorAction } from './contextActions';
 
 export const PAGES: Array<{ tab: AppTab; label: string; icon: typeof Search; key?: string; adminOnly?: boolean }> = [
   { tab: 'dashboard', label: 'Painel geral', icon: LayoutDashboard, key: 'D' },
@@ -144,10 +144,14 @@ export function ContextMenuHost(props: Props) {
     const { value, type } = entity;
     const lookups: ActionMenuEntry = { label: 'Consultar fora', icon: Globe, children: externalLookupEntries(value, type) };
     const items: ActionMenuEntry[] = [{ type: 'heading', label: value, detail: TYPE_LABEL[type] }];
+    // Em qualquer lugar (inclusive dentro de janelas), um IP pode ser analisado numa aba nova.
+    if (type === 'IPv4' || type === 'IPv6') {
+      items.push({ label: 'Analisar IP', icon: Fingerprint, hint: 'nova aba', title: 'Reputação, denúncias e onde está no GuardList, numa aba nova', onSelect: () => openIpAnalysisTab(value) });
+      if (inModal) items.push({ type: 'divider' });
+    }
     if (!inModal) {
       if (p.aiEnabled) items.push({ label: 'Perguntar à IA', icon: Sparkles, title: 'Resumo, reputação e recomendação', onSelect: () => p.onIndicatorAction('ai', value) });
       items.push(
-        ...(type === 'IPv4' || type === 'IPv6' ? [{ label: 'Analisar IP', icon: Fingerprint, title: 'Reputação, denúncias e onde está no GuardList', onSelect: () => p.onIndicatorAction('analyze', value) }] : []),
         { label: 'Abrir dossiê do indicador', icon: ScanSearch, onSelect: () => p.onIndicatorAction('dossier', value) },
         { label: 'Onde está bloqueado?', icon: Search, hint: 'Ctrl K', onSelect: () => p.onQuickSearch(value) },
         { type: 'divider' },

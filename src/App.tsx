@@ -11,7 +11,7 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { ContextMenuHost } from './components/ContextMenuHost';
 import { IndicatorActionModal, type IndicatorActionMode } from './components/IndicatorActionModal';
 import { IpDossierModal } from './components/IpDossierModal';
-import { INDICATOR_ACTION_EVENT, OPEN_CASE_EVENT, OPEN_IMPORT_REPORT_EVENT, aiAvailability, type IndicatorAction } from './components/contextActions';
+import { ANALYZE_PARAM, INDICATOR_ACTION_EVENT, OPEN_CASE_EVENT, OPEN_IMPORT_REPORT_EVENT, aiAvailability, openIpAnalysisTab, type IndicatorAction } from './components/contextActions';
 import { CaseBuilderModal } from './components/CaseBuilderModal';
 import { TopBar } from './components/TopBar';
 import { ImportReportModal } from './components/ImportReportModal';
@@ -92,7 +92,9 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       return false;
     }
   });
-  const [currentTab, setCurrentTab] = useState<AppTab>('dashboard');
+  // Aberto com ?analisar=IP (vindo de "Analisar IP" em outra aba): começa direto na Análise de IP.
+  const [initialAnalyzeIp] = useState(() => new URLSearchParams(window.location.search).get(ANALYZE_PARAM) || undefined);
+  const [currentTab, setCurrentTab] = useState<AppTab>(initialAnalyzeIp ? 'ip-analysis' : 'dashboard');
   // Tela anterior, para o botão Voltar da importação.
   const [previousTab, setPreviousTab] = useState<AppTab>('dashboard');
   const tabRef = useRef<AppTab>('dashboard');
@@ -292,7 +294,14 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [isAdmin]);
 
-  const [ipAnalysisSeed, setIpAnalysisSeed] = useState<string | undefined>(undefined);
+  const [ipAnalysisSeed] = useState<string | undefined>(initialAnalyzeIp);
+  useEffect(() => {
+    // Tira o ?analisar= da barra de endereço: recarregar a aba não refaz a consulta à toa.
+    if (!initialAnalyzeIp) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(ANALYZE_PARAM);
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash);
+  }, [initialAnalyzeIp]);
 
   const openQuickSearch = useCallback((seed?: string) => {
     setQuickSearchSeed(seed ?? '');
@@ -305,8 +314,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
     } else if (action === 'ai') {
       if (aiEnabledRef.current) askAi({ kind: 'indicator', indicator });
     } else if (action === 'analyze') {
-      setIpAnalysisSeed(indicator);
-      setCurrentTab('ip-analysis');
+      openIpAnalysisTab(indicator);
     } else if (action === 'dossier') {
       const entries = await getIndicatorEntries(indicator).catch(() => [] as BlocklistEntry[]);
       setDossier({ indicator, entries });

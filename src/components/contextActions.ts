@@ -26,6 +26,16 @@ export function requestImportReport(historyId: string) {
 /** Se o assistente de IA está ligado neste servidor (definido pelo App ao carregar). */
 export const aiAvailability = { enabled: false };
 
+/** Parâmetro da URL que abre o app direto na Análise de IP (usado ao abrir em outra aba). */
+export const ANALYZE_PARAM = 'analisar';
+
+/** Abre a Análise de IP numa aba nova do navegador, sem tirar o usuário da página em que está. */
+export function openIpAnalysisTab(ip: string) {
+  const url = new URL(window.location.pathname, window.location.origin);
+  url.searchParams.set(ANALYZE_PARAM, ip);
+  window.open(url.toString(), '_blank', 'noopener');
+}
+
 /** Pede ao app uma ação sobre um indicador (abre a janela certa, onde quer que o usuário esteja). */
 export function requestIndicatorAction(action: IndicatorAction, indicator: string) {
   window.dispatchEvent(new CustomEvent(INDICATOR_ACTION_EVENT, { detail: { action, indicator } }));
