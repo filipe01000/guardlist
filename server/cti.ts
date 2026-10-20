@@ -2,10 +2,13 @@ import { isIP } from 'node:net';
 import type { Database } from './db.ts';
 import type { CidrAnalysis, CtiSummary, CtiVerdict, IpAnalysis } from '../src/types/index.ts';
 
-// Reputação de IPs para triagem na importação e para os gráficos. Consulta AbuseIPDB, GreyNoise e OTX
-// com poucas requisições simultâneas e guarda o resultado em cti_cache, para não gastar a cota de novo.
+// Reputação de IPs. Todas as consultas ao AbuseIPDB, GreyNoise e OTX passam por aqui:
+// - cti_cache: resumo de 90 dias, usado na triagem da importação, na lista do cliente e nos gráficos;
+// - cti_analysis_cache: consulta detalhada de 12 meses (página Análise de IP e dossiê), guardada por pouco tempo.
+// As duas ficam separadas para os números de cada tela não se misturarem.
 
 const CACHE_HOURS = Number(process.env.CTI_CACHE_HOURS || 72);
+const ANALYSIS_CACHE_MIN = Number(process.env.CTI_ANALYSIS_CACHE_MIN || 60);
 const CONCURRENCY = 4;
 
 // Serviços conhecidos que raramente devem ser bloqueados (CDNs, nuvens, buscadores).
@@ -22,6 +25,21 @@ const KNOWN_PROVIDERS: Array<[RegExp, string]> = [
   [/oracle cloud|oraclecloud/i, 'Oracle Cloud']
 ];
 
+// Scanners de pesquisa conhecidos: varrem a internet toda, não miram o cliente. Bloquear ou não é decisão da equipe.
+const KNOWN_SCANNERS: Array<[RegExp, string]> = [
+  [/censys/i, 'Censys'],
+  [/shodan/i, 'Shodan'],
+  [/shadowserver/i, 'Shadowserver'],
+  [/binaryedge/i, 'BinaryEdge'],
+  [/rapid7|project sonar/i, 'Rapid7 (Project Sonar)'],
+  [/stretchoid/i, 'Stretchoid'],
+  [/internet-measurement|driftnet/i, 'Driftnet'],
+  [/onyphe/i, 'Onyphe'],
+  [/leakix/i, 'LeakIX'],
+  [/criminalip|ai-spera/i, 'Criminal IP'],
+  [/internet-census|recyber/i, 'Internet Census']
+];
+
 async function getJson(url: string, headers: Record<string, string>): Promise<{ status: number; body: any }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -33,22 +51,32 @@ async function getJson(url: string, headers: Record<string, string>): Promise<{ 
   }
 }
 
-function knownProvider(...values: Array<string | null | undefined>): string | null {
+function matchName(list: Array<[RegExp, string]>, ...values: Array<string | null | undefined>): string | null {
   const text = values.filter(Boolean).join(' ');
-  for (const [pattern, name] of KNOWN_PROVIDERS) if (pattern.test(text)) return name;
+  for (const [pattern, name] of list) if (pattern.test(text)) return name;
   return null;
 }
 
-function decide(summary: Omit<CtiSummary, 'verdict' | 'verdictReason'>): { verdict: CtiVerdict; verdictReason?: string } {
-  const provider = knownProvider(summary.domain, summary.isp, summary.asn, summary.greyNoise?.name);
-  if (summary.greyNoise?.riot) return { verdict: 'legit', verdictReason: `Serviço legítimo conhecido (GreyNoise${summary.greyNoise.name ? `: ${summary.greyNoise.name}` : ''})` };
-  if (provider && (summary.score ?? 0) < 25) return { verdict: 'legit', verdictReason: `Pertence a ${provider}` };
-  if (summary.usageType && /search engine spider|content delivery/i.test(summary.usageType) && (summary.score ?? 0) < 25) {
-    return { verdict: 'legit', verdictReason: summary.usageType };
-  }
-  if (summary.score === null && summary.greyNoise === null && summary.otxPulses === null) return { verdict: 'unknown' };
+/** Veredito da reputação. Exportado para os testes: é a regra que separa alto, médio, baixo, scanner e legítimo. */
+export function decide(summary: Omit<CtiSummary, 'verdict' | 'verdictReason'>): { verdict: CtiVerdict; verdictReason?: string } {
   const score = summary.score ?? 0;
   const reports = summary.totalReports ?? 0;
+  const names = [summary.domain, summary.isp, summary.asn, summary.greyNoise?.name, ...(summary.hostnames ?? [])];
+  const provider = matchName(KNOWN_PROVIDERS, ...names);
+  if (summary.greyNoise?.riot) return { verdict: 'legit', verdictReason: `Serviço legítimo conhecido (GreyNoise${summary.greyNoise.name ? `: ${summary.greyNoise.name}` : ''})` };
+  if (provider && score < 25) return { verdict: 'legit', verdictReason: `Pertence a ${provider}` };
+  if (summary.usageType && /search engine spider|content delivery/i.test(summary.usageType) && score < 25) {
+    return { verdict: 'legit', verdictReason: summary.usageType };
+  }
+  const scanner = matchName(KNOWN_SCANNERS, ...names);
+  if (score < 75) {
+    if (scanner) return { verdict: 'scanner', verdictReason: `Scanner de pesquisa conhecido (${scanner})` };
+    if (summary.isWhitelisted) return { verdict: 'scanner', verdictReason: 'Na lista branca do AbuseIPDB (serviço conhecido)' };
+    if (summary.greyNoise?.classification === 'benign') {
+      return { verdict: 'scanner', verdictReason: `Varredura benigna segundo o GreyNoise${summary.greyNoise.name ? ` (${summary.greyNoise.name})` : ''}` };
+    }
+  }
+  if (summary.score === null && summary.greyNoise === null && summary.otxPulses === null) return { verdict: 'unknown' };
   if (score >= 75 || reports >= 50 || summary.greyNoise?.classification === 'malicious') return { verdict: 'high' };
   if (score < 10 && reports < 3 && !(summary.otxPulses && summary.otxPulses > 0)) return { verdict: 'low', verdictReason: 'Sem denúncias relevantes' };
   // Médio: diz de onde veio o alerta, para não parecer contraditório com nota 0 no AbuseIPDB.
@@ -59,7 +87,10 @@ function decide(summary: Omit<CtiSummary, 'verdict' | 'verdictReason'>): { verdi
   return { verdict: 'medium', verdictReason: why.length ? `Risco médio: ${why.join(score > 0 || reports > 0 ? '; ' : ', mas ')}` : undefined };
 }
 
-// verbose: pede ao AbuseIPDB também as denúncias (usado só na página de análise, uma consulta por vez).
+const labelOf = (value: any): string =>
+  typeof value === 'string' ? value : String(value?.display_name || value?.name || value?.target || value?.id || '').trim();
+
+// verbose: janela de 12 meses e as denúncias do AbuseIPDB (página de análise e dossiê, uma consulta por vez).
 async function lookupFull(ip: string, verbose: boolean): Promise<{ summary: CtiSummary; detail: IpAnalysis['detail'] }> {
   const abuseKey = process.env.ABUSEIPDB_API_KEY;
   const greyKey = process.env.GREYNOISE_API_KEY;
@@ -87,6 +118,7 @@ async function lookupFull(ip: string, verbose: boolean): Promise<{ summary: CtiS
   const o = otx && otx.status === 200 ? otx.body : null;
   if (otxKey && !o) errors.push('OTX indisponível');
 
+  const hostnames: string[] = a && Array.isArray(a.hostnames) ? a.hostnames.filter((h: unknown): h is string => typeof h === 'string' && Boolean(h)).slice(0, 10) : [];
   const base = {
     indicator: ip,
     fetchedAt: new Date().toISOString(),
@@ -98,21 +130,24 @@ async function lookupFull(ip: string, verbose: boolean): Promise<{ summary: CtiS
     asn: (o && typeof o.asn === 'string' && o.asn) || null,
     countryCode: (a && typeof a.countryCode === 'string' && a.countryCode) || (o && typeof o.country_code === 'string' && o.country_code) || null,
     usageType: (a && typeof a.usageType === 'string' && a.usageType) || null,
+    hostnames,
+    isWhitelisted: a && typeof a.isWhitelisted === 'boolean' ? a.isWhitelisted : null,
     greyNoise: g
       ? { classification: typeof g.classification === 'string' ? g.classification : null, riot: Boolean(g.riot), name: typeof g.name === 'string' && g.name !== 'unknown' ? g.name : null }
       : null,
     otxPulses: o ? Number(o.pulse_info?.count ?? 0) : null,
     errors: errors.length ? errors : undefined
   };
-  const detail: IpAnalysis['detail'] = a
+  const pulses: any[] = o && Array.isArray(o.pulse_info?.pulses) ? o.pulse_info.pulses : [];
+  const detail: IpAnalysis['detail'] = a || o
     ? {
-        countryName: typeof a.countryName === 'string' ? a.countryName : null,
-        isTor: Boolean(a.isTor),
-        isWhitelisted: typeof a.isWhitelisted === 'boolean' ? a.isWhitelisted : null,
-        isPublic: typeof a.isPublic === 'boolean' ? a.isPublic : null,
-        hostnames: Array.isArray(a.hostnames) ? a.hostnames.filter((h: unknown) => typeof h === 'string').slice(0, 10) : [],
-        distinctUsers: typeof a.numDistinctUsers === 'number' ? a.numDistinctUsers : null,
-        reports: (Array.isArray(a.reports) ? a.reports : [])
+        countryName: a && typeof a.countryName === 'string' ? a.countryName : null,
+        isTor: Boolean(a?.isTor),
+        isWhitelisted: base.isWhitelisted,
+        isPublic: a && typeof a.isPublic === 'boolean' ? a.isPublic : null,
+        hostnames,
+        distinctUsers: a && typeof a.numDistinctUsers === 'number' ? a.numDistinctUsers : null,
+        reports: (a && Array.isArray(a.reports) ? a.reports : [])
           .slice()
           .sort((x: any, y: any) => String(y?.reportedAt).localeCompare(String(x?.reportedAt)))
           .slice(0, 50)
@@ -121,7 +156,9 @@ async function lookupFull(ip: string, verbose: boolean): Promise<{ summary: CtiS
             comment: typeof r?.comment === 'string' ? r.comment.slice(0, 600) : '',
             categories: Array.isArray(r?.categories) ? r.categories.filter((c: unknown) => typeof c === 'number') : [],
             reporterCountryCode: typeof r?.reporterCountryCode === 'string' ? r.reporterCountryCode : null
-          }))
+          })),
+        otxTags: [...new Set(pulses.flatMap((p) => p?.tags || []).map(labelOf).filter(Boolean))].slice(0, 15),
+        malwareFamilies: [...new Set(pulses.flatMap((p) => p?.malware_families || []).map(labelOf).filter(Boolean))].slice(0, 15)
       }
     : null;
   return { summary: { ...base, ...decide(base) }, detail };
@@ -139,6 +176,8 @@ export function ctiConfigured() {
   };
 }
 
+const answered = (summary: CtiSummary) => !(summary.score === null && summary.greyNoise === null && summary.otxPulses === null);
+
 export function createCti(db: Database) {
   async function cached(ips: string[]): Promise<Map<string, { data: CtiSummary; fetchedAt: number }>> {
     if (ips.length === 0) return new Map();
@@ -147,6 +186,23 @@ export function createCti(db: Database) {
       [ips]
     );
     return new Map(rows.map((r) => [r.indicator, { data: r.data, fetchedAt: new Date(r.fetched_at).getTime() }]));
+  }
+
+  // Consulta detalhada recente (IP ou rede), para não gastar a cota a cada vez que a página abre.
+  async function recentAnalysis<T>(key: string): Promise<T | null> {
+    const rows = await db.query<{ data: T }>(
+      `SELECT data FROM cti_analysis_cache WHERE indicator = $1 AND fetched_at > now() - make_interval(mins => $2::int)`,
+      [key, ANALYSIS_CACHE_MIN]
+    );
+    return rows[0]?.data ?? null;
+  }
+
+  async function saveAnalysis(key: string, data: unknown) {
+    await db.query(
+      `INSERT INTO cti_analysis_cache (indicator, data, fetched_at) VALUES ($1, $2::jsonb, now())
+       ON CONFLICT (indicator) DO UPDATE SET data = EXCLUDED.data, fetched_at = now()`,
+      [key, JSON.stringify(data)]
+    );
   }
 
   return {
@@ -173,7 +229,7 @@ export function createCti(db: Database) {
             const summary = await lookup(ip);
             results[ip] = summary;
             // Só guarda no cache quando ao menos uma fonte respondeu.
-            if (!(summary.score === null && summary.greyNoise === null && summary.otxPulses === null)) {
+            if (answered(summary)) {
               await db.query(
                 `INSERT INTO cti_cache (indicator, data, fetched_at) VALUES ($1, $2::jsonb, now())
                  ON CONFLICT (indicator) DO UPDATE SET data = EXCLUDED.data, fetched_at = now()`,
@@ -192,35 +248,41 @@ export function createCti(db: Database) {
       return { results, pending: Math.max(toFetch.length - limit, 0), configured };
     },
 
-    // Consulta detalhada de um IP, sempre na hora (a página é aberta sob demanda); atualiza o cache do resumo.
-    async analyze(indicator: string): Promise<IpAnalysis> {
+    // Consulta detalhada de um IP (12 meses, com denúncias). Fica guardada por ANALYSIS_CACHE_MIN minutos;
+    // force refaz a consulta. Não mexe no cache de 90 dias da triagem.
+    async analyze(indicator: string, options: { force?: boolean } = {}): Promise<IpAnalysis> {
       const ip = String(indicator ?? '').trim().toLowerCase();
       if (isIP(ip) === 0) throw Object.assign(new Error('Informe um endereço IP válido.'), { status: 400 });
       const configured = ctiConfigured();
       if (!Object.values(configured).some(Boolean)) {
-        return { configured, detail: null, summary: { indicator: ip, fetchedAt: new Date().toISOString(), verdict: 'unknown', score: null, totalReports: null, lastReportedAt: null, domain: null, isp: null, asn: null, countryCode: null, usageType: null, greyNoise: null, otxPulses: null } };
+        const fetchedAt = new Date().toISOString();
+        return { configured, detail: null, fetchedAt, summary: { indicator: ip, fetchedAt, verdict: 'unknown', score: null, totalReports: null, lastReportedAt: null, domain: null, isp: null, asn: null, countryCode: null, usageType: null, greyNoise: null, otxPulses: null } };
+      }
+      if (!options.force) {
+        const hit = await recentAnalysis<IpAnalysis>(`ip:${ip}`);
+        if (hit) return { ...hit, cached: true };
       }
       const { summary, detail } = await lookupFull(ip, true);
-      if (!(summary.score === null && summary.greyNoise === null && summary.otxPulses === null)) {
-        await db.query(
-          `INSERT INTO cti_cache (indicator, data, fetched_at) VALUES ($1, $2::jsonb, now())
-           ON CONFLICT (indicator) DO UPDATE SET data = EXCLUDED.data, fetched_at = now()`,
-          [ip, JSON.stringify(summary)]
-        );
-      }
-      return { configured, summary, detail };
+      const result: IpAnalysis = { configured, summary, detail, fetchedAt: summary.fetchedAt };
+      if (answered(summary)) await saveAnalysis(`ip:${ip}`, result);
+      return result;
     },
 
     // Rede inteira no AbuseIPDB: quais IPs dela foram denunciados. O plano grátis aceita até /24 e 30 dias.
-    async analyzeBlock(network: string): Promise<CidrAnalysis> {
+    async analyzeBlock(network: string, options: { force?: boolean } = {}): Promise<CidrAnalysis> {
       const cidr = String(network ?? '').trim();
       const key = process.env.ABUSEIPDB_API_KEY;
-      if (!key) return { network: cidr, configured: false, detail: null };
+      const fetchedAt = new Date().toISOString();
+      if (!key) return { network: cidr, configured: false, detail: null, fetchedAt };
+      if (!options.force) {
+        const hit = await recentAnalysis<CidrAnalysis>(`net:${cidr}`);
+        if (hit) return { ...hit, cached: true };
+      }
       const response = await getJson(
         `https://api.abuseipdb.com/api/v2/check-block?network=${encodeURIComponent(cidr)}&maxAgeInDays=30`,
         { Accept: 'application/json', Key: key }
       ).catch(() => null);
-      if (!response) return { network: cidr, configured: true, detail: null, error: 'AbuseIPDB indisponível. Tente de novo em instantes.' };
+      if (!response) return { network: cidr, configured: true, detail: null, fetchedAt, error: 'AbuseIPDB indisponível. Tente de novo em instantes.' };
       if (response.status !== 200) {
         const detail = String(response.body?.errors?.[0]?.detail ?? '');
         const error = response.status === 429
@@ -228,30 +290,11 @@ export function createCti(db: Database) {
           : /bitmask wider/i.test(detail)
             ? 'O plano grátis do AbuseIPDB só consulta redes de até /24 (256 endereços). Divida a rede em /24 para consultar.'
             : detail || `AbuseIPDB respondeu com erro ${response.status}.`;
-        return { network: cidr, configured: true, detail: null, error };
+        return { network: cidr, configured: true, detail: null, fetchedAt, error };
       }
-      const d = response.body?.data ?? {};
-      return {
-        network: cidr,
-        configured: true,
-        detail: {
-          networkAddress: String(d.networkAddress ?? ''),
-          netmask: String(d.netmask ?? ''),
-          minAddress: String(d.minAddress ?? ''),
-          maxAddress: String(d.maxAddress ?? ''),
-          numPossibleHosts: Number(d.numPossibleHosts ?? 0),
-          addressSpaceDesc: String(d.addressSpaceDesc ?? ''),
-          reported: (Array.isArray(d.reportedAddress) ? d.reportedAddress : [])
-            .map((r: any) => ({
-              ip: String(r?.ipAddress ?? ''),
-              numReports: Number(r?.numReports ?? 0),
-              mostRecentReport: String(r?.mostRecentReport ?? ''),
-              score: Number(r?.abuseConfidenceScore ?? 0),
-              countryCode: typeof r?.countryCode === 'string' ? r.countryCode : null
-            }))
-            .sort((a: { score: number; numReports: number }, b: { score: number; numReports: number }) => b.score - a.score || b.numReports - a.numReports)
-        }
-      };
+      const result: CidrAnalysis = { network: cidr, configured: true, fetchedAt, detail: parseBlock(response.body?.data ?? {}) };
+      await saveAnalysis(`net:${cidr}`, result);
+      return result;
     },
 
     async testKeys() {
@@ -260,6 +303,28 @@ export function createCti(db: Database) {
       const result = await lookup('8.8.8.8');
       return { configured, result };
     }
+  };
+}
+
+/** Converte a resposta do check-block do AbuseIPDB. Exportado para os testes. */
+export function parseBlock(d: any): NonNullable<CidrAnalysis['detail']> {
+  return {
+    networkAddress: String(d?.networkAddress ?? ''),
+    netmask: String(d?.netmask ?? ''),
+    minAddress: String(d?.minAddress ?? ''),
+    maxAddress: String(d?.maxAddress ?? ''),
+    numPossibleHosts: Number(d?.numPossibleHosts ?? 0),
+    addressSpaceDesc: String(d?.addressSpaceDesc ?? ''),
+    reported: (Array.isArray(d?.reportedAddress) ? d.reportedAddress : [])
+      .map((r: any) => ({
+        ip: String(r?.ipAddress ?? ''),
+        numReports: Number(r?.numReports ?? 0),
+        mostRecentReport: String(r?.mostRecentReport ?? ''),
+        score: Number(r?.abuseConfidenceScore ?? 0),
+        countryCode: typeof r?.countryCode === 'string' ? r.countryCode : null
+      }))
+      .filter((r: { ip: string }) => r.ip)
+      .sort((a: { score: number; numReports: number }, b: { score: number; numReports: number }) => b.score - a.score || b.numReports - a.numReports)
   };
 }
 

@@ -108,11 +108,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
 
   const [clients, setClients] = useState<Client[]>([]);
   const [activeCounts, setActiveCounts] = useState<Record<string, number>>({});
-  const [ipCounts, setIpCounts] = useState<Record<string, number>>({});
-  const [cidrCounts, setCidrCounts] = useState<Record<string, number>>({});
   const [totalActiveAcrossAll, setTotalActiveAcrossAll] = useState<number>(0);
-  const [totalIpsAcrossAll, setTotalIpsAcrossAll] = useState<number>(0);
-  const [totalCidrsAcrossAll, setTotalCidrsAcrossAll] = useState<number>(0);
   const [ipStats, setIpStats] = useState<Pick<DashboardStats, 'ipTotals' | 'ipTotalsSum'>>({ ipTotals: {}, ipTotalsSum: { ips: 0, cidrs: 0, withCidrs: 0, ipv6Networks: 0 } });
   const [totalCorrelatedIps, setTotalCorrelatedIps] = useState<number>(0);
   const [addedThisWeekCount, setAddedThisWeekCount] = useState<number>(0);
@@ -204,11 +200,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
 
       setClients(loadedClients);
       setActiveCounts(stats.activeCounts);
-      setIpCounts(stats.ipCounts);
-      setCidrCounts(stats.cidrCounts);
       setTotalActiveAcrossAll(stats.totalActiveAcrossAll);
-      setTotalIpsAcrossAll(stats.totalIpsAcrossAll);
-      setTotalCidrsAcrossAll(stats.totalCidrsAcrossAll);
       setIpStats({ ipTotals: stats.ipTotals ?? {}, ipTotalsSum: stats.ipTotalsSum ?? { ips: 0, cidrs: 0, withCidrs: 0, ipv6Networks: 0 } });
       setTotalCorrelatedIps(stats.totalCorrelatedIps);
       setAddedThisWeekCount(stats.addedThisWeekCount);
@@ -296,12 +288,14 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
 
   const [ipAnalysisSeed] = useState<string | undefined>(initialAnalyzeIp);
   useEffect(() => {
-    // Tira o ?analisar= da barra de endereço: recarregar a aba não refaz a consulta à toa.
-    if (!initialAnalyzeIp) return;
+    // O ?analisar= fica na barra de endereço enquanto a Análise de IP está aberta (o link pode ser enviado a
+    // um colega e recarregar volta para o mesmo IP, sem gastar cota graças ao cache do servidor). Fora dela, sai.
+    if (currentTab === 'ip-analysis') return;
     const url = new URL(window.location.href);
+    if (!url.searchParams.has(ANALYZE_PARAM)) return;
     url.searchParams.delete(ANALYZE_PARAM);
     window.history.replaceState(null, '', url.pathname + url.search + url.hash);
-  }, [initialAnalyzeIp]);
+  }, [currentTab]);
 
   const openQuickSearch = useCallback((seed?: string) => {
     setQuickSearchSeed(seed ?? '');
@@ -529,11 +523,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
           <DashboardView
             clients={clients}
             activeCounts={activeCounts}
-            ipCounts={ipCounts}
-            cidrCounts={cidrCounts}
             totalActiveAcrossAll={totalActiveAcrossAll}
-            totalIpsAcrossAll={totalIpsAcrossAll}
-            totalCidrsAcrossAll={totalCidrsAcrossAll}
             ipStats={ipStats}
             totalCorrelatedIps={totalCorrelatedIps}
             addedThisWeekCount={addedThisWeekCount}

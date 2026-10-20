@@ -137,6 +137,7 @@ kbd.key {
   background: currentColor;
 }
 .verdict--legit { color: var(--accent); }
+.verdict--scanner { color: #a78bfa; }
 .verdict--low { color: var(--success); }
 .verdict--medium { color: var(--warning); }
 .verdict--high { color: var(--danger); }
@@ -495,3 +496,5 @@ kbd.key {
 @media (max-width: 640px) {
   .ia-clients { grid-template-columns: 1fr; }
 }
+
+:root[data-theme="light"] .verdict--scanner { color: #6d28d9; }

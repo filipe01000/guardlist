@@ -34,51 +34,6 @@ export interface ClientException {
   addedAt?: string;
 }
 
-export interface IpCtiRecord {
-  indicator: string;
-  type: IndicatorType;
-  country: { code: string; name: string; flag: string };
-  asn: { number: number; name: string; org: string };
-  reverseDns?: string;
-  abuseIpDb: {
-    score: number; // 0 - 100
-    totalReports: number;
-    lastReportedAt: string;
-    categories: string[];
-    verifiedActor?: string;
-  };
-  greyNoise: {
-    classification: 'malicious' | 'benign' | 'unknown';
-    actor: string;
-    noise: boolean;
-    riot: boolean; // Known benign provider (Microsoft, Cloudflare, etc.)
-    lastSeen: string;
-    tags: string[];
-  };
-  alienVaultOtx: {
-    pulseCount: number;
-    tags: string[];
-    malwareFamilies: string[];
-    lastEvaluated: string;
-    confidence: number;
-  };
-  correlatedClients: Array<{
-    clientId: string;
-    clientName: string;
-    addedDate: string;
-    ticket?: string;
-    status: IndicatorStatus;
-    notes?: string;
-  }>;
-  timeline: Array<{
-    date: string;
-    clientName: string;
-    event: 'inclusao' | 'alerta_soc' | 'report_cti' | 'remocao';
-    description: string;
-    source: string;
-  }>;
-}
-
 export interface ClientOverlapMetric {
   clientA: string;
   clientB: string;
@@ -130,11 +85,7 @@ export interface ClientEntriesPage {
 
 export interface DashboardStats {
   activeCounts: Record<string, number>;
-  ipCounts: Record<string, number>;
-  cidrCounts: Record<string, number>;
   totalActiveAcrossAll: number;
-  totalIpsAcrossAll: number;
-  totalCidrsAcrossAll: number;
   totalCorrelatedIps: number;
   addedThisWeekCount: number;
   recurring: Array<{ indicator: string; count: number }>;
@@ -245,7 +196,8 @@ export interface AppSettings {
 }
 
 // Reputação consolidada de um IP (AbuseIPDB, GreyNoise e OTX), guardada em cache no servidor.
-export type CtiVerdict = 'legit' | 'low' | 'medium' | 'high' | 'unknown';
+// 'scanner': scanner de pesquisa conhecido (Censys, Shodan…) ou lista branca do AbuseIPDB; não é ataque dirigido.
+export type CtiVerdict = 'legit' | 'scanner' | 'low' | 'medium' | 'high' | 'unknown';
 
 export interface CtiSummary {
   indicator: string;
@@ -260,6 +212,10 @@ export interface CtiSummary {
   asn: string | null;
   countryCode: string | null;
   usageType: string | null;
+  /** Hostnames do AbuseIPDB (ausente em resumos antigos do cache). */
+  hostnames?: string[];
+  /** Lista branca do AbuseIPDB (ausente em resumos antigos do cache). */
+  isWhitelisted?: boolean | null;
   greyNoise: { classification: string | null; riot: boolean; name: string | null } | null;
   otxPulses: number | null;
   errors?: string[];
@@ -269,6 +225,9 @@ export interface CtiSummary {
 export interface IpAnalysis {
   summary: CtiSummary;
   configured: { abuseIpDb: boolean; greyNoise: boolean; otx: boolean };
+  /** Quando a consulta foi feita; cached = veio da consulta recente guardada no servidor. */
+  fetchedAt: string;
+  cached?: boolean;
   detail: {
     countryName: string | null;
     isTor: boolean;
@@ -278,6 +237,9 @@ export interface IpAnalysis {
     distinctUsers: number | null;
     /** Denúncias mais recentes do AbuseIPDB (até 50). */
     reports: Array<{ reportedAt: string; comment: string; categories: number[]; reporterCountryCode: string | null }>;
+    /** Tags e famílias de malware dos pulses do OTX. */
+    otxTags: string[];
+    malwareFamilies: string[];
   } | null;
 }
 
@@ -285,6 +247,8 @@ export interface IpAnalysis {
 export interface CidrAnalysis {
   network: string;
   configured: boolean;
+  fetchedAt: string;
+  cached?: boolean;
   /** Mensagem do AbuseIPDB quando a consulta não é permitida (rede maior que /24, cota etc.). */
   error?: string;
   detail: {

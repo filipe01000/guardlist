@@ -134,6 +134,14 @@ CREATE TABLE IF NOT EXISTS cti_cache (
   fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Consulta detalhada (página Análise de IP e dossiê): 12 meses, com denúncias. Guardada por pouco tempo,
+-- separada do cti_cache para não misturar com a contagem de 90 dias da triagem.
+CREATE TABLE IF NOT EXISTS cti_analysis_cache (
+  indicator TEXT PRIMARY KEY,
+  data JSONB NOT NULL,
+  fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Casos enviados aos clientes (texto gerado no GuardList): evita informar o mesmo IP duas vezes.
 CREATE TABLE IF NOT EXISTS client_cases (
   id BIGSERIAL PRIMARY KEY,

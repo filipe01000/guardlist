@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, Copy, ExternalLink, FileSignature, Fingerprint, Info, Loader2, Search, ShieldOff, ShieldPlus, Sparkles } from 'lucide-react';
+import { Check, Copy, ExternalLink, FileSignature, Fingerprint, Info, Loader2, RefreshCw, Search, ShieldOff, ShieldPlus, Sparkles } from 'lucide-react';
 import type { CidrAnalysis, Client, IpAnalysis } from '../types';
 import { analyzeCidr, analyzeIp, lookupIndicators, type LookupMatch } from '../db/store';
 import { exceptionHit, toRange } from '../utils/redundancy';
 import { abuseCategory } from '../utils/abuseCategories';
 import { PageHeader } from './PageHeader';
 import { VERDICT_LABEL } from './CtiBits';
-import { aiAvailability, openIpAnalysisTab, requestCaseBuilder, requestIndicatorAction } from './contextActions';
+import { ANALYZE_PARAM, aiAvailability, openIpAnalysisTab, requestCaseBuilder, requestIndicatorAction } from './contextActions';
 import './IpAnalysis.css';
 
 interface IpAnalysisViewProps {
@@ -17,7 +17,8 @@ interface IpAnalysisViewProps {
   onNavigateToClientList: (clientId: string) => void;
 }
 
-type Target = { kind: 'ip' | 'cidr'; value: string };
+// force: consulta as fontes de novo em vez de usar a consulta recente guardada no servidor.
+type Target = { kind: 'ip' | 'cidr'; value: string; force?: boolean };
 
 const MATCH_LABEL = { exact: 'Na lista', covered: 'Dentro de', inside: 'Contém' } as const;
 
@@ -55,14 +56,14 @@ export const IpAnalysisView: React.FC<IpAnalysisViewProps> = ({ clients, seed, i
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const run = (value: string) => {
+  const run = (value: string, force = false) => {
     const parsed = parseTarget(value);
     if (!parsed) {
       setError('Informe um IP (IPv4 ou IPv6) ou uma rede IPv4 no formato 192.0.2.0/24.');
       return;
     }
     setError(null);
-    setTarget(parsed);
+    setTarget({ ...parsed, force });
   };
 
   useEffect(() => {
@@ -79,8 +80,12 @@ export const IpAnalysisView: React.FC<IpAnalysisViewProps> = ({ clients, seed, i
     setIpResult(null);
     setCidrResult(null);
     setMatches([]);
+    // Link da aba: ?analisar= com o IP/rede atual, para recarregar ou enviar a alguém.
+    const url = new URL(window.location.href);
+    url.searchParams.set(ANALYZE_PARAM, target.value);
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash);
     // A parte do GuardList não depende das chaves de reputação: busca as duas em paralelo.
-    const reputation = target.kind === 'ip' ? analyzeIp(target.value) : analyzeCidr(target.value);
+    const reputation = target.kind === 'ip' ? analyzeIp(target.value, target.force) : analyzeCidr(target.value, target.force);
     Promise.allSettled([reputation, lookupIndicators([target.value])]).then(([rep, look]) => {
       if (cancelled) return;
       if (rep.status === 'fulfilled') {
@@ -192,6 +197,20 @@ export const IpAnalysisView: React.FC<IpAnalysisViewProps> = ({ clients, seed, i
       </form>
 
       {error && <p className="notice notice--danger" role="alert">{error}</p>}
+
+      {target && !loading && (ipResult || cidrResult) && (
+        <div className="ipa__stamp">
+          <span>
+            {(ipResult ?? cidrResult)?.cached ? 'Consulta guardada de ' : 'Consultado em '}
+            {fmtDate((ipResult ?? cidrResult)?.fetchedAt)}
+            {(ipResult ?? cidrResult)?.cached ? ' (sem gastar cota)' : ''}
+          </span>
+          <button type="button" className="btn btn--sm btn--quiet" onClick={() => run(target.value, true)} title="Consulta as fontes de novo, gastando uma consulta da cota">
+            <RefreshCw aria-hidden="true" />
+            Consultar de novo
+          </button>
+        </div>
+      )}
 
       {!target && !error && (
         <div className="empty-state ipa__empty">

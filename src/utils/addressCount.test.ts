@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { countAddresses } from './addressCount.ts';
+import { countAddresses, ipTotalsByClient } from './addressCount.ts';
 
 test('total de endereços: CIDR vale pelo tamanho, IP solto vale 1', () => {
   assert.deepEqual(countAddresses(['10.0.0.1', '192.0.2.0/24', '198.51.100.0/30']), { ipv4: 1 + 256 + 4, ipv6Networks: 0, singleIps: 1, cidrs: 2 });
@@ -29,4 +29,14 @@ test('total de endereços: separa IPs soltos e CIDRs, contando cada um uma vez',
   assert.equal(result.singleIps, 1);
   assert.equal(result.cidrs, 2);
   assert.equal(result.ipv4, 512);
+});
+
+test('conta por cliente: cada cliente sem repetir, e a soma conta o mesmo IP em clientes diferentes', () => {
+  const { perClient, sum } = ipTotalsByClient([
+    { clientId: 'a', indicator: '10.0.0.1' }, { clientId: 'a', indicator: '10.0.0.1' }, { clientId: 'a', indicator: '10.0.1.0/24' },
+    { clientId: 'b', indicator: '10.0.0.1' }, { clientId: 'b', indicator: 'exemplo.com' }
+  ]);
+  assert.deepEqual(perClient.a, { ips: 1, cidrs: 1, withCidrs: 257, ipv6Networks: 0 });
+  assert.deepEqual(perClient.b, { ips: 1, cidrs: 0, withCidrs: 1, ipv6Networks: 0 });
+  assert.deepEqual(sum, { ips: 2, cidrs: 1, withCidrs: 258, ipv6Networks: 0 });
 });

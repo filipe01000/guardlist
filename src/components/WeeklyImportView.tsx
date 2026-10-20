@@ -25,12 +25,14 @@ interface WeeklyImportViewProps {
   settings: AppSettings;
 }
 
-// 'legit' e 'malicious' são abas filtradas pela reputação dos IPs novos, não categorias do importador.
-type PreviewTab = ImportPreviewItem['category'] | 'legit' | 'malicious';
+// 'legit', 'scanner' e 'malicious' são abas filtradas pela reputação dos IPs novos, não categorias do importador.
+type PreviewTab = ImportPreviewItem['category'] | 'legit' | 'scanner' | 'malicious';
+const REPUTATION_TABS: PreviewTab[] = ['legit', 'scanner', 'malicious'];
 
 const TABS: Array<[PreviewTab, string, '' | 'ok' | 'warn' | 'danger']> = [
   ['new', 'Novos', 'ok'],
   ['malicious', 'Maliciosos', 'danger'],
+  ['scanner', 'Scanners', ''],
   ['legit', 'Legítimos', ''],
   ['dup_in_file', 'Repetidos no arquivo', ''],
   ['already_exists', 'Já na lista', ''],
@@ -159,6 +161,11 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
     [preview, cti]
   );
 
+  const scannerItems = useMemo(
+    () => (preview ? preview.items.filter((i) => i.category === 'new' && cti[i.indicator]?.verdict === 'scanner') : []),
+    [preview, cti]
+  );
+
   // IPs novos com reputação ruim, os piores primeiro.
   const maliciousItems = useMemo(() => {
     if (!preview) return [];
@@ -169,6 +176,7 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
   const itemsOfTab = (tab: PreviewTab) => {
     if (!preview) return [];
     if (tab === 'legit') return legitItems;
+    if (tab === 'scanner') return scannerItems;
     if (tab === 'malicious') return maliciousItems;
     return preview.items.filter((i) => i.category === tab);
   };
@@ -227,7 +235,7 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
       const isIpv4 = item.type === 'IPv4' && isValidIPv4(item.indicator);
       const rep = cti[item.indicator];
       const repNote = rep && rep.verdict !== 'unknown'
-        ? `Reputação na inclusão: ${rep.verdict === 'high' ? 'alto risco' : rep.verdict === 'medium' ? 'médio' : rep.verdict === 'low' ? 'baixo risco' : 'legítimo'}${rep.totalReports !== null ? `, ${rep.totalReports} ocorrências` : ''}${rep.domain ? `, ${rep.domain}` : ''}`
+        ? `Reputação na inclusão: ${rep.verdict === 'high' ? 'alto risco' : rep.verdict === 'medium' ? 'médio' : rep.verdict === 'low' ? 'baixo risco' : rep.verdict === 'scanner' ? 'scanner conhecido' : 'legítimo'}${rep.totalReports !== null ? `, ${rep.totalReports} ocorrências` : ''}${rep.domain ? `, ${rep.domain}` : ''}`
         : '';
       return {
         id: `entry-${selectedClient.id}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
@@ -554,7 +562,7 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
           </div>
 
           <div className="tabs" role="tablist" aria-label="Categorias da pré-visualização">
-            {TABS.filter(([id]) => !['exception', 'legit', 'malicious'].includes(id) || countOf(id) > 0).map(([id, label, tone]) => {
+            {TABS.filter(([id]) => !(id === 'exception' || REPUTATION_TABS.includes(id)) || countOf(id) > 0).map(([id, label, tone]) => {
               const count = countOf(id);
               return (
                 <button
@@ -583,13 +591,15 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
             </div>
           )}
 
-          {(activeTab === 'legit' || activeTab === 'malicious') && (
+          {REPUTATION_TABS.includes(activeTab) && (
             <div className={`notice ${activeTab === 'malicious' ? 'notice--danger' : ''}`}>
               {activeTab === 'malicious' ? <AlertTriangle aria-hidden="true" /> : <Info aria-hidden="true" />}
               <p>
                 {activeTab === 'malicious'
                   ? 'IPs novos com reputação de alto ou médio risco, os piores primeiro. Eles serão gravados.'
-                  : skipLegit
+                  : activeTab === 'scanner'
+                    ? 'Scanners de pesquisa conhecidos (Censys, Shodan, Shadowserver…) ou IPs na lista branca do AbuseIPDB. Varrem a internet toda, não miram o cliente. Eles serão gravados; tire-os da lista se a equipe não bloqueia scanners.'
+                    : skipLegit
                     ? 'IPs novos que parecem de serviços legítimos (Google, Cloudflare, Microsoft…). Não serão gravados.'
                     : 'IPs novos que parecem de serviços legítimos. A opção "Não gravar os legítimos" está desligada, então eles serão gravados.'}
               </p>
@@ -597,6 +607,18 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
                 <Copy aria-hidden="true" />
                 {copiedTab ? 'Copiados' : `Copiar ${countOf(activeTab)}`}
               </button>
+            </div>
+          )}
+
+          {REPUTATION_TABS.includes(activeTab) && ctiState.pending > 0 && (
+            <div className="notice notice--warn">
+              <Hourglass aria-hidden="true" />
+              <p>
+                {ctiState.pending} {ctiState.pending === 1 ? 'IP novo ainda não teve' : 'IPs novos ainda não tiveram'} a reputação consultada, então esta aba pode estar incompleta.
+              </p>
+              {!ctiState.loading && (
+                <button type="button" className="btn btn--sm" onClick={() => enrich(preview.items)}>Consultar mais {Math.min(ctiState.pending, AUTO_ENRICH)}</button>
+              )}
             </div>
           )}
 

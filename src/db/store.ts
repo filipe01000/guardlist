@@ -198,8 +198,9 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
   return json as T;
 }
 
-export const analyzeIp = (ip: string) => http<IpAnalysis>('POST', '/api/cti/analyze', { ip });
-export const analyzeCidr = (network: string) => http<CidrAnalysis>('POST', '/api/cti/analyze-block', { network });
+// force: ignora a consulta recente guardada no servidor e consulta as fontes de novo.
+export const analyzeIp = (ip: string, force = false) => http<IpAnalysis>('POST', '/api/cti/analyze', { ip, force });
+export const analyzeCidr = (network: string, force = false) => http<CidrAnalysis>('POST', '/api/cti/analyze-block', { network, force });
 
 export const enrichIndicators = (indicators: string[], force = false) =>
   http<{ results: Record<string, CtiSummary>; pending: number; configured: boolean }>('POST', '/api/cti/enrich', { indicators, force });

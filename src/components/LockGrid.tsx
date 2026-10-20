@@ -3,6 +3,8 @@ import { useEffect, useRef } from 'react';
 // Fundo do app: grade de cadeados apagados que acendem perto do mouse e, de vez em quando, trancam em ciano.
 const GAP = 46;
 const RADIUS = 150;
+// O fundo fica aberto o dia inteiro: 20 quadros por segundo bastam para a animação e poupam CPU, GPU e bateria.
+const FRAME_MS = 50;
 
 interface Lock {
   x: number;
@@ -29,6 +31,7 @@ export default function LockGrid() {
     let mouseY = -999;
     let frame = 0;
     let lastOpen = 0;
+    let lastFrame = 0;
 
     const build = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -80,7 +83,7 @@ export default function LockGrid() {
       palette = document.documentElement.dataset.theme === 'light' ? PALETTES.light : PALETTES.dark;
       const animate = !reduceMotion.matches;
       if (animate) {
-        if (Math.random() < 0.05) {
+        if (Math.random() < 0.15) {
           const lock = locks[(Math.random() * locks.length) | 0];
           if (lock && lock.open > 0.5) { lock.glow = 1; lock.closing = true; }
         }
@@ -92,16 +95,19 @@ export default function LockGrid() {
       }
       for (const lock of locks) {
         if (lock.closing) {
-          lock.open = Math.max(0, lock.open - 0.08);
+          lock.open = Math.max(0, lock.open - 0.24);
           if (!lock.open) lock.closing = false;
         }
-        lock.glow *= 0.97;
+        lock.glow *= 0.91;
         drawLock(lock);
       }
     };
 
     const loop = (time: number) => {
-      render(time);
+      if (time - lastFrame >= FRAME_MS) {
+        lastFrame = time;
+        render(time);
+      }
       frame = requestAnimationFrame(loop);
     };
     const start = () => {

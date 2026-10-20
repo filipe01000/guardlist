@@ -83,7 +83,8 @@ app.use((req, res, next) => {
 // Health check usado pelo Render; fica fora da autenticação.
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
-// Limite simples por IP em janela fixa, para proteger a cota das APIs de CTI e o login.
+// Limite simples em janela fixa, para proteger a cota das APIs de CTI e o login. Depois do login a conta é
+// por usuário (a equipe toda pode sair pela mesma internet da empresa); antes, por IP.
 function rateLimit(name: string, maxPerWindow: number, windowMs = 60_000): RequestHandler {
   const hits = new Map<string, { windowStart: number; count: number }>();
   setInterval(() => {
@@ -92,7 +93,7 @@ function rateLimit(name: string, maxPerWindow: number, windowMs = 60_000): Reque
   }, 60_000).unref();
 
   return (req, res, next) => {
-    const key = req.ip || 'unknown';
+    const key = res.locals.userId ? `user:${res.locals.userId}` : `ip:${req.ip || 'unknown'}`;
     const now = Date.now();
     const entry = hits.get(key);
     if (!entry || now - entry.windowStart >= windowMs) {
@@ -107,7 +108,6 @@ function rateLimit(name: string, maxPerWindow: number, windowMs = 60_000): Reque
   };
 }
 
-const ctiLimit = rateLimit('CTI', Number(process.env.CTI_RATE_LIMIT_PER_MIN || 30));
 const abuseSummaryLimit = rateLimit('AbuseIPDB', Number(process.env.ABUSE_SUMMARY_RATE_LIMIT_PER_MIN || 120));
 const loginLimit = rateLimit('login', 20, 15 * 60_000);
 const passwordLimit = rateLimit('senha', 10, 15 * 60_000);
@@ -289,16 +289,10 @@ app.post('/api/users/:id/reset-password', adminOnly, passwordLimit, jsonSmall, a
   }
 });
 
-type SourceResult = {
-  status: 'ok' | 'not_configured' | 'not_found' | 'rate_limited' | 'error';
-  data?: unknown;
-  message?: string;
-};
-
 type AbuseListSummary = {
   indicator: string;
   fetchedAt: string;
-  status: SourceResult['status'];
+  status: 'ok' | 'not_configured' | 'rate_limited' | 'error';
   data?: {
     domain: string | null;
     hostnames: string[];
@@ -309,115 +303,35 @@ type AbuseListSummary = {
   message?: string;
 };
 
-const abuseListCache = new Map<string, { expiresAt: number; value: AbuseListSummary }>();
-const ABUSE_LIST_CACHE_MS = 15 * 60 * 1000;
-
-async function getJson(url: string, headers: Record<string, string>): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-  try {
-    return await fetch(url, { headers, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function providerRequest(
-  apiKey: string | undefined,
-  request: () => Promise<Response>
-): Promise<SourceResult> {
-  if (!apiKey) return { status: 'not_configured', message: 'Chave não configurada no servidor.' };
-  try {
-    const response = await request();
-    const body = await response.json().catch(() => ({}));
-    if (response.ok) return { status: 'ok', data: body };
-    if (response.status === 404) return { status: 'not_found', data: body };
-    if (response.status === 429) return { status: 'rate_limited', data: body, message: 'Limite de consultas atingido.' };
-    const providerMessage = body?.errors?.[0]?.detail || body?.message || `HTTP ${response.status}`;
-    return { status: 'error', message: String(providerMessage) };
-  } catch (error) {
-    const message = error instanceof Error && error.name === 'AbortError'
-      ? 'Tempo limite de 10 segundos excedido.'
-      : 'Não foi possível consultar o provedor.';
-    return { status: 'error', message };
-  }
-}
-
-app.get('/api/cti/:indicator', ctiLimit, async (req, res) => {
-  const indicator = String(req.params.indicator || '').trim();
-  if (!isIP(indicator)) {
-    return res.status(400).json({ error: 'A consulta CTI externa aceita apenas endereços IPv4 ou IPv6 individuais.' });
-  }
-
-  const encoded = encodeURIComponent(indicator);
-  const abuseKey = process.env.ABUSEIPDB_API_KEY;
-  const greyNoiseKey = process.env.GREYNOISE_API_KEY;
-  const otxKey = process.env.OTX_API_KEY;
-  const otxType = isIP(indicator) === 6 ? 'IPv6' : 'IPv4';
-
-  const [abuseIpDb, greyNoise, alienVaultOtx] = await Promise.all([
-    providerRequest(abuseKey, () => getJson(
-      `https://api.abuseipdb.com/api/v2/check?ipAddress=${encoded}&maxAgeInDays=90&verbose=true`,
-      { Accept: 'application/json', Key: abuseKey! }
-    )),
-    providerRequest(greyNoiseKey, () => getJson(
-      `https://api.greynoise.io/v3/community/${encoded}`,
-      { Accept: 'application/json', key: greyNoiseKey! }
-    )),
-    providerRequest(otxKey, () => getJson(
-      `https://otx.alienvault.com/api/v1/indicators/${otxType}/${encoded}/general`,
-      { Accept: 'application/json', 'X-OTX-API-KEY': otxKey! }
-    ))
-  ]);
-
-  res.setHeader('Cache-Control', 'no-store');
-  return res.json({ indicator, fetchedAt: new Date().toISOString(), sources: { abuseIpDb, greyNoise, alienVaultOtx } });
-});
-
+// Resumo do AbuseIPDB de uma linha da lista do cliente. Usa o mesmo cache de 90 dias da importação
+// (server/cti.ts), então o mesmo IP não gasta a cota de novo em outra tela.
 app.get('/api/abuse-summary/:indicator', abuseSummaryLimit, async (req, res) => {
-  const indicator = String(req.params.indicator || '').trim();
+  const indicator = String(req.params.indicator || '').trim().toLowerCase();
   if (!isIP(indicator)) {
     return res.status(400).json({ error: 'O resumo AbuseIPDB aceita apenas endereços IPv4 ou IPv6 individuais.' });
   }
-
-  const forceRefresh = req.query.refresh === '1';
-  const cached = abuseListCache.get(indicator);
-  if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
-    res.setHeader('Cache-Control', 'private, max-age=900');
-    return res.json({ ...cached.value, cached: true });
+  try {
+    const { results, configured } = await cti.enrich([indicator], { force: req.query.refresh === '1', limit: 1 });
+    const summary = results[indicator];
+    const abuseError = summary?.errors?.find((e) => e.startsWith('AbuseIPDB'));
+    const value: AbuseListSummary = {
+      indicator,
+      fetchedAt: summary?.fetchedAt ?? new Date().toISOString(),
+      status: !configured || !process.env.ABUSEIPDB_API_KEY ? 'not_configured' : abuseError ? (/limite/i.test(abuseError) ? 'rate_limited' : 'error') : summary && summary.score !== null ? 'ok' : 'error',
+      message: !process.env.ABUSEIPDB_API_KEY ? 'Chave não configurada no servidor.' : abuseError,
+      data: summary && summary.score !== null ? {
+        domain: summary.domain,
+        hostnames: (summary.hostnames ?? []).slice(0, 5),
+        totalReports: summary.totalReports ?? 0,
+        lastReportedAt: summary.lastReportedAt,
+        abuseConfidenceScore: summary.score
+      } : undefined
+    };
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json(value);
+  } catch (error) {
+    return sendError(res, error);
   }
-
-  const abuseKey = process.env.ABUSEIPDB_API_KEY;
-  const encoded = encodeURIComponent(indicator);
-  const result = await providerRequest(abuseKey, () => getJson(
-    `https://api.abuseipdb.com/api/v2/check?ipAddress=${encoded}&maxAgeInDays=90`,
-    { Accept: 'application/json', Key: abuseKey! }
-  ));
-
-  const providerData = result.data && typeof result.data === 'object'
-    ? (result.data as { data?: Record<string, unknown> }).data
-    : undefined;
-  const value: AbuseListSummary = {
-    indicator,
-    fetchedAt: new Date().toISOString(),
-    status: result.status,
-    message: result.message,
-    data: result.status === 'ok' && providerData ? {
-      domain: typeof providerData.domain === 'string' && providerData.domain ? providerData.domain : null,
-      hostnames: Array.isArray(providerData.hostnames)
-        ? providerData.hostnames.filter((hostname): hostname is string => typeof hostname === 'string' && Boolean(hostname)).slice(0, 5)
-        : [],
-      totalReports: Number(providerData.totalReports || 0),
-      lastReportedAt: typeof providerData.lastReportedAt === 'string' ? providerData.lastReportedAt : null,
-      abuseConfidenceScore: Number(providerData.abuseConfidenceScore || 0)
-    } : undefined
-  };
-
-  if (value.status === 'ok') {
-    abuseListCache.set(indicator, { expiresAt: Date.now() + ABUSE_LIST_CACHE_MS, value });
-  }
-  res.setHeader('Cache-Control', 'private, max-age=900');
-  return res.json(value);
 });
 
 // Análise detalhada de um IP (página Análise de IP): uma consulta por vez, com as denúncias do AbuseIPDB.
@@ -427,7 +341,7 @@ app.post('/api/cti/analyze', analyzeLimit, jsonSmall, async (req, res) => {
   if (isIP(ip) === 0) return res.status(400).json({ error: 'Informe um endereço IP válido.' });
   try {
     res.setHeader('Cache-Control', 'no-store');
-    return res.json(await cti.analyze(ip));
+    return res.json(await cti.analyze(ip, { force: req.body?.force === true }));
   } catch (error) {
     return sendError(res, error);
   }
@@ -442,7 +356,7 @@ app.post('/api/cti/analyze-block', analyzeLimit, jsonSmall, async (req, res) => 
   }
   try {
     res.setHeader('Cache-Control', 'no-store');
-    return res.json(await cti.analyzeBlock(network));
+    return res.json(await cti.analyzeBlock(network, { force: req.body?.force === true }));
   } catch (error) {
     return sendError(res, error);
   }

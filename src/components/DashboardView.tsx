@@ -26,11 +26,7 @@ import { PageHeader } from './PageHeader';
 interface DashboardViewProps {
   clients: Client[];
   activeCounts: Record<string, number>;
-  ipCounts: Record<string, number>;
-  cidrCounts: Record<string, number>;
   totalActiveAcrossAll: number;
-  totalIpsAcrossAll: number;
-  totalCidrsAcrossAll: number;
   /** Endereços IPv4 cobertos (CIDRs pelo tamanho), por cliente e no total, e as faixas IPv6 à parte. */
   ipStats: Pick<DashboardStats, 'ipTotals' | 'ipTotalsSum'>;
   totalCorrelatedIps: number;
@@ -93,11 +89,7 @@ function formatShortDate(iso: string): string {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   clients,
   activeCounts,
-  ipCounts,
-  cidrCounts,
   totalActiveAcrossAll,
-  totalIpsAcrossAll,
-  totalCidrsAcrossAll,
   ipStats,
   totalCorrelatedIps,
   addedThisWeekCount,
@@ -156,15 +148,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         daysSince,
         daysUntilDue,
         total: activeCounts[client.id] || 0,
-        ips: ipStats.ipTotals[client.id]?.ips ?? ipCounts[client.id] ?? 0,
-        cidrs: ipStats.ipTotals[client.id]?.cidrs ?? cidrCounts[client.id] ?? 0,
+        ips: ipStats.ipTotals[client.id]?.ips ?? 0,
+        cidrs: ipStats.ipTotals[client.id]?.cidrs ?? 0,
         addresses: ipStats.ipTotals[client.id]?.withCidrs ?? 0,
         isLate,
         isNearDeadline,
         urgencyScore
       };
     });
-  }, [activeClients, activeCounts, ipCounts, cidrCounts, slaDays]);
+  }, [activeClients, activeCounts, ipStats, slaDays]);
 
   const sortedClients = useMemo(() => {
     const list = [...enrichedClients].sort((a, b) => b.urgencyScore - a.urgencyScore);

@@ -185,7 +185,7 @@ interface LookupRow { clientName: string; status: string; match: string; via?: s
 
 function ctiLine(c: CtiSummary | undefined): string {
   if (!c) return 'reputação: não consultada';
-  const verdict = { high: 'ALTO risco', medium: 'risco médio', low: 'baixo risco', legit: 'LEGÍTIMO', unknown: 'sem dados' }[c.verdict] ?? c.verdict;
+  const verdict = { high: 'ALTO risco', medium: 'risco médio', low: 'baixo risco', legit: 'LEGÍTIMO', scanner: 'SCANNER de pesquisa conhecido', unknown: 'sem dados' }[c.verdict] ?? c.verdict;
   const parts = [`reputação: ${verdict}${c.verdictReason ? ` (${c.verdictReason})` : ''}`];
   if (c.score !== null) parts.push(`AbuseIPDB ${c.score}% com ${c.totalReports ?? 0} denúncias (última ${fmtDate(c.lastReportedAt)})`);
   if (c.greyNoise?.classification) parts.push(`GreyNoise: ${c.greyNoise.classification}${c.greyNoise.name ? ` (${c.greyNoise.name})` : ''}`);
@@ -215,12 +215,12 @@ export function createAi(deps: { db: Database; store: Store; cti: Cti }) {
       .map((c) => {
         const d = daysSince(c.lastUpdateDate);
         const situation = d === null ? 'nunca revisado' : d > sla ? `ATRASADO há ${d - sla} dia(s)` : sla - d <= 2 ? `vence em ${sla - d} dia(s)` : `em dia (vence em ${sla - d} dias)`;
-        return `- ${c.name} · firewall/obs: ${clip(c.notes, 60) || '—'} · ativos ${stats.activeCounts[c.id] ?? 0} (${stats.ipCounts[c.id] ?? 0} IPs, ${stats.cidrCounts[c.id] ?? 0} CIDRs) · última revisão ${fmtDate(c.lastUpdateDate)}${d !== null ? ` (há ${d} dias)` : ''} · ${situation} · exceções: ${c.exceptions?.length ?? 0}`;
+        return `- ${c.name} · firewall/obs: ${clip(c.notes, 60) || '—'} · ativos ${stats.activeCounts[c.id] ?? 0} (${stats.ipTotals[c.id]?.ips ?? 0} IPs, ${stats.ipTotals[c.id]?.cidrs ?? 0} CIDRs) · última revisão ${fmtDate(c.lastUpdateDate)}${d !== null ? ` (há ${d} dias)` : ''} · ${situation} · exceções: ${c.exceptions?.length ?? 0}`;
       });
     const recurring = stats.recurring.slice(0, 6).map((r) => `${r.indicator} (${r.count} clientes)`).join(', ');
     return [
       `Hoje: ${new Date().toLocaleDateString('pt-BR')}. Prazo de revisão de cada lista: ${sla} dias. Revisão de bloqueios parados após ${settings.reviewDays ?? 90} dias.`,
-      `Totais: ${stats.totalActiveAcrossAll} bloqueios ativos (${stats.totalIpsAcrossAll} IPs, ${stats.totalCidrsAcrossAll} CIDRs) em ${lines.length} clientes; ${stats.totalCorrelatedIps} indicadores em 2+ clientes; ${stats.addedThisWeekCount} incluídos nesta semana.`,
+      `Totais: ${stats.totalActiveAcrossAll} bloqueios ativos (${stats.ipTotalsSum.ips} IPs, ${stats.ipTotalsSum.cidrs} CIDRs, somando os clientes) em ${lines.length} clientes; ${stats.totalCorrelatedIps} indicadores em 2+ clientes; ${stats.addedThisWeekCount} incluídos nesta semana.`,
       `Mais recorrentes: ${recurring || 'nenhum'}.`,
       'Clientes:',
       ...lines

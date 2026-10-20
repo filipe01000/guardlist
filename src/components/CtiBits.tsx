@@ -3,6 +3,7 @@ import { CtiSummary } from '../types';
 
 export const VERDICT_LABEL: Record<CtiSummary['verdict'], string> = {
   legit: 'Legítimo',
+  scanner: 'Scanner conhecido',
   low: 'Baixo risco',
   medium: 'Médio',
   high: 'Alto risco',
@@ -12,7 +13,7 @@ export const VERDICT_LABEL: Record<CtiSummary['verdict'], string> = {
 export const VerdictBadge: React.FC<{ summary: CtiSummary }> = ({ summary }) => (
   <span className={`verdict verdict--${summary.verdict}`} title={summary.verdictReason || undefined}>
     {VERDICT_LABEL[summary.verdict]}
-    {summary.score !== null && summary.verdict !== 'legit' ? ` · ${summary.score}` : ''}
+    {summary.score !== null && summary.verdict !== 'legit' && summary.verdict !== 'scanner' ? ` · ${summary.score}` : ''}
   </span>
 );
 

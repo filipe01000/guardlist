@@ -70,13 +70,15 @@ test('consultas SQL paginam listas e agregam correlação sem perder o contexto 
   await t.test('dashboard mantém métricas anteriores e limita recorrentes a quatro clientes ativos', async () => {
     const stats = await store.getDashboardStats();
     assert.equal(stats.totalActiveAcrossAll, 16);
-    assert.equal(stats.totalIpsAcrossAll, 14);
-    assert.equal(stats.totalCidrsAcrossAll, 2);
     assert.equal(stats.totalCorrelatedIps, 5);
     assert.equal(stats.addedThisWeekCount, 14);
     assert.equal(stats.activeCounts.a, 7);
-    assert.equal(stats.ipCounts.a, 6);
-    assert.equal(stats.cidrCounts.a, 1);
+    // Conta por cliente: IP repetido conta uma vez, domínio fica fora, IPv6 entra nos IPs mas não no total com CIDRs.
+    assert.deepEqual(stats.ipTotals.a, { ips: 4, cidrs: 1, withCidrs: 259, ipv6Networks: 1 });
+    assert.deepEqual(stats.ipTotals.b, { ips: 2, cidrs: 1, withCidrs: 258, ipv6Networks: 0 });
+    assert.equal(stats.ipTotals.z, undefined, 'cliente arquivado não entra na conta');
+    // Soma dos clientes: o mesmo IP em dois clientes conta duas vezes.
+    assert.deepEqual(stats.ipTotalsSum, { ips: 8, cidrs: 2, withCidrs: 519, ipv6Networks: 1 });
     assert.equal(stats.recurring.length, 4);
     assert.deepEqual(stats.recurring[0], { indicator: '192.0.2.10', count: 4 });
     assert.ok(!stats.recurring.some((item) => item.indicator === '198.51.100.50'));
@@ -146,5 +148,16 @@ test('consultas SQL paginam listas e agregam correlação sem perder o contexto 
     assert.deepEqual((await store.getClientEntries(actor, 'a')).map((e) => e.id), ['restored-a']);
     const histories = await db.query<{ id: string; undone: boolean | null }>("SELECT id, (data->>'undone')::boolean AS undone FROM history ORDER BY id");
     assert.deepEqual(histories, [{ id: 'history-a', undone: true }, { id: 'history-b', undone: null }]);
+  });
+
+  await t.test('conta de IPs do painel é refeita quando uma lista muda (e reaproveitada quando não muda)', async () => {
+    const before = await store.getDashboardStats();
+    assert.deepEqual((await store.getDashboardStats()).ipTotalsSum, before.ipTotalsSum);
+    const extra = entry('d-new', 'd', '198.51.100.0/30');
+    await db.query('INSERT INTO entries (id, client_id, indicator, status, data) VALUES ($1, $2, $3, $4, $5::jsonb)',
+      [extra.id, extra.clientId, extra.indicator, extra.status, JSON.stringify(extra)]);
+    const after = await store.getDashboardStats();
+    assert.equal(after.ipTotals.d.cidrs, before.ipTotals.d.cidrs + 1);
+    assert.equal(after.ipTotalsSum.withCidrs, before.ipTotalsSum.withCidrs + 4);
   });
 });

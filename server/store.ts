@@ -16,7 +16,11 @@ import type {
   PendingImport
 } from '../src/types/index.ts';
 import { exceptionHit, findExceptionConflicts, findRedundant, toRange } from '../src/utils/redundancy.ts';
-import { countAddresses } from '../src/utils/addressCount.ts';
+import { ipTotalsByClient, type IpTotals } from '../src/utils/addressCount.ts';
+
+// Conta de IPs/CIDRs por cliente: refeita só quando alguma lista ou cliente muda (o Painel é atualizado
+// depois de cada ação, e a conta percorre todas as entradas ativas).
+const ipTotalsCache = new WeakMap<object, { key: string; value: { perClient: Record<string, IpTotals>; sum: IpTotals } }>();
 import { classifyIndicator, normalizeIndicator } from '../src/utils/validator.ts';
 
 // Operações da base compartilhada da equipe. Espelham as funções que o app usava no IndexedDB,
@@ -1125,14 +1129,10 @@ export function createStore(db: Database) {
     async getDashboardStats(): Promise<DashboardStats> {
       const rows = await db.query<{ result: DashboardStats }>(`
         WITH active AS MATERIALIZED (
-          SELECT client_id, indicator, data->>'addedDate' AS added_date,
-                 (data->>'type' IN ('CIDR_v4', 'CIDR_v6') OR strpos(indicator, '/') > 0) AS is_cidr
+          SELECT client_id, indicator, data->>'addedDate' AS added_date
           FROM entries WHERE status = 'active'
         ), counts AS (
-          SELECT client_id, count(*)::int AS total,
-                 count(*) FILTER (WHERE is_cidr)::int AS cidrs,
-                 count(*) FILTER (WHERE NOT coalesce(is_cidr, false))::int AS ips
-          FROM active GROUP BY client_id
+          SELECT client_id, count(*)::int AS total FROM active GROUP BY client_id
         ), correlations AS (
           SELECT lower(trim(indicator)) FROM active GROUP BY lower(trim(indicator)) HAVING count(DISTINCT client_id) >= 2
         ), recurring AS (
@@ -1143,40 +1143,29 @@ export function createStore(db: Database) {
         )
         SELECT jsonb_build_object(
           'activeCounts', coalesce((SELECT jsonb_object_agg(client_id, total) FROM counts), '{}'::jsonb),
-          'ipCounts', coalesce((SELECT jsonb_object_agg(client_id, ips) FROM counts WHERE ips > 0), '{}'::jsonb),
-          'cidrCounts', coalesce((SELECT jsonb_object_agg(client_id, cidrs) FROM counts WHERE cidrs > 0), '{}'::jsonb),
           'totalActiveAcrossAll', (SELECT count(*)::int FROM active),
-          'totalIpsAcrossAll', (SELECT count(*)::int FROM active WHERE NOT coalesce(is_cidr, false)),
-          'totalCidrsAcrossAll', (SELECT count(*)::int FROM active WHERE is_cidr),
           'totalCorrelatedIps', (SELECT count(*)::int FROM correlations),
           'addedThisWeekCount', (SELECT count(*)::int FROM active WHERE
             added_date ~ '^[0-9]{4}-(0[1-9]|1[0-2])-([012][0-9]|3[01])($|T)' AND
             CASE WHEN length(added_date) = 10 THEN added_date || 'T00:00:00.000Z' ELSE added_date END >= $1),
           'recurring', coalesce((SELECT jsonb_agg(jsonb_build_object('indicator', indicator, 'count', count) ORDER BY count DESC, indicator) FROM recurring), '[]'::jsonb)
         ) AS result`, [new Date(Date.now() - 7 * 86_400_000).toISOString()]);
-      // Total de endereços cobertos: a conta de faixas é feita aqui, fora do SQL.
-      const active = await db.query<{ client_id: string; indicator: string }>(
-        `SELECT e.client_id, e.indicator FROM entries e JOIN clients c ON c.id = e.client_id
-         WHERE e.status = 'active' AND coalesce(c.data->>'isArchived', 'false') <> 'true'`
+      // Conta de IPs/CIDRs (feita aqui, fora do SQL), guardada até alguma entrada ou cliente mudar.
+      const [{ key }] = await db.query<{ key: string }>(
+        `SELECT (SELECT count(*) FROM entries)::text || '|' || coalesce((SELECT max(updated_at) FROM entries)::text, '')
+           || '|' || coalesce((SELECT max(updated_at) FROM clients)::text, '') AS key`
       );
-      const byClient = new Map<string, string[]>();
-      for (const row of active) {
-        const list = byClient.get(row.client_id);
-        if (list) list.push(row.indicator);
-        else byClient.set(row.client_id, [row.indicator]);
+      const hit = ipTotalsCache.get(db);
+      let totals = hit && hit.key === key ? hit.value : null;
+      if (!totals) {
+        const active = await db.query<{ client_id: string; indicator: string }>(
+          `SELECT e.client_id, e.indicator FROM entries e JOIN clients c ON c.id = e.client_id
+           WHERE e.status = 'active' AND coalesce(c.data->>'isArchived', 'false') <> 'true'`
+        );
+        totals = ipTotalsByClient(active.map((row) => ({ clientId: row.client_id, indicator: row.indicator })));
+        ipTotalsCache.set(db, { key, value: totals });
       }
-      const ipTotals: DashboardStats['ipTotals'] = {};
-      const ipTotalsSum = { ips: 0, cidrs: 0, withCidrs: 0, ipv6Networks: 0 };
-      for (const [clientId, list] of byClient) {
-        const count = countAddresses(list);
-        const totals = { ips: count.singleIps, cidrs: count.cidrs, withCidrs: count.ipv4, ipv6Networks: count.ipv6Networks };
-        ipTotals[clientId] = totals;
-        ipTotalsSum.ips += totals.ips;
-        ipTotalsSum.cidrs += totals.cidrs;
-        ipTotalsSum.withCidrs += totals.withCidrs;
-        ipTotalsSum.ipv6Networks += totals.ipv6Networks;
-      }
-      return { ...rows[0].result, ipTotals, ipTotalsSum };
+      return { ...rows[0].result, ipTotals: totals.perClient, ipTotalsSum: totals.sum };
     },
 
     async getCorrelationPage(_actor: Actor, params: CorrelationPageParams = {}): Promise<CorrelationPage> {
