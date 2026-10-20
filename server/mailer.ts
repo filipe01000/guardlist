@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 
 // Envio de e-mail por SMTP (Gmail com senha de app, Outlook, Brevo, Resend, SES...).
 // Variáveis: SMTP_HOST, SMTP_PORT (465 = TLS direto; 587 = STARTTLS), SMTP_USER, SMTP_PASS, SMTP_FROM.
@@ -18,9 +19,9 @@ export function recipients(variable: 'REPORT_EMAILS' | 'BACKUP_EMAILS'): string[
   return raw.split(/[,;\s]+/).map((x) => x.trim()).filter((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x));
 }
 
-let transport: nodemailer.Transporter | null = null;
+let transport: Transporter | null = null;
 
-function getTransport(): nodemailer.Transporter {
+function getTransport(): Transporter {
   if (transport) return transport;
   const port = Number(process.env.SMTP_PORT || 587);
   transport = nodemailer.createTransport({
