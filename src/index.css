@@ -321,7 +321,7 @@ a {
   font-weight: 650;
 }
 
-/* O total com CIDRs é o número principal: grande, com o rótulo embaixo. */
+/* O total sem CIDRs é o número principal: grande, com o rótulo embaixo. */
 .ip-totals > div:first-child {
   flex-direction: column-reverse;
   align-items: flex-start;
@@ -333,6 +333,21 @@ a {
   font-size: 1.45rem;
   letter-spacing: -0.03em;
 }
+
+.ip-totals__toggle {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ip-totals__toggle:hover { text-decoration: underline; }
 
 .workspace-summary__action {
   cursor: pointer;

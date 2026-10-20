@@ -49,6 +49,7 @@ interface DashboardViewProps {
 }
 
 const VIEW_MODE_KEY = 'guardlist-dashboard-view';
+const CIDR_TOTAL_KEY = 'guardlist.dashboard.cidrTotal';
 
 function dueLabel(daysSince: number | null, daysUntilDue: number): { text: string; tone: 'danger' | 'warn' | 'muted' } {
   if (daysSince === null) return { text: 'Sem importação', tone: 'danger' };
@@ -123,6 +124,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   });
   const [statusFilter, setStatusFilter] = useState<'all' | 'late' | 'near' | 'ok'>('all');
+  // Total contando os endereços dentro dos CIDRs: opcional, porque um /16 sozinho já vale 65.536 e distorce a leitura.
+  const [showCidrTotal, setShowCidrTotal] = useState(() => {
+    try {
+      return window.localStorage.getItem(CIDR_TOTAL_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleCidrTotal = () => {
+    setShowCidrTotal((on) => {
+      try { window.localStorage.setItem(CIDR_TOTAL_KEY, on ? '0' : '1'); } catch { /* preferência opcional */ }
+      return !on;
+    });
+  };
   const [history, setHistory] = useState<ImportHistoryRecord[]>([]);
 
   useEffect(() => {
@@ -223,19 +238,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="workspace-summary__item">
           <span>IPs bloqueados</span>
           <dl className="ip-totals">
-            <div title="Endereços IPv4 distintos: cada CIDR conta pelo tamanho, sem repetir sobreposições">
-              <dt>Com CIDRs</dt>
-              <dd>{addressStats.totalAddresses.toLocaleString('pt-BR')}</dd>
-            </div>
-            <div title="Só os IPs informados um a um, sem contar o que está dentro dos CIDRs">
-              <dt>Sem CIDRs</dt>
+            <div title="IPs informados um a um, sem contar o que está dentro dos CIDRs; cada IP conta uma vez">
+              <dt>IPs, sem CIDRs</dt>
               <dd>{addressStats.uniqueSingleIps.toLocaleString('pt-BR')}</dd>
             </div>
             <div title="Quantidade de redes CIDR distintas nas listas">
               <dt>CIDRs</dt>
               <dd>{addressStats.uniqueCidrs.toLocaleString('pt-BR')}</dd>
             </div>
+            {showCidrTotal && (
+              <div title="Endereços IPv4 distintos: cada CIDR conta pelo tamanho, sem repetir sobreposições">
+                <dt>Total com CIDRs</dt>
+                <dd>{addressStats.totalAddresses.toLocaleString('pt-BR')}</dd>
+              </div>
+            )}
           </dl>
+          <button type="button" className="ip-totals__toggle" onClick={toggleCidrTotal} aria-pressed={showCidrTotal}>
+            {showCidrTotal ? 'Ocultar total com CIDRs' : 'Mostrar total com CIDRs'}
+          </button>
           <small>
             {totalActiveAcrossAll.toLocaleString('pt-BR')} entradas ativas
             {addressStats.ipv6Networks > 0 && ` · IPv6 à parte: ${addressStats.ipv6Networks} ${addressStats.ipv6Networks === 1 ? 'faixa' : 'faixas'}`}
@@ -347,7 +367,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <li><strong>{total.toLocaleString('pt-BR')}</strong> ativos</li>
                       <li>{ips.toLocaleString('pt-BR')} IPs</li>
                       <li>{cidrs.toLocaleString('pt-BR')} CIDRs</li>
-                      {cidrs > 0 && <li title="Endereços IPv4 cobertos, contando o tamanho de cada CIDR">{addresses.toLocaleString('pt-BR')} com CIDRs</li>}
+                      {showCidrTotal && cidrs > 0 && <li title="Endereços IPv4 cobertos, contando o tamanho de cada CIDR">{addresses.toLocaleString('pt-BR')} com CIDRs</li>}
                     </ul>
 
                     <footer className="cl-card__foot">
