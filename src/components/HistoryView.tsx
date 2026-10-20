@@ -30,25 +30,24 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
     load();
   }, [selectedClientId]);
 
-  // Agrupamento por semana para o gráfico de evolução
-  const weeklyEvolution = useMemo(() => {
-    const map = new Map<string, { week: string; added: number; discarded: number; count: number }>();
-
+  // Agrupamento por dia (os bloqueios são diários): os 14 dias mais recentes com importação, do mais antigo ao mais novo.
+  const dailyEvolution = useMemo(() => {
+    const map = new Map<string, { day: string; added: number; discarded: number; count: number }>();
     for (const r of records) {
-      const wk = r.isoWeek || 'Semana';
-      if (!map.has(wk)) {
-        map.set(wk, { week: wk, added: 0, discarded: 0, count: 0 });
-      }
-      const data = map.get(wk)!;
+      const parsed = new Date(r.date);
+      const day = Number.isNaN(parsed.getTime())
+        ? r.date.slice(0, 10)
+        : `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+      if (!map.has(day)) map.set(day, { day, added: 0, discarded: 0, count: 0 });
+      const data = map.get(day)!;
       data.added += r.addedCount;
       data.discarded += r.duplicatesDiscarded + r.coveredByCidrDiscarded;
       data.count += 1;
     }
-
-    return Array.from(map.values()).slice(0, 10);
+    return Array.from(map.values()).sort((a, b) => b.day.localeCompare(a.day)).slice(0, 14).reverse();
   }, [records]);
 
-  const maxAdded = Math.max(...weeklyEvolution.map(w => w.added), 1);
+  const maxAdded = Math.max(...dailyEvolution.map(w => w.added), 1);
 
   return (
     <div className="space-y-6">
@@ -90,22 +89,22 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
         </div>
       ) : (
         <>
-          {weeklyEvolution.length > 0 && (
-            <section className="data-panel" aria-labelledby="weekly-volume-title">
+          {dailyEvolution.length > 0 && (
+            <section className="data-panel" aria-labelledby="daily-volume-title">
               <header className="data-panel__header">
-                <h2 id="weekly-volume-title">Novos indicadores por semana</h2>
-                <span>{weeklyEvolution.reduce((acc, w) => acc + w.added, 0)} no período</span>
+                <h2 id="daily-volume-title">Novos indicadores por dia</h2>
+                <span>{dailyEvolution.reduce((acc, w) => acc + w.added, 0)} nos últimos {dailyEvolution.length} {dailyEvolution.length === 1 ? 'dia com importação' : 'dias com importação'}</span>
               </header>
               <div className="week-bars">
-                {weeklyEvolution.map((item) => {
+                {dailyEvolution.map((item) => {
                   const pct = Math.round((item.added / Math.max(1, maxAdded)) * 100);
                   return (
-                    <div key={item.week} className="week-bars__item">
+                    <div key={item.day} className="week-bars__item">
                       <span className="week-bars__value">+{item.added}</span>
                       <span className="week-bars__track" aria-hidden="true">
                         <i style={{ height: `${Math.max(6, pct)}%` }} />
                       </span>
-                      <span className="week-bars__label">{item.week.replace(/^\d{4}-/, '')}</span>
+                      <span className="week-bars__label">{item.day.slice(8, 10)}/{item.day.slice(5, 7)}</span>
                       <span className="week-bars__discarded">{item.discarded} descartados</span>
                     </div>
                   );

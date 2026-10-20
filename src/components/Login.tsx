@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Loader2, LogIn, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Loader2, LogIn } from 'lucide-react';
 import { SessionUser } from '../types';
 import './Login.css';
 
@@ -46,7 +46,7 @@ const LoginForm: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <form className="gl-form gl-form--login" onSubmit={handleSubmit}>
       <div className="gl-form__head">
-        <ShieldCheck aria-hidden="true" />
+        <img src="/brand/guardlist-mark.png" alt="" className="gl-form__mark" />
         <h1>Entrar no GuardList</h1>
         <p>Acesso restrito à equipe autorizada.</p>
       </div>

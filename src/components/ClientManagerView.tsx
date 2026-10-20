@@ -212,11 +212,11 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
             />
           </div>
           <div>
-            <label className="field-label" htmlFor="new-client-notes">Firewall ou observação <span className="text-slate-500 font-normal">(opcional)</span></label>
+            <label className="field-label" htmlFor="new-client-notes">Observação <span className="text-slate-500 font-normal">(opcional)</span></label>
             <input
               id="new-client-notes"
               type="text"
-              placeholder="FortiGate 100F na borda da DMZ"
+              placeholder="Contato do cliente, janela de manutenção…"
               value={newClientNotes}
               onChange={(e) => setNewClientNotes(e.target.value)}
               className="field w-full"
@@ -277,7 +277,7 @@ export const ClientManagerView: React.FC<ClientManagerViewProps> = ({
                           maxLength={1000}
                           value={editNotesText}
                           onChange={(e) => setEditNotesText(e.target.value)}
-                          placeholder="Firewall, contato do cliente, janela de manutenção, particularidades da lista…"
+                          placeholder="Contato do cliente, janela de manutenção, particularidades da lista…"
                           className="field w-full py-2 leading-relaxed resize-y"
                         />
                       </div>

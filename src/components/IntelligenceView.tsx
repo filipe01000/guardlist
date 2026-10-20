@@ -177,11 +177,10 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
         <div className="overflow-x-auto">
           <table className="data-table">
             <colgroup>
-              <col style={{ width: '22%' }} />
-              <col style={{ width: '9%' }} />
-              <col style={{ width: '30%' }} />
-              <col style={{ width: '13%' }} />
+              <col style={{ width: '26%' }} />
+              <col style={{ width: '10%' }} />
               <col />
+              <col style={{ width: '15%' }} />
               <col style={{ width: '40px' }} />
             </colgroup>
             <thead>
@@ -190,14 +189,13 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
                 <th>Tipo</th>
                 <th>Clientes</th>
                 <th>Disseminação</th>
-                <th>Firewalls</th>
                 <th aria-label="Abrir" />
               </tr>
             </thead>
             <tbody>
               {filteredList.length === 0 ? (
                 <tr>
-                  <td colSpan={6}>
+                  <td colSpan={5}>
                     <div className="empty-state">
                       <Search aria-hidden="true" />
                       <strong>{loading ? 'Carregando indicadores…' : error ? 'Não foi possível carregar a correlação' : summary?.totalCorrelatedIpsCount === 0 ? 'Nenhum indicador em comum' : 'Nenhum indicador encontrado'}</strong>
@@ -248,11 +246,6 @@ const CorrelationPanel: React.FC<IntelligenceViewProps> = ({
                     <td>
                       <span className={severityChip(item.severity)}>
                         {item.occurrencesCount} de {activeClientsCount}
-                      </span>
-                    </td>
-                    <td>
-                      <span className="data-table__clamp" title={item.firewallsImpacted.join(' · ')}>
-                        {item.firewallsImpacted.join(' · ')}
                       </span>
                     </td>
                     <td className="text-right">
