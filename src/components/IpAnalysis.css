@@ -120,3 +120,10 @@
   .ipa__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ipa__cats li { grid-template-columns: 110px minmax(0, 1fr) 30px; }
 }
+
+/* Nota de abuso em miniatura, na tabela de IPs denunciados de uma rede. */
+.ipa__mini { display: flex; align-items: center; gap: 8px; }
+.ipa__mini .ipa__bar { flex: 1; margin: 0; height: 6px; min-width: 60px; }
+.ipa__mini strong { width: 38px; text-align: right; font-size: 12.5px; }
+
+.ipa .notice > svg { flex: none; }

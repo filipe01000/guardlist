@@ -1,4 +1,4 @@
-import { AppSettings, BlocklistEntry, Client, ClientEntriesPage, ClientEntriesPageParams, ClientException, ClientSnapshot, CorrelationPage, CorrelationPageParams, CtiSummary, DashboardStats, IpAnalysis, EntryComment, ImportHistoryRecord, ImportOutcome, PendingImport, ReportData } from '../types';
+import { AppSettings, BlocklistEntry, Client, ClientEntriesPage, ClientEntriesPageParams, ClientException, ClientSnapshot, CorrelationPage, CorrelationPageParams, CtiSummary, DashboardStats, IpAnalysis, CidrAnalysis, EntryComment, ImportHistoryRecord, ImportOutcome, PendingImport, ReportData } from '../types';
 export type { ReportClientRow, ReportChangeRow, ReportData } from '../types';
 
 // Acesso à base compartilhada da equipe pelo servidor (/api/data/<operação>).
@@ -199,6 +199,7 @@ async function http<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const analyzeIp = (ip: string) => http<IpAnalysis>('POST', '/api/cti/analyze', { ip });
+export const analyzeCidr = (network: string) => http<CidrAnalysis>('POST', '/api/cti/analyze-block', { network });
 
 export const enrichIndicators = (indicators: string[], force = false) =>
   http<{ results: Record<string, CtiSummary>; pending: number; configured: boolean }>('POST', '/api/cti/enrich', { indicators, force });

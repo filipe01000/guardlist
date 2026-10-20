@@ -1272,7 +1272,7 @@ export const ClientListView: React.FC<ClientListViewProps> = ({
                           badge={commentCounts[item.id] || undefined}
                           items={[
                             ...(aiAvailability.enabled ? [{ label: 'Perguntar à IA', icon: Sparkles, onSelect: () => requestIndicatorAction('ai', item.indicator) }] : []),
-                            ...(item.type === 'IPv4' || item.type === 'IPv6' ? [{ label: 'Analisar IP', icon: Fingerprint, hint: 'nova aba', onSelect: () => openIpAnalysisTab(item.indicator) }] : []),
+                            ...(item.type === 'IPv4' || item.type === 'IPv6' || item.type === 'CIDR_v4' ? [{ label: item.type === 'CIDR_v4' ? 'Analisar rede' : 'Analisar IP', icon: Fingerprint, hint: 'nova aba', onSelect: () => openIpAnalysisTab(item.indicator) }] : []),
                             { label: 'Abrir dossiê do indicador', icon: ScanSearch, onSelect: () => openDossier(item.indicator) },
                             { label: 'Onde mais está bloqueado?', icon: Search, onSelect: () => requestIndicatorAction('where', item.indicator) },
                             { label: 'Consultar fora', icon: Globe, children: externalLookupEntries(item.indicator, item.type) },

@@ -281,6 +281,24 @@ export interface IpAnalysis {
   } | null;
 }
 
+/** Análise de uma rede CIDR no AbuseIPDB (check-block): só IPv4, até /24 e 30 dias no plano grátis. */
+export interface CidrAnalysis {
+  network: string;
+  configured: boolean;
+  /** Mensagem do AbuseIPDB quando a consulta não é permitida (rede maior que /24, cota etc.). */
+  error?: string;
+  detail: {
+    networkAddress: string;
+    netmask: string;
+    minAddress: string;
+    maxAddress: string;
+    numPossibleHosts: number;
+    addressSpaceDesc: string;
+    /** IPs da rede com denúncia nos últimos 30 dias. */
+    reported: Array<{ ip: string; numReports: number; mostRecentReport: string; score: number; countryCode: string | null }>;
+  } | null;
+}
+
 export interface EntryComment {
   id: number;
   entryId: string;

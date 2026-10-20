@@ -1,6 +1,6 @@
 import { isIP } from 'node:net';
 import type { Database } from './db.ts';
-import type { CtiSummary, CtiVerdict, IpAnalysis } from '../src/types/index.ts';
+import type { CidrAnalysis, CtiSummary, CtiVerdict, IpAnalysis } from '../src/types/index.ts';
 
 // Reputação de IPs para triagem na importação e para os gráficos. Consulta AbuseIPDB, GreyNoise e OTX
 // com poucas requisições simultâneas e guarda o resultado em cti_cache, para não gastar a cota de novo.
@@ -51,7 +51,12 @@ function decide(summary: Omit<CtiSummary, 'verdict' | 'verdictReason'>): { verdi
   const reports = summary.totalReports ?? 0;
   if (score >= 75 || reports >= 50 || summary.greyNoise?.classification === 'malicious') return { verdict: 'high' };
   if (score < 10 && reports < 3 && !(summary.otxPulses && summary.otxPulses > 0)) return { verdict: 'low', verdictReason: 'Sem denúncias relevantes' };
-  return { verdict: 'medium' };
+  // Médio: diz de onde veio o alerta, para não parecer contraditório com nota 0 no AbuseIPDB.
+  const why: string[] = [];
+  if (score > 0 || reports > 0) why.push(`nota ${score}% e ${reports} denúncias no AbuseIPDB`);
+  else if (summary.score !== null) why.push('sem denúncias recentes no AbuseIPDB');
+  if (summary.otxPulses) why.push(`${summary.otxPulses} alertas (pulses) no OTX`);
+  return { verdict: 'medium', verdictReason: why.length ? `Risco médio: ${why.join(score > 0 || reports > 0 ? '; ' : ', mas ')}` : undefined };
 }
 
 // verbose: pede ao AbuseIPDB também as denúncias (usado só na página de análise, uma consulta por vez).
@@ -64,7 +69,7 @@ async function lookupFull(ip: string, verbose: boolean): Promise<{ summary: CtiS
 
   const [abuse, grey, otx] = await Promise.all([
     abuseKey
-      ? getJson(`https://api.abuseipdb.com/api/v2/check?ipAddress=${encoded}&maxAgeInDays=90${verbose ? '&verbose' : ''}`, { Accept: 'application/json', Key: abuseKey }).catch(() => null)
+      ? getJson(`https://api.abuseipdb.com/api/v2/check?ipAddress=${encoded}&maxAgeInDays=${verbose ? '365&verbose' : '90'}`, { Accept: 'application/json', Key: abuseKey }).catch(() => null)
       : Promise.resolve(null),
     greyKey
       ? getJson(`https://api.greynoise.io/v3/community/${encoded}`, { Accept: 'application/json', key: greyKey }).catch(() => null)
@@ -204,6 +209,49 @@ export function createCti(db: Database) {
         );
       }
       return { configured, summary, detail };
+    },
+
+    // Rede inteira no AbuseIPDB: quais IPs dela foram denunciados. O plano grátis aceita até /24 e 30 dias.
+    async analyzeBlock(network: string): Promise<CidrAnalysis> {
+      const cidr = String(network ?? '').trim();
+      const key = process.env.ABUSEIPDB_API_KEY;
+      if (!key) return { network: cidr, configured: false, detail: null };
+      const response = await getJson(
+        `https://api.abuseipdb.com/api/v2/check-block?network=${encodeURIComponent(cidr)}&maxAgeInDays=30`,
+        { Accept: 'application/json', Key: key }
+      ).catch(() => null);
+      if (!response) return { network: cidr, configured: true, detail: null, error: 'AbuseIPDB indisponível. Tente de novo em instantes.' };
+      if (response.status !== 200) {
+        const detail = String(response.body?.errors?.[0]?.detail ?? '');
+        const error = response.status === 429
+          ? 'Limite diário do AbuseIPDB atingido.'
+          : /bitmask wider/i.test(detail)
+            ? 'O plano grátis do AbuseIPDB só consulta redes de até /24 (256 endereços). Divida a rede em /24 para consultar.'
+            : detail || `AbuseIPDB respondeu com erro ${response.status}.`;
+        return { network: cidr, configured: true, detail: null, error };
+      }
+      const d = response.body?.data ?? {};
+      return {
+        network: cidr,
+        configured: true,
+        detail: {
+          networkAddress: String(d.networkAddress ?? ''),
+          netmask: String(d.netmask ?? ''),
+          minAddress: String(d.minAddress ?? ''),
+          maxAddress: String(d.maxAddress ?? ''),
+          numPossibleHosts: Number(d.numPossibleHosts ?? 0),
+          addressSpaceDesc: String(d.addressSpaceDesc ?? ''),
+          reported: (Array.isArray(d.reportedAddress) ? d.reportedAddress : [])
+            .map((r: any) => ({
+              ip: String(r?.ipAddress ?? ''),
+              numReports: Number(r?.numReports ?? 0),
+              mostRecentReport: String(r?.mostRecentReport ?? ''),
+              score: Number(r?.abuseConfidenceScore ?? 0),
+              countryCode: typeof r?.countryCode === 'string' ? r.countryCode : null
+            }))
+            .sort((a: { score: number; numReports: number }, b: { score: number; numReports: number }) => b.score - a.score || b.numReports - a.numReports)
+        }
+      };
     },
 
     async testKeys() {

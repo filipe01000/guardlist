@@ -145,8 +145,9 @@ export function ContextMenuHost(props: Props) {
     const lookups: ActionMenuEntry = { label: 'Consultar fora', icon: Globe, children: externalLookupEntries(value, type) };
     const items: ActionMenuEntry[] = [{ type: 'heading', label: value, detail: TYPE_LABEL[type] }];
     // Em qualquer lugar (inclusive dentro de janelas), um IP pode ser analisado numa aba nova.
-    if (type === 'IPv4' || type === 'IPv6') {
-      items.push({ label: 'Analisar IP', icon: Fingerprint, hint: 'nova aba', title: 'Reputação, denúncias e onde está no GuardList, numa aba nova', onSelect: () => openIpAnalysisTab(value) });
+    if (type === 'IPv4' || type === 'IPv6' || type === 'CIDR_v4') {
+      const isNetwork = type === 'CIDR_v4';
+      items.push({ label: isNetwork ? 'Analisar rede' : 'Analisar IP', icon: Fingerprint, hint: 'nova aba', title: isNetwork ? 'IPs denunciados nesta rede e onde ela está no GuardList, numa aba nova' : 'Reputação, denúncias e onde está no GuardList, numa aba nova', onSelect: () => openIpAnalysisTab(value) });
       if (inModal) items.push({ type: 'divider' });
     }
     if (!inModal) {

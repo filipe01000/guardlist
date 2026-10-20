@@ -433,6 +433,21 @@ app.post('/api/cti/analyze', analyzeLimit, jsonSmall, async (req, res) => {
   }
 });
 
+// Análise de uma rede CIDR IPv4 (página Análise de IP): IPs denunciados dentro dela.
+app.post('/api/cti/analyze-block', analyzeLimit, jsonSmall, async (req, res) => {
+  const network = typeof req.body?.network === 'string' ? req.body.network.trim() : '';
+  const [address, prefix, extra] = network.split('/');
+  if (extra !== undefined || isIP(address) !== 4 || !/^\d{1,2}$/.test(prefix ?? '') || Number(prefix) > 32) {
+    return res.status(400).json({ error: 'Informe uma rede IPv4 no formato 192.0.2.0/24.' });
+  }
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json(await cti.analyzeBlock(network));
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
 // Reputação de vários IPs de uma vez (triagem da importação e gráficos). Até 100 consultas novas por chamada;
 // o restante vem do cache ou fica para a próxima chamada.
 const enrichLimit = rateLimit('reputação', Number(process.env.CTI_ENRICH_RATE_LIMIT_PER_MIN || 20));
