@@ -110,6 +110,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   const [totalActiveAcrossAll, setTotalActiveAcrossAll] = useState<number>(0);
   const [totalIpsAcrossAll, setTotalIpsAcrossAll] = useState<number>(0);
   const [totalCidrsAcrossAll, setTotalCidrsAcrossAll] = useState<number>(0);
+  const [addressStats, setAddressStats] = useState<Pick<DashboardStats, 'addressCounts' | 'totalAddresses' | 'ipv6Networks'>>({ addressCounts: {}, totalAddresses: 0, ipv6Networks: 0 });
   const [totalCorrelatedIps, setTotalCorrelatedIps] = useState<number>(0);
   const [addedThisWeekCount, setAddedThisWeekCount] = useState<number>(0);
   const [recurring, setRecurring] = useState<DashboardStats['recurring']>([]);
@@ -205,6 +206,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
       setTotalActiveAcrossAll(stats.totalActiveAcrossAll);
       setTotalIpsAcrossAll(stats.totalIpsAcrossAll);
       setTotalCidrsAcrossAll(stats.totalCidrsAcrossAll);
+      setAddressStats({ addressCounts: stats.addressCounts ?? {}, totalAddresses: stats.totalAddresses ?? 0, ipv6Networks: stats.ipv6Networks ?? 0 });
       setTotalCorrelatedIps(stats.totalCorrelatedIps);
       setAddedThisWeekCount(stats.addedThisWeekCount);
       setRecurring(stats.recurring);
@@ -518,6 +520,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
             totalActiveAcrossAll={totalActiveAcrossAll}
             totalIpsAcrossAll={totalIpsAcrossAll}
             totalCidrsAcrossAll={totalCidrsAcrossAll}
+            addressStats={addressStats}
             totalCorrelatedIps={totalCorrelatedIps}
             addedThisWeekCount={addedThisWeekCount}
             recurring={recurring}

@@ -10,7 +10,7 @@
     "start": "tsx server.ts --production",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "lint": "tsc --noEmit",
-    "test": "tsx --test auth.test.ts server/*.test.ts src/db/store.test.ts src/utils/validator.node.test.ts src/utils/ctiService.test.ts src/utils/caseTemplate.test.ts src/utils/importReport.test.ts",
+    "test": "tsx --test auth.test.ts server/*.test.ts src/db/store.test.ts src/utils/validator.node.test.ts src/utils/ctiService.test.ts src/utils/caseTemplate.test.ts src/utils/importReport.test.ts src/utils/addressCount.test.ts",
     "user:add": "tsx scripts/add-user.ts"
   },
   "dependencies": {

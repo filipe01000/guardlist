@@ -138,6 +138,12 @@ export interface DashboardStats {
   totalCorrelatedIps: number;
   addedThisWeekCount: number;
   recurring: Array<{ indicator: string; count: number }>;
+  /** Endereços IPv4 cobertos por cliente (CIDRs pelo tamanho, sem contar sobreposição). */
+  addressCounts: Record<string, number>;
+  /** Endereços IPv4 distintos cobertos somando todos os clientes ativos. */
+  totalAddresses: number;
+  /** Faixas IPv6 distintas (contadas à parte). */
+  ipv6Networks: number;
 }
 
 export interface CorrelationPageParams {

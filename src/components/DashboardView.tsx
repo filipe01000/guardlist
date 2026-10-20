@@ -30,6 +30,8 @@ interface DashboardViewProps {
   totalActiveAcrossAll: number;
   totalIpsAcrossAll: number;
   totalCidrsAcrossAll: number;
+  /** Endereços IPv4 cobertos (CIDRs pelo tamanho), por cliente e no total, e as faixas IPv6 à parte. */
+  addressStats: Pick<DashboardStats, 'addressCounts' | 'totalAddresses' | 'ipv6Networks'>;
   totalCorrelatedIps: number;
   addedThisWeekCount: number;
   recurring: DashboardStats['recurring'];
@@ -95,6 +97,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   totalActiveAcrossAll,
   totalIpsAcrossAll,
   totalCidrsAcrossAll,
+  addressStats,
   totalCorrelatedIps,
   addedThisWeekCount,
   recurring,
@@ -153,6 +156,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         total: activeCounts[client.id] || 0,
         ips: ipCounts[client.id] || 0,
         cidrs: cidrCounts[client.id] || 0,
+        addresses: addressStats.addressCounts[client.id] || 0,
         isLate,
         isNearDeadline,
         urgencyScore
@@ -217,9 +221,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       <div className="workspace-summary" aria-label="Resumo operacional">
         <div className="workspace-summary__item">
-          <span>Entradas ativas</span>
-          <strong>{totalActiveAcrossAll.toLocaleString('pt-BR')}</strong>
-          <small>{totalIpsAcrossAll.toLocaleString('pt-BR')} IPs · {totalCidrsAcrossAll} CIDRs</small>
+          <span>IPs bloqueados</span>
+          <strong title="Endereços IPv4 distintos: cada CIDR conta pelo tamanho, sem repetir sobreposições">{addressStats.totalAddresses.toLocaleString('pt-BR')}</strong>
+          <small>
+            {totalActiveAcrossAll.toLocaleString('pt-BR')} entradas · {totalIpsAcrossAll.toLocaleString('pt-BR')} IPs · {totalCidrsAcrossAll} CIDRs
+            {addressStats.ipv6Networks > 0 && ` · +${addressStats.ipv6Networks} ${addressStats.ipv6Networks === 1 ? 'rede' : 'redes'} IPv6`}
+          </small>
         </div>
         <button
           type="button"
@@ -279,7 +286,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           ) : viewMode === 'cards' ? (
             <div key="cards" className="cl-grid">
-              {sortedClients.map(({ client, daysSince, daysUntilDue, total, ips, cidrs, isLate, isNearDeadline }, index) => {
+              {sortedClients.map(({ client, daysSince, daysUntilDue, total, ips, cidrs, addresses, isLate, isNearDeadline }, index) => {
                 const tone = isLate ? 'is-late' : isNearDeadline ? 'is-near' : 'is-ok';
                 const due = dueLabel(daysSince, daysUntilDue);
                 return (
@@ -327,6 +334,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <li><strong>{total.toLocaleString('pt-BR')}</strong> ativos</li>
                       <li>{ips.toLocaleString('pt-BR')} IPs</li>
                       <li>{cidrs.toLocaleString('pt-BR')} CIDRs</li>
+                      {cidrs > 0 && <li title="Endereços IPv4 cobertos, contando o tamanho de cada CIDR">≈ {addresses.toLocaleString('pt-BR')} endereços</li>}
                     </ul>
 
                     <footer className="cl-card__foot">

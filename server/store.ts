@@ -16,6 +16,7 @@ import type {
   PendingImport
 } from '../src/types/index.ts';
 import { exceptionHit, findExceptionConflicts, findRedundant, toRange } from '../src/utils/redundancy.ts';
+import { countAddresses } from '../src/utils/addressCount.ts';
 import { classifyIndicator, normalizeIndicator } from '../src/utils/validator.ts';
 
 // Operações da base compartilhada da equipe. Espelham as funções que o app usava no IndexedDB,
@@ -1153,7 +1154,21 @@ export function createStore(db: Database) {
             CASE WHEN length(added_date) = 10 THEN added_date || 'T00:00:00.000Z' ELSE added_date END >= $1),
           'recurring', coalesce((SELECT jsonb_agg(jsonb_build_object('indicator', indicator, 'count', count) ORDER BY count DESC, indicator) FROM recurring), '[]'::jsonb)
         ) AS result`, [new Date(Date.now() - 7 * 86_400_000).toISOString()]);
-      return rows[0].result;
+      // Total de endereços cobertos: a conta de faixas é feita aqui, fora do SQL.
+      const active = await db.query<{ client_id: string; indicator: string }>(
+        `SELECT e.client_id, e.indicator FROM entries e JOIN clients c ON c.id = e.client_id
+         WHERE e.status = 'active' AND coalesce(c.data->>'isArchived', 'false') <> 'true'`
+      );
+      const byClient = new Map<string, string[]>();
+      for (const row of active) {
+        const list = byClient.get(row.client_id);
+        if (list) list.push(row.indicator);
+        else byClient.set(row.client_id, [row.indicator]);
+      }
+      const addressCounts: Record<string, number> = {};
+      for (const [clientId, list] of byClient) addressCounts[clientId] = countAddresses(list).ipv4;
+      const total = countAddresses(active.map((row) => row.indicator));
+      return { ...rows[0].result, addressCounts, totalAddresses: total.ipv4, ipv6Networks: total.ipv6Networks };
     },
 
     async getCorrelationPage(_actor: Actor, params: CorrelationPageParams = {}): Promise<CorrelationPage> {
