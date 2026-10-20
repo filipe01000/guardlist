@@ -5,15 +5,25 @@ export interface AddressCount {
   ipv4: number;
   /** Faixas IPv6 distintas depois de juntar as sobrepostas: o total de endereços IPv6 não cabe numa conta útil. */
   ipv6Networks: number;
+  /** IPs individuais distintos (sem /prefixo), IPv4 e IPv6: o total "sem os CIDRs". */
+  singleIps: number;
+  /** Entradas que são CIDR (com /prefixo), IPv4 e IPv6, sem repetir. */
+  cidrs: number;
 }
 
 // Junta as faixas (ordenadas por início) e soma o tamanho de cada bloco contínuo.
 export function countAddresses(indicators: Iterable<string>): AddressCount {
   const v4: Array<[bigint, bigint]> = [];
   const v6: Array<[bigint, bigint]> = [];
+  const singles = new Set<string>();
+  const cidrs = new Set<string>();
   for (const indicator of indicators) {
     const range = toRange(indicator);
-    if (range) (range.family === 4 ? v4 : v6).push([range.start, range.end]);
+    if (!range) continue;
+    (range.family === 4 ? v4 : v6).push([range.start, range.end]);
+    const key = `${range.family}:${range.start}:${range.end}`;
+    if (indicator.includes('/')) cidrs.add(key);
+    else singles.add(key);
   }
   const merge = (ranges: Array<[bigint, bigint]>) => {
     ranges.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
@@ -29,5 +39,5 @@ export function countAddresses(indicators: Iterable<string>): AddressCount {
     return blocks;
   };
   const ipv4 = merge(v4).reduce((sum, [start, end]) => sum + (end - start + 1n), 0n);
-  return { ipv4: Number(ipv4), ipv6Networks: merge(v6).length };
+  return { ipv4: Number(ipv4), ipv6Networks: merge(v6).length, singleIps: singles.size, cidrs: cidrs.size };
 }

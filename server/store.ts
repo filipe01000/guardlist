@@ -1168,7 +1168,7 @@ export function createStore(db: Database) {
       const addressCounts: Record<string, number> = {};
       for (const [clientId, list] of byClient) addressCounts[clientId] = countAddresses(list).ipv4;
       const total = countAddresses(active.map((row) => row.indicator));
-      return { ...rows[0].result, addressCounts, totalAddresses: total.ipv4, ipv6Networks: total.ipv6Networks };
+      return { ...rows[0].result, addressCounts, totalAddresses: total.ipv4, ipv6Networks: total.ipv6Networks, uniqueSingleIps: total.singleIps, uniqueCidrs: total.cidrs };
     },
 
     async getCorrelationPage(_actor: Actor, params: CorrelationPageParams = {}): Promise<CorrelationPage> {

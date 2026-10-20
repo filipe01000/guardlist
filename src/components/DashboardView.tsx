@@ -31,7 +31,7 @@ interface DashboardViewProps {
   totalIpsAcrossAll: number;
   totalCidrsAcrossAll: number;
   /** Endereços IPv4 cobertos (CIDRs pelo tamanho), por cliente e no total, e as faixas IPv6 à parte. */
-  addressStats: Pick<DashboardStats, 'addressCounts' | 'totalAddresses' | 'ipv6Networks'>;
+  addressStats: Pick<DashboardStats, 'addressCounts' | 'totalAddresses' | 'ipv6Networks' | 'uniqueSingleIps' | 'uniqueCidrs'>;
   totalCorrelatedIps: number;
   addedThisWeekCount: number;
   recurring: DashboardStats['recurring'];
@@ -222,10 +222,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="workspace-summary" aria-label="Resumo operacional">
         <div className="workspace-summary__item">
           <span>IPs bloqueados</span>
-          <strong title="Endereços IPv4 distintos: cada CIDR conta pelo tamanho, sem repetir sobreposições">{addressStats.totalAddresses.toLocaleString('pt-BR')}</strong>
+          <dl className="ip-totals">
+            <div title="Endereços IPv4 distintos: cada CIDR conta pelo tamanho, sem repetir sobreposições">
+              <dt>Com CIDRs</dt>
+              <dd>{addressStats.totalAddresses.toLocaleString('pt-BR')}</dd>
+            </div>
+            <div title="Só os IPs informados um a um, sem contar o que está dentro dos CIDRs">
+              <dt>Sem CIDRs</dt>
+              <dd>{addressStats.uniqueSingleIps.toLocaleString('pt-BR')}</dd>
+            </div>
+            <div title="Quantidade de redes CIDR distintas nas listas">
+              <dt>CIDRs</dt>
+              <dd>{addressStats.uniqueCidrs.toLocaleString('pt-BR')}</dd>
+            </div>
+          </dl>
           <small>
-            {totalActiveAcrossAll.toLocaleString('pt-BR')} entradas · {totalIpsAcrossAll.toLocaleString('pt-BR')} IPs · {totalCidrsAcrossAll} CIDRs
-            {addressStats.ipv6Networks > 0 && ` · +${addressStats.ipv6Networks} ${addressStats.ipv6Networks === 1 ? 'rede' : 'redes'} IPv6`}
+            {totalActiveAcrossAll.toLocaleString('pt-BR')} entradas ativas
+            {addressStats.ipv6Networks > 0 && ` · IPv6 à parte: ${addressStats.ipv6Networks} ${addressStats.ipv6Networks === 1 ? 'faixa' : 'faixas'}`}
           </small>
         </div>
         <button
@@ -334,7 +347,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <li><strong>{total.toLocaleString('pt-BR')}</strong> ativos</li>
                       <li>{ips.toLocaleString('pt-BR')} IPs</li>
                       <li>{cidrs.toLocaleString('pt-BR')} CIDRs</li>
-                      {cidrs > 0 && <li title="Endereços IPv4 cobertos, contando o tamanho de cada CIDR">≈ {addresses.toLocaleString('pt-BR')} endereços</li>}
+                      {cidrs > 0 && <li title="Endereços IPv4 cobertos, contando o tamanho de cada CIDR">{addresses.toLocaleString('pt-BR')} com CIDRs</li>}
                     </ul>
 
                     <footer className="cl-card__foot">

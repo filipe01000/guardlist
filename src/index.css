@@ -291,6 +291,49 @@ a {
   white-space: normal;
 }
 
+/* Quadro "IPs bloqueados": com CIDRs, sem CIDRs e quantidade de CIDRs, lado a lado. */
+.ip-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin: 5px 0 0;
+}
+
+.ip-totals > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ip-totals dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ip-totals dd {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+/* O total com CIDRs é o número principal: grande, com o rótulo embaixo. */
+.ip-totals > div:first-child {
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 0;
+  margin-bottom: 4px;
+}
+
+.ip-totals > div:first-child dd {
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+
 .workspace-summary__action {
   cursor: pointer;
 }

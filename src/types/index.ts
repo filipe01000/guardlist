@@ -144,6 +144,10 @@ export interface DashboardStats {
   totalAddresses: number;
   /** Faixas IPv6 distintas (contadas à parte). */
   ipv6Networks: number;
+  /** IPs individuais distintos em todos os clientes (o total sem os CIDRs). */
+  uniqueSingleIps: number;
+  /** CIDRs distintos em todos os clientes. */
+  uniqueCidrs: number;
 }
 
 export interface CorrelationPageParams {
