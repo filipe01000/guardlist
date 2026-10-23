@@ -1,208 +1,374 @@
-/* Tela de login: cartão com painel visual à direita e formulário à esquerda. */
+/* Telas de entrada (login, primeiro acesso): faixas de luz ao fundo, cadeado e cartão de vidro com os cantos cortados. */
 
 .gl-login-page {
+  --gl-page: #030916;
+  --gl-glass-bg: rgba(10, 24, 50, 0.52);
+  --gl-glass-shadow: 0 30px 90px rgba(0, 0, 0, 0.55);
+  --gl-frame-a: rgba(125, 211, 252, 0.75);
+  --gl-frame-b: rgba(255, 255, 255, 0.10);
+  --gl-field-bg: rgba(255, 255, 255, 0.045);
+  --gl-field-line: rgba(148, 197, 255, 0.18);
+  --gl-text: #eef5ff;
+  --gl-soft: #b9c9e2;
+  --gl-muted: #7f93b4;
+  --gl-accent: #38bdf8;
+  --gl-lock-top: rgba(125, 211, 252, 0.30);
+  --gl-lock-bottom: rgba(14, 40, 80, 0.75);
+  --gl-lock-line: rgba(186, 230, 253, 0.85);
+  --gl-streak: 37, 150, 235;
+  --gl-streak-hot: 125, 211, 252;
+
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
   place-items: center;
-  padding: 24px 16px;
-  background:
-    radial-gradient(60% 50% at 70% 20%, var(--accent-soft), transparent 70%),
-    var(--app-bg);
-  color: var(--text);
+  padding: 72px 16px 32px;
+  background: radial-gradient(120% 90% at 50% 45%, #071a3a 0%, var(--gl-page) 62%);
+  color: var(--gl-text);
 }
 
-.gl-card {
-  position: relative;
-  overflow: hidden;
-  width: 100%;
-  max-width: 660px;
-  height: 520px;
-  border-radius: 24px;
-  background: var(--surface);
-  border: 8px solid var(--surface);
-  box-shadow:
-    0 0 0 1px var(--line),
-    0 12px 80px rgba(5, 40, 100, 0.14);
+:root[data-theme="light"] .gl-login-page {
+  --gl-page: #e8f0fa;
+  --gl-glass-bg: rgba(255, 255, 255, 0.55);
+  --gl-glass-shadow: 0 30px 80px rgba(15, 45, 90, 0.18);
+  --gl-frame-a: rgba(14, 116, 184, 0.65);
+  --gl-frame-b: rgba(255, 255, 255, 0.6);
+  --gl-field-bg: rgba(255, 255, 255, 0.7);
+  --gl-field-line: rgba(14, 60, 120, 0.16);
+  --gl-text: #0b1a33;
+  --gl-soft: #33476a;
+  --gl-muted: #5a6c87;
+  --gl-accent: #0a6fc2;
+  --gl-lock-top: rgba(255, 255, 255, 0.85);
+  --gl-lock-bottom: rgba(186, 214, 245, 0.85);
+  --gl-lock-line: rgba(10, 111, 194, 0.85);
+  --gl-streak: 59, 130, 246;
+  --gl-streak-hot: 147, 197, 253;
+  background: radial-gradient(120% 90% at 50% 45%, #f7fbff 0%, var(--gl-page) 65%);
 }
 
-.gl-card-bg {
-  position: absolute;
-  z-index: 2;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  width: 50%;
-  border-radius: 18px;
-  overflow: hidden;
-  /* Pôster da porta do cofre (primeiro quadro do loop); o degradê é o fallback. */
-  background:
-    url("/brand/login-vault-poster.webp") center / cover no-repeat,
-    linear-gradient(160deg, #0b3d8c 0%, #050d1f 100%);
-  translate: 100% 0;
-  animation: gl-slide-in 0.65s ease-in-out;
-}
+/* ---------- Faixas de luz ---------- */
 
-.gl-card-bg__video {
+.gl-streaks {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  z-index: -1;
   pointer-events: none;
+  overflow: hidden;
 }
 
-/* Véu azul sobre a porta para manter a marca legível. */
-.gl-card-bg::after {
+.gl-streak {
+  position: absolute;
+  left: -40vw;
+  width: 180vw;
+  height: 22vh;
+  border-radius: 50%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(var(--gl-streak), 0) 18%,
+    rgba(var(--gl-streak), 0.38) 42%,
+    rgba(var(--gl-streak-hot), 0.55) 50%,
+    rgba(var(--gl-streak), 0.30) 60%,
+    transparent 82%);
+  filter: blur(26px);
+  transform: rotate(-17deg);
+  animation: gl-drift 26s ease-in-out infinite alternate;
+}
+
+.gl-streak--1 { top: 8%; opacity: 0.85; }
+.gl-streak--2 { top: 38%; height: 30vh; opacity: 0.55; animation-duration: 34s; animation-delay: -8s; }
+.gl-streak--3 { top: 62%; opacity: 0.7; animation-duration: 30s; animation-delay: -16s; transform: rotate(-12deg); }
+.gl-streak--4 { top: -12%; height: 16vh; opacity: 0.45; animation-duration: 38s; animation-delay: -4s; transform: rotate(-22deg); }
+
+/* Linhas finas e nítidas, como reflexos. */
+.gl-streak--line {
+  height: 2px;
+  border-radius: 2px;
+  filter: blur(0.6px);
+  background: linear-gradient(90deg, transparent 10%, rgba(var(--gl-streak-hot), 0.0) 25%, rgba(var(--gl-streak-hot), 0.9) 52%, rgba(var(--gl-streak), 0.0) 75%, transparent 90%);
+}
+.gl-streak--5 { top: 31%; animation-duration: 22s; }
+.gl-streak--6 { top: 74%; animation-duration: 28s; animation-delay: -11s; transform: rotate(-14deg); opacity: 0.7; }
+
+@keyframes gl-drift {
+  from { translate: -9vw 0; }
+  to { translate: 9vw 2vh; }
+}
+
+/* ---------- Cartão de vidro ---------- */
+
+.gl-glass-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  animation: gl-rise 0.7s cubic-bezier(.2, .8, .2, 1) both;
+  transition: opacity 0.38s ease, transform 0.38s ease, filter 0.38s ease;
+}
+
+.gl-glass-wrap.is-leaving {
+  opacity: 0;
+  transform: scale(0.96) translateY(-6px);
+  filter: blur(4px);
+}
+
+.gl-glass {
+  position: relative;
+  padding: 58px 36px 30px;
+  background: var(--gl-glass-bg);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  clip-path: polygon(34px 0, 100% 0, 100% calc(100% - 34px), calc(100% - 34px) 100%, 0 100%, 0 34px);
+  box-shadow: var(--gl-glass-shadow);
+}
+
+.gl-glass::before {
+  /* Brilho do vidro no topo. */
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(5, 13, 31, 0.72) 0%, rgba(5, 13, 31, 0.35) 55%, rgba(5, 13, 31, 0.55) 100%);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.10), transparent 38%);
+  pointer-events: none;
 }
 
-.gl-hero,
-.gl-form {
+.gl-glass__frame {
   position: absolute;
-  top: 0;
-  width: 50%;
-  height: 100%;
+  inset: 0;
+  pointer-events: none;
 }
 
-.gl-hero {
-  z-index: 3;
+/* Lascas de vidro soltas nos cantos cortados, como na referência. */
+.gl-glass__corner {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  background: linear-gradient(135deg, rgba(186, 230, 253, 0.22), rgba(56, 189, 248, 0.06));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(186, 230, 253, 0.35);
+  pointer-events: none;
+}
+.gl-glass__corner--tl { left: -16px; top: -16px; clip-path: polygon(0 0, 100% 0, 0 100%); }
+.gl-glass__corner--br { right: -16px; bottom: -16px; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+
+:root[data-theme="light"] .gl-glass__corner {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.85), rgba(147, 197, 253, 0.35));
+  border-color: rgba(10, 111, 194, 0.35);
+}
+
+/* ---------- Cadeado ---------- */
+
+.gl-padlock {
+  position: absolute;
+  z-index: 2;
   left: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 0 32px;
-  color: #f9f9f9;
-  text-align: center;
-  animation: gl-fade-in 0.65s ease-in-out 0.2s both;
+  top: -46px;
+  width: 76px;
+  height: 90px;
+  translate: -50% 0;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.45));
 }
 
-.gl-hero__mark {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
-  padding: 10px;
-  backdrop-filter: blur(12px);
+.gl-padlock svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.gl-hero h2 {
-  font-size: 1.6rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+.gl-padlock__shackle {
+  fill: none;
+  stroke: var(--gl-lock-line);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transform-box: view-box;
+  transform-origin: 46px 38px;
+  /* Aberto: haste levantada e girada para fora. */
+  transform: translateY(-11px) rotate(18deg);
+  transition: transform 0.45s cubic-bezier(.5, 1.6, .5, 1), stroke 0.3s ease;
 }
 
-.gl-hero p {
-  font-size: 0.875rem;
-  line-height: 1.55;
-  color: rgba(249, 249, 249, 0.78);
-  max-width: 24ch;
+.gl-padlock__body {
+  stroke: var(--gl-lock-line);
+  stroke-width: 1.5;
+  transition: filter 0.4s ease;
 }
+
+.gl-padlock__keyhole {
+  fill: var(--gl-lock-line);
+  opacity: 0.7;
+  transition: fill 0.3s ease, opacity 0.3s ease;
+}
+
+.gl-padlock.is-locked .gl-padlock__shackle {
+  transform: translateY(0) rotate(0);
+  stroke: var(--gl-accent);
+}
+
+.gl-padlock.is-locked .gl-padlock__body {
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.85));
+  animation: gl-lock-glow 0.9s ease 0.35s both;
+}
+
+.gl-padlock.is-locked .gl-padlock__keyhole {
+  fill: var(--gl-accent);
+  opacity: 1;
+}
+
+.gl-padlock.is-shake {
+  animation: gl-shake 0.5s cubic-bezier(.36, .07, .19, .97);
+}
+
+.gl-padlock.is-shake .gl-padlock__keyhole {
+  fill: #fb7185;
+  opacity: 1;
+}
+
+@keyframes gl-lock-glow {
+  0% { filter: drop-shadow(0 0 0 rgba(56, 189, 248, 0)); }
+  40% { filter: drop-shadow(0 0 22px rgba(56, 189, 248, 1)); }
+  100% { filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.85)); }
+}
+
+@keyframes gl-shake {
+  10%, 90% { translate: calc(-50% - 2px) 0; }
+  20%, 80% { translate: calc(-50% + 4px) 0; }
+  30%, 50%, 70% { translate: calc(-50% - 7px) 0; }
+  40%, 60% { translate: calc(-50% + 7px) 0; }
+}
+
+@keyframes gl-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Formulário ---------- */
 
 .gl-form {
-  z-index: 1;
-  left: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 14px;
-  padding: 28px;
-  background: var(--surface);
 }
 
 .gl-form__head {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
-.gl-form__head svg {
-  width: 28px;
-  height: 28px;
-  color: var(--accent);
-  margin-bottom: 4px;
+.gl-form__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--gl-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
-.gl-form__mark {
-  width: 40px;
-  height: 40px;
+.gl-form__brand img {
+  width: 22px;
+  height: 22px;
   object-fit: contain;
-  margin-bottom: 4px;
 }
 
 .gl-form__head h1 {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--text);
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--gl-text);
+}
+
+.gl-form__head h1 span {
+  background: linear-gradient(90deg, #7dd3fc, #38bdf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+:root[data-theme="light"] .gl-form__head h1 span {
+  background: linear-gradient(90deg, #0a6fc2, #0284c7);
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 
 .gl-form__head p {
-  font-size: 0.8rem;
-  color: var(--muted);
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--gl-muted);
 }
 
 .gl-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 0.75rem;
+  gap: 7px;
+  font-size: 0.8rem;
   font-weight: 600;
-  color: var(--text-soft);
+  color: var(--gl-soft);
 }
 
-.gl-field input {
-  width: 100%;
-  height: 42px;
-  padding: 0 12px;
-  border-radius: 12px;
-  border: 1px solid var(--line-strong);
-  background: var(--surface-subtle);
-  color: var(--text);
-  font-size: 0.9rem;
-  font-weight: 400;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.gl-field input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-.gl-field__password {
+.gl-field__box {
   position: relative;
   display: block;
 }
 
-.gl-field__password input {
-  padding-right: 42px;
+.gl-field__icon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  translate: 0 -50%;
+  color: var(--gl-muted);
+  pointer-events: none;
+}
+
+.gl-field input {
+  width: 100%;
+  height: 46px;
+  padding: 0 44px 0 40px;
+  border-radius: 12px;
+  border: 1px solid var(--gl-field-line);
+  background: var(--gl-field-bg);
+  color: var(--gl-text);
+  font-size: 0.92rem;
+  font-weight: 400;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.gl-field input::placeholder {
+  color: var(--gl-muted);
+  opacity: 0.7;
+}
+
+.gl-field input:focus {
+  outline: none;
+  border-color: var(--gl-accent);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
 }
 
 .gl-field__toggle {
   position: absolute;
   top: 50%;
-  right: 6px;
+  right: 7px;
   translate: 0 -50%;
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  color: var(--muted);
+  color: var(--gl-muted);
   cursor: pointer;
 }
 
 .gl-field__toggle:hover,
 .gl-field__toggle:focus-visible {
-  color: var(--text);
-  background: var(--surface-raised);
+  color: var(--gl-text);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .gl-field__toggle svg {
@@ -212,9 +378,14 @@
 
 .gl-form__error {
   min-height: 1.2em;
-  font-size: 0.75rem;
+  margin: -2px 0 0;
+  font-size: 0.78rem;
   font-weight: 600;
-  color: var(--danger);
+  color: #fb7185;
+}
+
+:root[data-theme="light"] .gl-form__error {
+  color: #be123c;
 }
 
 .gl-submit {
@@ -222,28 +393,30 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 44px;
-  border-radius: 50px;
-  background: var(--action);
-  color: var(--action-text, #fff);
-  font-size: 0.875rem;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #5cc8ff, #1d9bf0);
+  color: #04132b;
+  font-size: 0.95rem;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.3s, opacity 0.3s;
+  box-shadow: 0 10px 30px rgba(29, 155, 240, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: filter 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .gl-submit:hover {
-  background: var(--action-hover);
+  filter: brightness(1.07);
+  transform: translateY(-1px);
 }
 
 .gl-submit:focus-visible {
-  outline: 3px solid var(--accent-soft);
+  outline: 3px solid rgba(56, 189, 248, 0.45);
   outline-offset: 2px;
 }
 
 .gl-submit:disabled {
-  opacity: 0.6;
   cursor: progress;
+  transform: none;
 }
 
 .gl-submit svg {
@@ -255,67 +428,55 @@
   animation: gl-spin 0.9s linear infinite;
 }
 
-@keyframes gl-slide-in {
-  from { translate: 0 0; }
-  to { translate: 100% 0; }
-}
-
-@keyframes gl-fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 @keyframes gl-spin {
   to { rotate: 360deg; }
 }
 
-/* Celular: painel no topo e formulário embaixo. */
-@media (max-width: 680px) {
-  .gl-card {
-    height: auto;
-    display: flex;
-    flex-direction: column;
+/* Primeiro acesso e "verificando sessão" dentro do mesmo vidro. */
+.gl-glass .gl-shell-title {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--gl-text);
+}
+
+.gl-glass .gl-shell-text {
+  margin: 0 0 18px;
+  font-size: 0.85rem;
+  color: var(--gl-muted);
+}
+
+/* ---------- Celular ---------- */
+
+@media (max-width: 520px) {
+  .gl-login-page {
+    padding-top: 64px;
   }
 
-  .gl-card-bg {
-    width: 100%;
-    height: 200px;
-    bottom: auto;
-    translate: 0 0;
-    animation: none;
+  .gl-glass {
+    padding: 52px 20px 24px;
   }
 
-  .gl-hero,
-  .gl-form {
-    position: relative;
-    left: 0;
-    width: 100%;
-    height: auto;
+  .gl-form__head h1 {
+    font-size: 1.45rem;
   }
 
-  .gl-hero {
-    height: 200px;
-    gap: 10px;
-  }
-
-  .gl-hero__mark {
-    width: 48px;
-    height: 48px;
-  }
-
-  .gl-hero p {
+  .gl-glass__corner {
     display: none;
-  }
-
-  .gl-form {
-    padding: 24px 16px 16px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gl-card-bg,
-  .gl-hero,
+  .gl-streak,
+  .gl-glass-wrap,
+  .gl-padlock.is-shake,
+  .gl-padlock.is-locked .gl-padlock__body,
   .gl-spin {
     animation: none;
+  }
+
+  .gl-padlock__shackle,
+  .gl-glass-wrap {
+    transition: none;
   }
 }
