@@ -141,15 +141,7 @@ a {
   background: transparent;
 }
 
-/* Fundo de cadeados: fica atrás de tudo e não recebe cliques. A casca do app e o body ficam transparentes para ele aparecer nos dois temas. */
-.lock-grid {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-}
+/* A casca do app e o body ficam transparentes para o fundo de luz (AmbientLight) aparecer nos dois temas. */
 
 
 .studio-footer {

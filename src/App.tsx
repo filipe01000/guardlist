@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 
 import { flushSync } from 'react-dom';
 import { Navbar, type AppTab } from './components/Navbar';
 import { PageBoundary } from './components/PageBoundary';
-import LockGrid from './components/LockGrid';
+import { AmbientLight } from './components/AmbientLight';
 import { AccountModal } from './components/AccountModal';
 import { DashboardView } from './components/DashboardView';
 import { QuickSearchModal } from './components/QuickSearchView';
@@ -32,6 +32,8 @@ import {
 import { generateFirewallTxt, generateNanoFormattedTxt, triggerDownload } from './utils/exporter';
 import { getDaysSince } from './utils/validator';
 import { AlertTriangle, CheckCircle2, Info, Loader2 } from 'lucide-react';
+// Por último: o vidro precisa valer sobre o CSS de cada componente.
+import './styles/glass.css';
 
 const AdminView = lazy(() => import('./components/AdminView').then(m => ({ default: m.AdminView })));
 const ReportsView = lazy(() => import('./components/ReportsView').then(m => ({ default: m.ReportsView })));
@@ -431,7 +433,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''} min-h-screen text-slate-100 flex flex-col font-sans`}>
-      <LockGrid />
+      <AmbientLight />
       <a className="skip-link" href="#main-content">Ir para o conteúdo</a>
       {toast && (
         <div key={toast.id} className={`toast toast--${toast.type}`} role="status" aria-live="polite">

@@ -1,0 +1,180 @@
+/* Fundo de faixas de luz e painéis de vidro fosco. Carregado por último (App.tsx) para valer sobre os estilos de cada tela. */
+
+:root {
+  --glass: rgba(12, 28, 58, 0.52);
+  --glass-strong: rgba(10, 24, 50, 0.86);
+  --glass-line: rgba(148, 197, 255, 0.13);
+  --glass-line-hover: rgba(148, 197, 255, 0.24);
+  --glass-hi: rgba(255, 255, 255, 0.055);
+  --glass-blur: blur(18px) saturate(135%);
+  --ambient-streak: 37, 150, 235;
+  --ambient-hot: 125, 211, 252;
+  --ambient-strength: 0.75;
+  --ambient-mark: 0.11;
+  --ambient-mark-blend: screen;
+}
+
+:root[data-theme="light"] {
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.92);
+  --glass-line: rgba(15, 40, 80, 0.09);
+  --glass-line-hover: rgba(15, 40, 80, 0.18);
+  --glass-hi: rgba(255, 255, 255, 0.7);
+  --ambient-streak: 59, 130, 246;
+  --ambient-hot: 147, 197, 253;
+  --ambient-strength: 0.55;
+  --ambient-mark: 0.09;
+  --ambient-mark-blend: multiply;
+}
+
+/* ---------- Fundo ---------- */
+
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Logo do GuardList ao fundo: grande, translúcida, centrada na área de conteúdo (à direita do menu). */
+.ambient__mark {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 140px);
+  height: min(88vh, 1100px);
+  width: auto;
+  translate: -50% -50%;
+  opacity: var(--ambient-mark);
+  mix-blend-mode: var(--ambient-mark-blend);
+  user-select: none;
+}
+
+@media (max-width: 1024px) {
+  .ambient__mark { left: 50%; height: min(70vh, 80vw); }
+}
+
+/* Faixas de luz diagonais, as mesmas do login, mais apagadas atrás do app. */
+.ambient__streak {
+  position: absolute;
+  left: -40vw;
+  width: 180vw;
+  height: 22vh;
+  border-radius: 50%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(var(--ambient-streak), 0) 18%,
+    rgba(var(--ambient-streak), 0.30) 42%,
+    rgba(var(--ambient-hot), 0.42) 50%,
+    rgba(var(--ambient-streak), 0.24) 60%,
+    transparent 82%);
+  filter: blur(28px);
+  transform: rotate(-17deg);
+  opacity: var(--ambient-strength);
+  will-change: translate;
+  animation: ambient-drift 32s ease-in-out infinite alternate;
+}
+
+.ambient__streak--1 { top: 6%; }
+.ambient__streak--2 { top: 40%; height: 30vh; opacity: calc(var(--ambient-strength) * 0.6); animation-duration: 40s; animation-delay: -10s; }
+.ambient__streak--3 { top: 66%; animation-duration: 36s; animation-delay: -18s; transform: rotate(-12deg); }
+.ambient__streak--4 { top: -14%; height: 16vh; opacity: calc(var(--ambient-strength) * 0.5); animation-duration: 46s; animation-delay: -5s; transform: rotate(-22deg); }
+
+.ambient__streak--line {
+  height: 2px;
+  border-radius: 2px;
+  filter: blur(0.6px);
+  background: linear-gradient(90deg, transparent 10%, rgba(var(--ambient-hot), 0) 25%, rgba(var(--ambient-hot), 0.7) 52%, rgba(var(--ambient-streak), 0) 75%, transparent 90%);
+}
+.ambient__streak--5 { top: 30%; animation-duration: 28s; }
+.ambient__streak--6 { top: 76%; animation-duration: 34s; animation-delay: -12s; transform: rotate(-14deg); opacity: calc(var(--ambient-strength) * 0.7); }
+
+@keyframes ambient-drift {
+  from { translate: -9vw 0; }
+  to { translate: 9vw 2vh; }
+}
+
+/* ---------- Painéis de vidro ---------- */
+
+/* Molduras grandes: menu lateral, quadros, painéis e cards. */
+.app-shell .gl-sidebar,
+.app-shell .workspace-summary,
+.app-shell .data-panel,
+.app-shell .rail-panel,
+.app-shell .client-ip-totals,
+.app-shell .report-filters,
+.app-shell .status-card,
+.app-shell .ipa__search,
+.app-shell .cl-card,
+.app-shell .client-ledger-table,
+.app-shell .ir-section {
+  background: var(--glass);
+  border-color: var(--glass-line);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 18px 40px -28px rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme="light"] .app-shell .gl-sidebar,
+:root[data-theme="light"] .app-shell .workspace-summary,
+:root[data-theme="light"] .app-shell .data-panel,
+:root[data-theme="light"] .app-shell .rail-panel,
+:root[data-theme="light"] .app-shell .cl-card {
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 18px 40px -30px rgba(15, 45, 90, 0.35);
+}
+
+.app-shell .cl-card:hover {
+  background: color-mix(in srgb, var(--glass) 88%, var(--text) 4%);
+  border-color: color-mix(in srgb, var(--cl-tone) 35%, var(--glass-line-hover));
+}
+
+/* O menu lateral desenha a própria cor por variável. */
+.app-shell .gl-sidebar {
+  --sb-card: var(--glass);
+}
+
+/* Botões e busca do topo: vidro leve. */
+.app-shell .gl-topbar__search,
+.app-shell .gl-topbar__btn {
+  background: var(--glass);
+  border-color: var(--glass-line);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.app-shell .gl-topbar.is-stuck {
+  background: color-mix(in srgb, var(--app-bg) 55%, transparent);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+}
+
+/* Sobreposições (menus, janelas, assistente): vidro mais denso, para leitura. */
+.am__menu,
+.gl-modal,
+.ai-drawer {
+  background: var(--glass-strong);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+}
+
+/* Linhas de tabela e campos continuam legíveis: leve véu sobre o vidro. */
+.app-shell .data-table thead th {
+  background: color-mix(in srgb, var(--app-bg) 35%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient__streak {
+    animation: none;
+  }
+}
+
+/* Navegadores sem backdrop-filter: painéis sólidos como antes. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .app-shell .gl-sidebar,
+  .app-shell .workspace-summary,
+  .app-shell .data-panel,
+  .app-shell .rail-panel,
+  .app-shell .cl-card {
+    background: var(--surface);
+  }
+}
