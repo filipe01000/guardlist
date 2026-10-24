@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createSessionToken, readSession, setSessionCookie } from './auth.ts';
+import { createSessionToken, createStepToken, readSession, readStepToken, setSessionCookie, setStepCookie, type StepKind } from './auth.ts';
+import { createMfa } from './server/mfa/service.ts';
 import { aiConfigured, aiSettings, createAi, type AiEvent } from './server/ai.ts';
 import { fetchLogoFromSite, LogoError } from './server/logo.ts';
 import { createCti, ctiConfigured } from './server/cti.ts';
@@ -32,6 +33,7 @@ app.disable('x-powered-by');
 const db = await openDatabase(rootDir);
 const store = createStore(db);
 const users = createUsers(db);
+const mfa = createMfa(db);
 const cti = createCti(db);
 const startedAt = Date.now();
 
@@ -151,6 +153,15 @@ app.post('/api/auth/login', loginLimit, jsonSmall, async (req, res) => {
       return res.status(423).json({ error: `Conta bloqueada por excesso de tentativas. Tente de novo em ${minutes} min ou peça a um administrador para liberar.` });
     }
     if (!result) return res.status(401).json({ error: 'Usuário ou senha incorretos.' });
+    // Com a verificação em duas etapas exigida, a sessão só abre depois do código (ou do cadastro dele).
+    if (await mfa.isRequired()) {
+      if (!mfa.available()) {
+        return res.status(503).json({ error: 'A verificação em duas etapas está exigida, mas falta MFA_SECRET_KEY no servidor. Defina a chave no Render.' });
+      }
+      const kind: StepKind = result.row.mfa_enabled_at ? 'mfa' : 'mfa-setup';
+      setStepCookie(req, res, createStepToken(sessionSecret, { uid: result.row.id, ver: result.row.session_version, kind }));
+      return res.json({ step: kind });
+    }
     await startSession(req, res, result.row);
     return res.json({ user: toPublic(result.row) });
   } catch (error) {
@@ -164,6 +175,73 @@ app.post('/api/auth/logout', async (req, res) => {
   if (row) await users.revokeSessionById(row.session_id).catch((error: unknown) => console.error(error));
   setSessionCookie(req, res, null);
   return res.json({ ok: true });
+});
+
+// Usuário da etapa pendente do login, se o cookie for válido, do tipo esperado e da versão de sessão atual.
+async function stepUser(req: express.Request, kind: StepKind): Promise<UserRow | null> {
+  const step = readStepToken(sessionSecret, req);
+  if (!step || step.kind !== kind) return null;
+  const row = await users.byId(step.uid);
+  return row && row.active && row.session_version === step.ver ? row : null;
+}
+
+const STEP_EXPIRED = 'A verificação expirou. Entre com usuário e senha de novo.';
+
+app.post('/api/auth/mfa', passwordLimit, jsonSmall, async (req, res) => {
+  try {
+    const row = await stepUser(req, 'mfa');
+    if (!row) return res.status(401).json({ error: STEP_EXPIRED, code: 'MFA_STEP_EXPIRED' });
+    const code = typeof req.body?.code === 'string' ? req.body.code.slice(0, 20) : undefined;
+    const recoveryCode = typeof req.body?.recoveryCode === 'string' ? req.body.recoveryCode.slice(0, 40) : undefined;
+    const result = await mfa.verify(row.id, { code, recoveryCode });
+    if (typeof result === 'object') {
+      setStepCookie(req, res, null);
+      const minutes = Math.max(1, Math.ceil((new Date(result.lockedUntil).getTime() - Date.now()) / 60_000));
+      return res.status(423).json({ error: `Conta bloqueada por excesso de tentativas. Tente de novo em ${minutes} min ou peça a um administrador para liberar.` });
+    }
+    if (result === 'bad') return res.status(401).json({ error: 'Código incorreto.' });
+    setStepCookie(req, res, null);
+    await startSession(req, res, row);
+    return res.json({ user: toPublic(row) });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// Cadastro do autenticador: na etapa pendente do login (exigência ligada, sem cadastro) ou já logado (Minha conta).
+async function setupUser(req: express.Request): Promise<{ row: UserRow; pending: boolean } | null> {
+  const pending = await stepUser(req, 'mfa-setup');
+  if (pending) return { row: pending, pending: true };
+  const logged = await currentUser(req).catch(() => null);
+  return logged && !logged.must_change_password ? { row: logged, pending: false } : null;
+}
+
+app.get('/api/auth/mfa/setup', async (req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    const who = await setupUser(req);
+    if (!who) return res.status(401).json({ error: STEP_EXPIRED, code: 'MFA_STEP_EXPIRED' });
+    return res.json(await mfa.startSetup(who.row.id, who.row.username));
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.post('/api/auth/mfa/enable', passwordLimit, jsonSmall, async (req, res) => {
+  try {
+    const who = await setupUser(req);
+    if (!who) return res.status(401).json({ error: STEP_EXPIRED, code: 'MFA_STEP_EXPIRED' });
+    const recoveryCodes = await mfa.confirmSetup(who.row.id, String(req.body?.code ?? '').slice(0, 20));
+    if (!recoveryCodes) return res.status(401).json({ error: 'Código incorreto.' });
+    const row = (await users.byId(who.row.id))!;
+    if (who.pending) {
+      setStepCookie(req, res, null);
+      await startSession(req, res, row);
+    }
+    return res.json({ recoveryCodes, user: toPublic(row) });
+  } catch (error) {
+    return sendError(res, error);
+  }
 });
 
 app.post('/api/auth/change-password', passwordLimit, jsonSmall, async (req, res) => {
@@ -274,6 +352,72 @@ app.get('/api/users/:id/sessions', adminOnly, async (req, res) => {
 app.post('/api/users/:id/sessions/revoke-all', adminOnly, async (req, res) => {
   try {
     await users.revokeAllSessions(res.locals.actor as Actor, Number(req.params.id));
+    return res.json({ ok: true });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// Verificação em duas etapas da própria conta (Minha conta).
+app.get('/api/mfa/status', async (_req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    const row = (await users.byId(res.locals.userId))!;
+    return res.json({
+      available: mfa.available(),
+      required: await mfa.isRequired(),
+      enrolled: Boolean(row.mfa_enabled_at),
+      enrolledAt: row.mfa_enabled_at ? new Date(row.mfa_enabled_at).toISOString() : null,
+      recoveryLeft: row.mfa_recovery?.length ?? 0
+    });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.post('/api/mfa/recovery', passwordLimit, jsonSmall, async (req, res) => {
+  try {
+    const codes = await mfa.regenerateRecovery(res.locals.userId, String(req.body?.code ?? '').slice(0, 20));
+    if (!codes) return res.status(401).json({ error: 'Código incorreto.' });
+    return res.json({ recoveryCodes: codes });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.post('/api/mfa/disable', passwordLimit, jsonSmall, async (req, res) => {
+  try {
+    const ok = await mfa.disable(res.locals.userId, String(req.body?.code ?? '').slice(0, 20));
+    if (!ok) return res.status(401).json({ error: 'Código incorreto.' });
+    return res.json({ ok: true });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// Exigência para a equipe (Administração).
+app.get('/api/mfa/policy', adminOnly, async (_req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    const me = (await users.byId(res.locals.userId))!;
+    return res.json({ available: mfa.available(), required: await mfa.isRequired(), selfEnrolled: Boolean(me.mfa_enabled_at), ...(await mfa.stats()) });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.post('/api/mfa/policy', adminOnly, jsonSmall, async (req, res) => {
+  try {
+    await mfa.setRequired(res.locals.actor as Actor, res.locals.userId, req.body?.required === true);
+    return res.json({ required: await mfa.isRequired() });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.post('/api/users/:id/mfa/reset', adminOnly, async (req, res) => {
+  try {
+    await mfa.reset(res.locals.actor as Actor, Number(req.params.id));
     return res.json({ ok: true });
   } catch (error) {
     return sendError(res, error);

@@ -84,6 +84,48 @@ function readCookie(req: Request, name: string): string | null {
   return null;
 }
 
+// Etapa pendente do login (senha certa, falta o código de verificação ou o cadastro dele). Não é uma sessão:
+// só vale para as rotas /api/auth/mfa*, por 5 minutos, e carrega a versão de sessão do usuário.
+export const STEP_COOKIE = 'gl_mfa';
+const STEP_TTL_MS = 5 * 60_000;
+export type StepKind = 'mfa' | 'mfa-setup';
+export interface StepToken { uid: number; ver: number; kind: StepKind }
+
+export function createStepToken(secret: string, step: StepToken, nowMs = Date.now()): string {
+  const payload = Buffer.from(JSON.stringify({ ...step, exp: nowMs + STEP_TTL_MS, t: 'step' })).toString('base64url');
+  return `${payload}.${sign(secret, payload)}`;
+}
+
+export function readStepToken(secret: string, req: Request, nowMs = Date.now()): StepToken | null {
+  const token = readCookie(req, STEP_COOKIE);
+  if (!token) return null;
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) return null;
+  const expected = Buffer.from(sign(secret, payload));
+  const received = Buffer.from(signature);
+  if (expected.length !== received.length || !timingSafeEqual(expected, received)) return null;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (data.t !== 'step' || typeof data.exp !== 'number' || data.exp < nowMs) return null;
+    if (!Number.isInteger(data.uid) || !Number.isInteger(data.ver) || (data.kind !== 'mfa' && data.kind !== 'mfa-setup')) return null;
+    return { uid: data.uid, ver: data.ver, kind: data.kind };
+  } catch {
+    return null;
+  }
+}
+
+export function setStepCookie(req: Request, res: Response, token: string | null): void {
+  const attributes = [
+    `${STEP_COOKIE}=${token ? encodeURIComponent(token) : ''}`,
+    'Path=/api/auth',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${token ? Math.floor(STEP_TTL_MS / 1000) : 0}`
+  ];
+  if (req.secure) attributes.push('Secure');
+  res.append('Set-Cookie', attributes.join('; '));
+}
+
 export function setSessionCookie(req: Request, res: Response, token: string | null): void {
   const attributes = [
     `${SESSION_COOKIE}=${token ? encodeURIComponent(token) : ''}`,
@@ -93,5 +135,5 @@ export function setSessionCookie(req: Request, res: Response, token: string | nu
     `Max-Age=${token ? Math.floor(SESSION_TTL_MS / 1000) : 0}`
   ];
   if (req.secure) attributes.push('Secure');
-  res.setHeader('Set-Cookie', attributes.join('; '));
+  res.append('Set-Cookie', attributes.join('; '));
 }
