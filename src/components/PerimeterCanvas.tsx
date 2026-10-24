@@ -75,11 +75,12 @@ export const PerimeterCanvas: React.FC<PerimeterCanvasProps> = ({ alarmKey, seal
       canvas.width = W * dpr;
       canvas.height = H * dpr;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      // Layout empilhado (celular): o perímetro ocupa a largura toda e fica centralizado.
-      const narrow = W > window.innerWidth * 0.8;
-      cx = W * (narrow ? 0.5 : 0.94);
+      // Layout empilhado (celular): perímetro centralizado acima do formulário.
+      // Lado a lado: o centro fica junto da borda do painel, e os anéis seguem por trás do vidro.
+      const narrow = window.matchMedia('(max-width: 900px)').matches;
+      cx = W * (narrow ? 0.5 : 0.49);
       cy = H * (narrow ? 0.7 : 0.56);
-      R = narrow ? Math.min(H * 0.2, W * 0.34) : Math.min(H * 0.34, W * 0.4);
+      R = narrow ? Math.min(H * 0.2, W * 0.34) : Math.min(H * 0.34, W * 0.21);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(canvas);

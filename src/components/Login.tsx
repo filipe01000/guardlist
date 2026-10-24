@@ -36,18 +36,9 @@ interface FeedItem extends PerimeterEvent {
 
 let feedId = 0;
 
-// Lado esquerdo das telas de entrada: frase, perímetro animado e a lista de bloqueios simulados.
-const PerimeterStage: React.FC<{ alarmKey: number; sealing: boolean }> = ({ alarmKey, sealing }) => {
-  const [feed, setFeed] = useState<FeedItem[]>([]);
-
-  const handleEvent = useCallback((event: PerimeterEvent) => {
-    setFeed((items) => [{ ...event, id: ++feedId }, ...items].slice(0, FEED_SIZE));
-  }, []);
-
-  return (
+// Lado esquerdo das telas de entrada: frase e a lista de bloqueios simulados (o perímetro fica atrás da tela toda).
+const PerimeterStage: React.FC<{ feed: FeedItem[] }> = ({ feed }) => (
     <section className="gl-stage" aria-label="GuardList">
-      <PerimeterCanvas alarmKey={alarmKey} sealing={sealing} onEvent={handleEvent} />
-      <span className="gl-stage__edge" aria-hidden="true" />
       <div className="gl-stage__brand">
         <img src="/brand/guardlist-mark.svg" alt="" />
         GuardList
@@ -82,8 +73,7 @@ const PerimeterStage: React.FC<{ alarmKey: number; sealing: boolean }> = ({ alar
       </div>
       <div className="gl-stage__foot">Gestão de IPs e redes CIDR</div>
     </section>
-  );
-};
+);
 
 // Moldura comum das telas de entrada (login, primeiro acesso, verificação de sessão).
 export const GlassShell: React.FC<{
@@ -94,6 +84,12 @@ export const GlassShell: React.FC<{
   labelledBy?: string;
   children: React.ReactNode;
 }> = ({ lock = 'open', alarmKey = 0, sealing = false, sealed = false, labelledBy, children }) => {
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+
+  const handleEvent = useCallback((event: PerimeterEvent) => {
+    setFeed((items) => [{ ...event, id: ++feedId }, ...items].slice(0, FEED_SIZE));
+  }, []);
+
   useLayoutEffect(() => {
     // Antes do login o App ainda não aplicou o tema: usa o que ficou salvo neste navegador.
     if (!document.documentElement.dataset.theme) {
@@ -106,7 +102,9 @@ export const GlassShell: React.FC<{
 
   return (
     <main className="gl-entry">
-      <PerimeterStage alarmKey={alarmKey} sealing={sealing} />
+      <PerimeterCanvas alarmKey={alarmKey} sealing={sealing} onEvent={handleEvent} />
+      <PerimeterStage feed={feed} />
+      {/* Painel de vidro fosco sobre o perímetro; a borda ganha um pulso de luz descendo. */}
       <section className="gl-panel" aria-labelledby={labelledBy}>
         <div className="gl-panel__inner">
           <Padlock state={lock} />

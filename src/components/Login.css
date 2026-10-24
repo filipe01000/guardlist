@@ -1,7 +1,7 @@
 /* Telas de entrada (login, primeiro acesso, verificação de sessão): perímetro animado à esquerda, formulário à direita. */
 
 .gl-entry {
-  --gl-panel: #0c1528;
+  --gl-panel: rgba(10, 18, 36, 0.58);
   --gl-panel-glow: rgba(37, 99, 235, 0.10);
   --gl-field-bg: rgba(255, 255, 255, 0.045);
   --gl-field-line: rgba(148, 197, 255, 0.18);
@@ -12,16 +12,22 @@
   --gl-accent-hot: #7dd3fc;
   --gl-danger: #fb7185;
 
+  position: relative;
+  isolation: isolate;
   display: grid;
   grid-template-columns: 52fr 48fr;
   min-height: 100vh;
   min-height: 100dvh;
-  background: var(--gl-panel);
+  overflow: hidden;
   color: var(--gl-text);
+  /* O perímetro ocupa a tela inteira; o formulário fica num vidro por cima. */
+  background:
+    radial-gradient(120% 90% at 50% 60%, #15387d 0%, transparent 60%),
+    linear-gradient(160deg, #0f2a62 0%, #0b1e48 55%, #08163a 100%);
 }
 
 :root[data-theme="light"] .gl-entry {
-  --gl-panel: #f3f7fc;
+  --gl-panel: rgba(244, 248, 253, 0.66);
   --gl-panel-glow: rgba(37, 99, 235, 0.08);
   --gl-field-bg: #ffffff;
   --gl-field-line: rgba(14, 60, 120, 0.18);
@@ -37,14 +43,10 @@
 
 .gl-stage {
   position: relative;
-  isolation: isolate;
-  overflow: hidden;
+  z-index: 1;
   min-height: 100vh;
   min-height: 100dvh;
   color: #eef5ff;
-  background:
-    radial-gradient(120% 90% at 80% 60%, #15387d 0%, transparent 60%),
-    linear-gradient(160deg, #0f2a62 0%, #0b1e48 55%, #08163a 100%);
 }
 
 .gl-perimeter {
@@ -65,22 +67,6 @@
   background:
     linear-gradient(90deg, rgba(8, 22, 58, 0.78) 0%, rgba(8, 22, 58, 0.35) 42%, transparent 62%),
     radial-gradient(140% 100% at 0% 0%, transparent 55%, rgba(3, 9, 22, 0.55));
-}
-
-.gl-stage__edge {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 2;
-  width: 1px;
-  background: linear-gradient(180deg, transparent, rgba(125, 211, 252, 0.7) 50%, transparent);
-  animation: gl-edge 6s ease-in-out infinite;
-}
-
-@keyframes gl-edge {
-  0%, 100% { opacity: 0.25; }
-  50% { opacity: 0.9; }
 }
 
 .gl-stage__brand {
@@ -272,10 +258,56 @@
 /* ---------- Painel do formulário ---------- */
 
 .gl-panel {
+  position: relative;
+  z-index: 1;
   display: grid;
   place-items: center;
   padding: 40px;
   background: radial-gradient(90% 60% at 50% 40%, var(--gl-panel-glow), transparent 70%), var(--gl-panel);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+}
+
+/* No tema claro o vidro clareia o perímetro atrás dele, em vez de deixá-lo acinzentado. */
+:root[data-theme="light"] .gl-panel {
+  backdrop-filter: blur(22px) saturate(115%) brightness(1.55);
+  -webkit-backdrop-filter: blur(22px) saturate(115%) brightness(1.55);
+}
+
+/* Borda do vidro: fio ciano com brilho. */
+.gl-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(125, 211, 252, 0.6) 18%, rgba(125, 211, 252, 0.6) 82%, transparent);
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.45);
+  pointer-events: none;
+}
+
+/* Pulso de luz que desce pela borda de tempos em tempos. */
+.gl-panel::after {
+  content: "";
+  position: absolute;
+  top: -160px;
+  left: -1px;
+  width: 3px;
+  height: 160px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, transparent, #e0f2fe 55%, transparent);
+  box-shadow: 0 0 18px 2px rgba(56, 189, 248, 0.8);
+  opacity: 0;
+  animation: gl-pulse 6s cubic-bezier(.45, 0, .25, 1) 1.2s infinite;
+  pointer-events: none;
+}
+
+@keyframes gl-pulse {
+  0% { transform: translateY(0); opacity: 0; }
+  8% { opacity: 1; }
+  55% { transform: translateY(calc(100vh + 160px)); opacity: 1; }
+  56%, 100% { transform: translateY(calc(100vh + 160px)); opacity: 0; }
 }
 
 .gl-panel__inner {
@@ -573,7 +605,7 @@
   display: grid;
   place-items: end center;
   padding-bottom: 9vh;
-  background: radial-gradient(60% 60% at 26% 56%, rgba(56, 189, 248, 0.25), rgba(3, 9, 22, 0.96) 70%);
+  background: radial-gradient(60% 60% at 49% 56%, rgba(56, 189, 248, 0.25), rgba(3, 9, 22, 0.96) 70%);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.7s ease;
@@ -603,6 +635,11 @@
     min-height: 340px;
   }
 
+  /* Empilhado: o perímetro fica só na faixa de cima. */
+  .gl-perimeter {
+    height: 340px;
+  }
+
   .gl-stage__brand {
     top: 24px;
     left: 16px;
@@ -624,16 +661,20 @@
     display: none;
   }
 
-  .gl-stage__edge {
-    top: auto;
-    left: 0;
-    width: auto;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.7) 50%, transparent);
-  }
-
   .gl-panel {
     padding: 36px 16px 56px;
+  }
+
+  .gl-panel::before {
+    right: 0;
+    bottom: auto;
+    width: auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(125, 211, 252, 0.6) 50%, transparent);
+  }
+
+  .gl-panel::after {
+    display: none;
   }
 
   .gl-sealed {
@@ -642,7 +683,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .gl-stage__edge,
+  .gl-panel::after,
   .gl-word,
   .gl-word--hl,
   .gl-stage__text,
