@@ -29,11 +29,15 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 1));
 app.disable('x-powered-by');
 
+// Origem pública do app (links e logo nos e-mails e no QR do MFA).
+const configuredOrigin = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
+
 // Base compartilhada da equipe.
 const db = await openDatabase(rootDir);
 const store = createStore(db);
 const users = createUsers(db);
-const mfa = createMfa(db);
+// O ícone só vai no QR com endereço https: o aplicativo do celular busca a imagem pela internet.
+const mfa = createMfa(db, { iconUrl: /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin) ? `${configuredOrigin}/brand/guardlist-icon.png` : undefined });
 const cti = createCti(db);
 const startedAt = Date.now();
 
@@ -596,8 +600,6 @@ app.post('/api/logo/fetch', logoLimit, jsonSmall, async (req, res) => {
   }
 });
 
-// Origem pública do app (links e logo nos e-mails).
-const configuredOrigin = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || '').replace(/\/+$/, '');
 const publicOrigin = () => (/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin) ? configuredOrigin : `http://localhost:${port}`);
 const jobs = createJobs(db, store, publicOrigin);
 jobs.start();

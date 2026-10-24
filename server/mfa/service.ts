@@ -1,8 +1,8 @@
-import QRCode from 'qrcode';
 import type { Database } from '../db.ts';
 import { openSecret, sealSecret, secretKeyAvailable } from '../secretBox.ts';
 import { DEFAULT_SETTINGS, StoreError, type Actor } from '../storeCore.ts';
 import { registerFailedAttempt, type UserRow } from '../users.ts';
+import { brandedQrSvg } from './qr.ts';
 import { consumeRecoveryCode, generateRecoveryCodes } from './recovery.ts';
 import { generateSecret, otpauthUri, verifyTotp } from './totp.ts';
 
@@ -11,7 +11,8 @@ import { generateSecret, otpauthUri, verifyTotp } from './totp.ts';
 
 const KEY = 'MFA_SECRET_KEY';
 
-export function createMfa(db: Database, opts: { env?: NodeJS.ProcessEnv; now?: () => number } = {}) {
+// iconUrl: endereço público da logo, que vai no QR para os aplicativos que mostram ícone.
+export function createMfa(db: Database, opts: { env?: NodeJS.ProcessEnv; now?: () => number; iconUrl?: string } = {}) {
   const env = opts.env ?? process.env;
   const now = opts.now ?? (() => Date.now());
 
@@ -74,8 +75,8 @@ export function createMfa(db: Database, opts: { env?: NodeJS.ProcessEnv; now?: (
     async startSetup(userId: number, account: string): Promise<{ secret: string; uri: string; qrSvg: string }> {
       const secret = generateSecret();
       await db.query('UPDATE users SET mfa_pending_secret = $2 WHERE id = $1', [userId, sealSecret(secret, KEY, env)]);
-      const uri = otpauthUri(secret, account);
-      const qrSvg = await QRCode.toString(uri, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0b1a33', light: '#ffffff' } });
+      const uri = otpauthUri(secret, account, opts.iconUrl);
+      const qrSvg = brandedQrSvg(uri);
       return { secret, uri, qrSvg };
     },
 

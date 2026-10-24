@@ -64,7 +64,9 @@ export function verifyTotp(secret: string, code: string, nowMs: number, lastStep
   return null;
 }
 
-export function otpauthUri(secret: string, account: string, issuer = 'GuardList'): string {
+// `image` é o ícone da conta; alguns aplicativos (FreeOTP, por exemplo) mostram, os demais ignoram.
+export function otpauthUri(secret: string, account: string, image?: string, issuer = 'GuardList'): string {
   const label = `${encodeURIComponent(issuer)}:${encodeURIComponent(account)}`;
-  return `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+  const icon = image ? `&image=${encodeURIComponent(image)}` : '';
+  return `otpauth://totp/${label}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30${icon}`;
 }

@@ -40,3 +40,8 @@ test('URI para o aplicativo autenticador', () => {
   const uri = otpauthUri('ABCDEF', 'ana.souza');
   assert.equal(uri, 'otpauth://totp/GuardList:ana.souza?secret=ABCDEF&issuer=GuardList&algorithm=SHA1&digits=6&period=30');
 });
+
+test('URI leva o ícone quando informado', () => {
+  const uri = otpauthUri('ABCDEF', 'ana.souza', 'https://guardlist.onrender.com/brand/guardlist-icon.png');
+  assert.equal(uri, 'otpauth://totp/GuardList:ana.souza?secret=ABCDEF&issuer=GuardList&algorithm=SHA1&digits=6&period=30&image=https%3A%2F%2Fguardlist.onrender.com%2Fbrand%2Fguardlist-icon.png');
+});
