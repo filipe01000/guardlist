@@ -17,6 +17,11 @@ export interface UserRow {
   last_login_at: string | null;
   failed_logins: number;
   locked_until: string | null;
+  mfa_secret?: string | null;
+  mfa_pending_secret?: string | null;
+  mfa_enabled_at?: string | null;
+  mfa_last_step?: string | number | null;
+  mfa_recovery?: string[] | null;
 }
 
 export interface SessionInfo {
@@ -43,6 +48,7 @@ export interface PublicUser {
   createdAt: string;
   lastLoginAt: string | null;
   lockedUntil: string | null;
+  mfaEnabled: boolean;
 }
 
 const USERNAME_RE = /^[a-z0-9._-]{2,64}$/;
@@ -58,7 +64,8 @@ export function toPublic(row: UserRow): PublicUser {
     mustChangePassword: row.must_change_password,
     createdAt: row.created_at,
     lastLoginAt: row.last_login_at,
-    lockedUntil: row.locked_until && new Date(row.locked_until).getTime() > Date.now() ? new Date(row.locked_until).toISOString() : null
+    lockedUntil: row.locked_until && new Date(row.locked_until).getTime() > Date.now() ? new Date(row.locked_until).toISOString() : null,
+    mfaEnabled: Boolean(row.mfa_enabled_at)
   };
 }
 
@@ -72,6 +79,24 @@ function checkPassword(password: unknown): string {
   }
   if (password.length > 256) throw new StoreError('Senha longa demais.');
   return password;
+}
+
+// Conta uma tentativa errada (senha ou código de verificação). Na quinta seguida, a conta trava por LOCK_MINUTES.
+export async function registerFailedAttempt(q: Query, row: UserRow, kind: 'password' | 'mfa' = 'password'): Promise<{ lockedUntil: string } | null> {
+  const failed = (row.failed_logins || 0) + 1;
+  const log = (action: string, detail: Record<string, unknown>) =>
+    q('INSERT INTO audit_log (username, action, detail) VALUES ($1, $2, $3::jsonb)', [row.username, action, JSON.stringify(detail)]);
+  if (failed >= MAX_FAILED_LOGINS) {
+    const locked = await q<{ locked_until: string }>(
+      "UPDATE users SET failed_logins = 0, locked_until = now() + make_interval(mins => $2::int) WHERE id = $1 RETURNING locked_until",
+      [row.id, LOCK_MINUTES]
+    );
+    await log('auth.locked', { minutes: LOCK_MINUTES, after: kind });
+    return { lockedUntil: new Date(locked[0].locked_until).toISOString() };
+  }
+  await q('UPDATE users SET failed_logins = $2 WHERE id = $1', [row.id, failed]);
+  await log(kind === 'mfa' ? 'mfa.failed' : 'auth.failed', { attempt: failed });
+  return null;
 }
 
 // Hash fictício para que usuário inexistente custe o mesmo tempo que senha errada.
@@ -134,20 +159,7 @@ export function createUsers(db: Database) {
         if (row && row.locked_until && new Date(row.locked_until).getTime() > Date.now()) {
           return { lockedUntil: new Date(row.locked_until).toISOString() };
         }
-        if (row && !ok) {
-          const failed = (row.failed_logins || 0) + 1;
-          if (failed >= MAX_FAILED_LOGINS) {
-            const locked = await q<{ locked_until: string }>(
-              "UPDATE users SET failed_logins = 0, locked_until = now() + make_interval(mins => $2::int) WHERE id = $1 RETURNING locked_until",
-              [row.id, LOCK_MINUTES]
-            );
-            await audit(row.username, 'auth.locked', { minutes: LOCK_MINUTES }, q);
-            return { lockedUntil: new Date(locked[0].locked_until).toISOString() };
-          }
-          await q('UPDATE users SET failed_logins = $2 WHERE id = $1', [row.id, failed]);
-          await audit(row.username, 'auth.failed', { attempt: failed }, q);
-          return null;
-        }
+        if (row && !ok) return registerFailedAttempt(q, row);
         if (!row || !ok || !row.active) return null;
         await q('UPDATE users SET last_login_at = now(), failed_logins = 0, locked_until = NULL WHERE id = $1', [row.id]);
         await audit(row.username, 'auth.login', {}, q);

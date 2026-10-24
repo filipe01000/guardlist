@@ -80,6 +80,12 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 CREATE INDEX IF NOT EXISTS audit_log_at_idx ON audit_log (at DESC);
 
+-- Verificação em duas etapas (código de aplicativo autenticador). Segredos criptografados; códigos de recuperação só como hash.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_pending_secret TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_last_step BIGINT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_recovery JSONB;
 -- Bloqueio temporário da conta após várias senhas erradas.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
