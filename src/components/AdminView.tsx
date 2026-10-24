@@ -4,6 +4,7 @@ import { Sparkles,
 } from 'lucide-react';
 import { PageHeader } from './PageHeader';
 import { UsersView } from './UsersView';
+import { MfaPolicyPanel } from './mfa/MfaPolicyPanel';
 import { Modal } from './Modal';
 import { SessionUser, PendingImport } from '../types';
 import {
@@ -43,7 +44,12 @@ export const AdminView: React.FC<AdminViewProps> = ({ currentUser, tab, onTabCha
         ))}
       </div>
       <div key={tab} className="view-enter">
-        {tab === 'users' && <UsersView currentUser={currentUser} embedded />}
+        {tab === 'users' && (
+          <>
+            <MfaPolicyPanel />
+            <UsersView currentUser={currentUser} embedded />
+          </>
+        )}
         {tab === 'approvals' && <ApprovalsPanel onChanged={onChanged} showToast={showToast} />}
         {tab === 'audit' && <AuditPanel />}
         {tab === 'status' && <StatusPanel showToast={showToast} />}

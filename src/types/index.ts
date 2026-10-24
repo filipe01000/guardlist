@@ -315,6 +315,7 @@ export interface SessionUser {
   createdAt: string;
   lastLoginAt: string | null;
   lockedUntil?: string | null;
+  mfaEnabled?: boolean;
 }
 
 // Relatório de um período (geral ou de um cliente), gerado no servidor.

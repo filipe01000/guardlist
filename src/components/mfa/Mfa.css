@@ -1,0 +1,166 @@
+/* Verificação em duas etapas: caixas do código, dígitos em órbita, cadastro e códigos de recuperação.
+   Usa as cores da tela de entrada (--gl-*) e, fora dela (Minha conta), as do app. */
+
+.gl-mfa {
+  --mfa-field: var(--gl-field-bg, var(--surface-subtle, rgba(255, 255, 255, 0.045)));
+  --mfa-line: var(--gl-field-line, var(--line-strong, rgba(148, 197, 255, 0.18)));
+  --mfa-text: var(--gl-text, var(--text, #f1f6fd));
+  --mfa-muted: var(--gl-muted, var(--muted, #8094b6));
+  --mfa-accent: var(--gl-accent, var(--action, #2ea6ff));
+  --mfa-danger: var(--gl-danger, var(--danger, #ff6b7a));
+}
+
+.gl-mfa__slots {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+.gl-mfa__slots input {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1 / 1.15;
+  border: 1px solid var(--mfa-line);
+  border-radius: 12px;
+  background: var(--mfa-field);
+  color: var(--mfa-text);
+  caret-color: var(--mfa-accent);
+  font: 600 24px var(--font-mono);
+  text-align: center;
+  transition: border-color 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+
+.gl-mfa__slots input:focus {
+  outline: none;
+  border-color: var(--mfa-accent);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.16);
+}
+
+.gl-mfa__slots input.is-filled { border-color: color-mix(in srgb, var(--mfa-accent) 55%, transparent); }
+.gl-mfa__slots input:disabled { opacity: 0.85; }
+.gl-mfa__slots.is-away input { color: transparent; }
+.gl-mfa__slots.is-bad { animation: gl-mfa-shake 0.45s; }
+.gl-mfa__slots.is-bad input { border-color: var(--mfa-danger); box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.18); }
+
+@keyframes gl-mfa-shake {
+  20%, 60% { transform: translateX(-7px); }
+  40%, 80% { transform: translateX(7px); }
+}
+
+.gl-mfa-fly {
+  position: fixed;
+  z-index: 60;
+  translate: -50% -50%;
+  color: #7dd3fc;
+  font: 600 24px var(--font-mono);
+  text-shadow: 0 0 12px rgba(56, 189, 248, 0.9);
+  pointer-events: none;
+}
+
+.gl-mfa__error {
+  min-height: 1.2em;
+  margin: 10px 0 0;
+  color: var(--mfa-danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.gl-mfa__hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 0;
+  color: var(--gl-muted, var(--muted));
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.gl-mfa__timer {
+  flex: 0 0 64px;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(148, 197, 255, 0.15);
+}
+
+.gl-mfa__timer i {
+  display: block;
+  height: 100%;
+  background: var(--gl-accent, var(--action));
+  transform-origin: left;
+  transition: transform 0.5s linear;
+}
+
+.gl-mfa-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gl-accent-hot, var(--action));
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gl-mfa-link svg { width: 14px; height: 14px; }
+.gl-mfa-link--muted { color: var(--gl-muted, var(--muted)); font-weight: 500; }
+
+.gl-mfa-alt {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.gl-mfa-recovery-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--gl-field-line, var(--line-strong));
+  border-radius: 10px;
+  background: var(--gl-field-bg, var(--surface-subtle));
+  color: var(--gl-text, var(--text));
+  font: 500 16px var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+/* Cadastro */
+.gl-mfa-setup { display: flex; flex-direction: column; gap: 14px; }
+.gl-mfa-setup__steps { margin: 0; padding-left: 18px; color: var(--gl-soft, var(--text-soft)); font-size: 13.5px; line-height: 1.6; }
+.gl-mfa-setup__qr { align-self: flex-start; width: 168px; height: 168px; padding: 8px; border-radius: 12px; background: #fff; }
+.gl-mfa-setup__qr svg { display: block; width: 100%; height: 100%; }
+.gl-mfa-setup__key { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--gl-muted, var(--muted)); font-size: 12.5px; }
+.gl-mfa-setup__key code { color: var(--gl-text, var(--text)); font: 500 13px var(--font-mono); letter-spacing: 0.06em; }
+
+/* Códigos de recuperação */
+.gl-mfa-recovery { display: flex; flex-direction: column; gap: 14px; }
+.gl-mfa-recovery__list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 18px;
+  margin: 0;
+  padding: 14px 16px;
+  list-style: none;
+  border: 1px solid var(--gl-field-line, var(--line));
+  border-radius: 12px;
+  background: var(--gl-field-bg, var(--surface-subtle));
+  color: var(--gl-text, var(--text));
+  font: 500 15px var(--font-mono);
+  letter-spacing: 0.06em;
+}
+.gl-mfa-recovery__actions { display: flex; gap: 18px; }
+.gl-mfa-recovery__check { display: flex; align-items: center; gap: 8px; color: var(--gl-soft, var(--text-soft)); font-size: 13.5px; }
+.gl-mfa-recovery__check input { width: 16px; height: 16px; accent-color: var(--gl-accent, var(--action)); }
+.gl-mfa-recovery .gl-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 420px) {
+  .gl-mfa__slots { gap: 6px; }
+  .gl-mfa__slots input { font-size: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-mfa__slots.is-bad { animation: none; }
+  .gl-mfa__timer i { transition: none; }
+}

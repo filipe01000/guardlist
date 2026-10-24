@@ -1,7 +1,9 @@
-import React, { useCallback, useLayoutEffect, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, User } from 'lucide-react';
 import { SessionUser } from '../types';
 import { PerimeterCanvas, PerimeterEvent } from './PerimeterCanvas';
+import { MfaCode, type VerifyResult } from './mfa/MfaCode';
+import { MfaSetup } from './mfa/MfaSetup';
 import './Login.css';
 
 interface LoginProps {
@@ -128,6 +130,63 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [alarmKey, setAlarmKey] = useState(0);
   const [sealing, setSealing] = useState(false);
   const [sealed, setSealed] = useState(false);
+  // Depois da senha: código do autenticador, cadastro dele, ou código de recuperação.
+  const [step, setStep] = useState<'password' | 'mfa' | 'mfa-setup' | 'recovery'>('password');
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const mfaUser = useRef<SessionUser | null>(null);
+
+  // Acesso liberado: o cadeado tranca, os anéis fecham o perímetro e o app abre.
+  const seal = async (user: SessionUser) => {
+    setLock('locked');
+    setSealing(true);
+    await wait(1300);
+    setSealed(true);
+    await wait(1000);
+    onLogin(user);
+  };
+
+  const alarm = async () => {
+    setLock('shake');
+    setAlarmKey((key) => key + 1);
+    await wait(560);
+    setLock('open');
+  };
+
+  const backToPassword = (message: string | null = null) => {
+    setStep('password');
+    setPassword('');
+    setRecoveryCode('');
+    setSubmitting(false);
+    setError(message);
+  };
+
+  // Confere o código do autenticador (ou de recuperação). Etapa expirada ou conta travada voltam para a senha.
+  const sendMfa = async (payload: { code?: string; recoveryCode?: string }): Promise<VerifyResult & { user?: SessionUser }> => {
+    const response = await fetch('/api/auth/mfa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const body = await response.json().catch(() => ({}));
+    if (response.ok) return { ok: true, user: body.user };
+    if (body.code === 'MFA_STEP_EXPIRED' || response.status === 423) backToPassword(body.error);
+    return { ok: false, error: body.error || 'Código incorreto.' };
+  };
+
+  const verifyCode = async (code: string): Promise<VerifyResult> => {
+    const result = await sendMfa({ code });
+    if (result.ok) mfaUser.current = result.user ?? null;
+    return result;
+  };
+
+  const handleRecovery = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    const result = await sendMfa({ recoveryCode });
+    if (result.ok && result.user) return seal(result.user);
+    setSubmitting(false);
+    setRecoveryCode('');
+    if (!result.ok) setError(result.error);
+    await alarm();
+  };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -142,26 +201,82 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || 'Não foi possível entrar.');
-      // Senha aceita: o cadeado tranca, os anéis fecham o perímetro e o app abre.
-      setLock('locked');
-      setSealing(true);
-      await wait(1300);
-      setSealed(true);
-      await wait(1000);
-      onLogin(body.user);
+      // Senha certa e verificação em duas etapas exigida: falta o código (ou o cadastro do autenticador).
+      if (body.step === 'mfa' || body.step === 'mfa-setup') {
+        setSubmitting(false);
+        setStep(body.step);
+        return;
+      }
+      await seal(body.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível entrar.');
       setPassword('');
       setSubmitting(false);
-      setLock('shake');
-      setAlarmKey((key) => key + 1);
-      await wait(560);
-      setLock('open');
+      await alarm();
     }
   };
 
   return (
     <GlassShell lock={lock} alarmKey={alarmKey} sealing={sealing} sealed={sealed} labelledBy="gl-login-title">
+      {step === 'mfa' && (
+        <div className="gl-form">
+          <div className="gl-form__head">
+            <h1 id="gl-login-title">Confirme que é você</h1>
+            <p>Digite o código de 6 dígitos do seu aplicativo autenticador.</p>
+          </div>
+          <MfaCode verify={verifyCode} onSuccess={() => { if (mfaUser.current) void seal(mfaUser.current); }} onError={() => void alarm()} />
+          <div className="gl-mfa-alt">
+            <button type="button" className="gl-mfa-link" onClick={() => { setError(null); setStep('recovery'); }}>Usar um código de recuperação</button>
+            <button type="button" className="gl-mfa-link gl-mfa-link--muted" onClick={() => backToPassword()}>Voltar</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'recovery' && (
+        <form className="gl-form" onSubmit={handleRecovery}>
+          <div className="gl-form__head">
+            <h1 id="gl-login-title">Código de recuperação</h1>
+            <p>Use um dos códigos que você guardou ao cadastrar o autenticador. Cada um vale uma vez.</p>
+          </div>
+          <input
+            className="gl-mfa-recovery-input"
+            value={recoveryCode}
+            onChange={(e) => setRecoveryCode(e.target.value)}
+            placeholder="xxxx-xxxx"
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            aria-label="Código de recuperação"
+            autoFocus
+            required
+          />
+          <p className="gl-form__error" role="alert">{error}</p>
+          <button type="submit" className="gl-submit gl-submit--split" disabled={submitting}>
+            <span>{lock === 'locked' ? 'Acesso liberado' : submitting ? 'Verificando…' : 'Entrar'}</span>
+            {submitting && lock !== 'locked' ? <Loader2 className="gl-spin" aria-hidden="true" /> : <ArrowRight className="gl-submit__arrow" aria-hidden="true" />}
+          </button>
+          <div className="gl-mfa-alt">
+            <button type="button" className="gl-mfa-link" onClick={() => { setError(null); setStep('mfa'); }}>Usar o código do aplicativo</button>
+            <button type="button" className="gl-mfa-link gl-mfa-link--muted" onClick={() => backToPassword()}>Voltar</button>
+          </div>
+        </form>
+      )}
+
+      {step === 'mfa-setup' && (
+        <div className="gl-form">
+          <div className="gl-form__head">
+            <h1 id="gl-login-title">Ative a verificação em duas etapas</h1>
+            <p>O administrador passou a exigir um código do celular, além da senha.</p>
+          </div>
+          <MfaSetup onDone={(user) => void seal(user)} onExpired={() => backToPassword('A verificação expirou. Entre com usuário e senha de novo.')} />
+          <div className="gl-mfa-alt">
+            <span />
+            <button type="button" className="gl-mfa-link gl-mfa-link--muted" onClick={() => backToPassword()}>Voltar</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'password' && (
       <form className="gl-form" onSubmit={handleSubmit}>
         <div className="gl-form__head">
           <h1 id="gl-login-title">Entrar no <span>GuardList</span></h1>
@@ -220,6 +335,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             : <ArrowRight className="gl-submit__arrow" aria-hidden="true" />}
         </button>
       </form>
+      )}
     </GlassShell>
   );
 };

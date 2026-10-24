@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import ActionMenu, { openActionMenuAt } from './ActionMenu';
-import { Check, Copy, Eye, EyeOff, KeyRound, LockOpen, MonitorSmartphone, Plus, RefreshCw, Trash2, UserCheck, UserX, Users } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff, KeyRound, LockOpen, MonitorSmartphone, Plus, RefreshCw, ShieldOff, Trash2, UserCheck, UserX, Users } from 'lucide-react';
 import { Modal } from './Modal';
 import { SessionList } from './SessionList';
-import { listUserSessions, revokeAllUserSessions, revokeSession, unlockUser, type SessionInfo } from '../db/store';
+import { listUserSessions, resetUserMfa, revokeAllUserSessions, revokeSession, unlockUser, type SessionInfo } from '../db/store';
 import { SessionUser } from '../types';
 import { PageHeader } from './PageHeader';
 
@@ -127,6 +127,17 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
       setSessions((await listUserSessions(user.id)).sessions);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível carregar as sessões.');
+    }
+  };
+
+  const handleResetMfa = async (user: SessionUser) => {
+    if (!window.confirm(`Zerar a verificação em duas etapas de ${user.displayName}? As sessões abertas dessa pessoa serão encerradas e ela cadastra o autenticador de novo no próximo login.`)) return;
+    try {
+      await resetUserMfa(user.id);
+      setNotice({ text: `A verificação em duas etapas de ${user.displayName} foi zerada.` });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível zerar.');
     }
   };
 
@@ -397,6 +408,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                         ) : (
                           <span className="chip chip--ok">Ativo</span>
                         )}
+                        {user.mfaEnabled && <span className="chip ml-1" title="Verificação em duas etapas cadastrada">MFA</span>}
                       </td>
                       <td className="font-mono text-[0.72rem] whitespace-nowrap">{formatDate(user.lastLoginAt)}</td>
                       <td>
@@ -412,6 +424,9 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                                   : []),
                                 { label: 'Ver sessões abertas', icon: MonitorSmartphone, disabled: !user.active, onSelect: () => openSessions(user) },
                                 { label: 'Gerar nova senha', icon: KeyRound, disabled: !user.active, onSelect: () => openReset(user) },
+                                ...(user.mfaEnabled
+                                  ? [{ label: 'Zerar verificação em duas etapas', icon: ShieldOff, title: 'Para quem perdeu o celular e os códigos de recuperação', onSelect: () => handleResetMfa(user) }]
+                                  : []),
                                 { type: 'divider' as const },
                                 user.active
                                   ? { label: 'Desativar acesso', icon: UserX, title: 'Bloqueia o acesso sem apagar a conta', onSelect: () => handleUpdate(user, { active: false }) }

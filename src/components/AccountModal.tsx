@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { ChangePasswordForm } from './ChangePasswordForm';
 import { SessionList } from './SessionList';
+import { MfaAccount } from './mfa/MfaAccount';
 import { listMySessions, revokeSession, type SessionInfo } from '../db/store';
 import { SessionUser } from '../types';
 
@@ -12,9 +13,9 @@ interface AccountModalProps {
   onPasswordChanged: (user: SessionUser) => void;
 }
 
-// Minha conta: trocar a senha e ver/encerrar as sessões abertas em outros computadores.
+// Minha conta: trocar a senha, verificação em duas etapas e ver/encerrar as sessões abertas em outros computadores.
 export const AccountModal: React.FC<AccountModalProps> = ({ open, currentUser, onClose, onPasswordChanged }) => {
-  const [tab, setTab] = useState<'password' | 'sessions'>('password');
+  const [tab, setTab] = useState<'password' | 'mfa' | 'sessions'>('password');
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,12 +36,15 @@ export const AccountModal: React.FC<AccountModalProps> = ({ open, currentUser, o
     <Modal open={open} onClose={onClose} title="Minha conta" subtitle={`${currentUser.displayName} · ${currentUser.username}`} size="md">
       <div className="page-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'password'} onClick={() => setTab('password')}>Alterar senha</button>
+        <button type="button" role="tab" aria-selected={tab === 'mfa'} onClick={() => setTab('mfa')}>Verificação em duas etapas</button>
         <button type="button" role="tab" aria-selected={tab === 'sessions'} onClick={() => setTab('sessions')}>
           Sessões abertas <span className="tabs__count">{sessions.length}</span>
         </button>
       </div>
       {tab === 'password' ? (
         <ChangePasswordForm onCancel={onClose} onDone={onPasswordChanged} />
+      ) : tab === 'mfa' ? (
+        <MfaAccount />
       ) : (
         <div className="space-y-3">
           <p className="text-xs text-slate-400">

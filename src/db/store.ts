@@ -219,6 +219,16 @@ export const listUserSessions = (userId: number) => http<{ sessions: SessionInfo
 export const revokeAllUserSessions = (userId: number) => http<{ ok: true }>('POST', `/api/users/${userId}/sessions/revoke-all`);
 export const unlockUser = (userId: number) => http<{ user: unknown }>('PATCH', `/api/users/${userId}`, { unlock: true });
 
+// Verificação em duas etapas (MFA).
+export interface MfaStatus { available: boolean; required: boolean; enrolled: boolean; enrolledAt: string | null; recoveryLeft: number }
+export interface MfaPolicy { available: boolean; required: boolean; selfEnrolled: boolean; enrolled: number; total: number }
+export const getMfaStatus = () => http<MfaStatus>('GET', '/api/mfa/status');
+export const regenerateMfaRecovery = (code: string) => http<{ recoveryCodes: string[] }>('POST', '/api/mfa/recovery', { code });
+export const disableMfa = (code: string) => http<{ ok: true }>('POST', '/api/mfa/disable', { code });
+export const getMfaPolicy = () => http<MfaPolicy>('GET', '/api/mfa/policy');
+export const setMfaPolicy = (required: boolean) => http<{ required: boolean }>('POST', '/api/mfa/policy', { required });
+export const resetUserMfa = (userId: number) => http<{ ok: true }>('POST', `/api/users/${userId}/mfa/reset`);
+
 export const getNotifications = () => http<{ pendingApprovals: number; failedJobs: string[] }>('GET', '/api/notifications');
 
 export interface JobRun {
