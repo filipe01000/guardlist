@@ -9,3 +9,6 @@ coverage/
 .data/
 .data-backup-*/
 .data-corrompido-*/
+
+# Estado de plugins do editor
+.omc/

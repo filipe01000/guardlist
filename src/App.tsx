@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
+import { Suspense, lazy, useState, useEffect, useCallback, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { Navbar, type AppTab } from './components/Navbar';
 import { PageBoundary } from './components/PageBoundary';

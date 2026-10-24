@@ -25,7 +25,6 @@ Uso recorrente em desktop por uma equipe autenticada operando várias listas: co
 ## Capabilities and Constraints
 
 - PostgreSQL compartilhado pela equipe em produção; os operadores consultam e alteram a mesma base pelo backend. Sem `DATABASE_URL`, o desenvolvimento usa PGlite local em `.data/pglite`; os testes de integração usam PGlite em memória.
-- IndexedDB é um armazenamento legado, lido apenas para migrar dados de versões anteriores para a base da equipe.
 - Autenticação, sessões e permissões são verificadas no backend. Administradores gerenciam usuários, aprovações e restauração de backups; analistas operam as listas. Por padrão, substituições e lotes acima de 500 itens enviados por analistas aguardam aprovação, conforme as regras configuradas.
 - Listas de clientes permanecem independentes.
 - Integrações CTI com AbuseIPDB, GreyNoise e AlienVault OTX dependem de chaves válidas, limites e disponibilidade das APIs.

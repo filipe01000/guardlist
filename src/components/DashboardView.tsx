@@ -74,11 +74,6 @@ function morph(update: () => void) {
 
 const vtName = (id: string) => `cl-${id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
 
-function clientInitials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  return (words.length > 1 ? words[0][0] + words[1][0] : name.slice(0, 2)).toUpperCase();
-}
-
 function formatShortDate(iso: string): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime())

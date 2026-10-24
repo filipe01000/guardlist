@@ -34,14 +34,6 @@ export interface ClientException {
   addedAt?: string;
 }
 
-export interface ClientOverlapMetric {
-  clientA: string;
-  clientB: string;
-  sharedCount: number;
-  percentageA: number;
-  percentageB: number;
-}
-
 export interface BlocklistEntry {
   id: string;
   clientId: string;

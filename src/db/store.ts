@@ -2,7 +2,6 @@ import { AppSettings, BlocklistEntry, Client, ClientEntriesPage, ClientEntriesPa
 export type { ReportClientRow, ReportChangeRow, ReportData } from '../types';
 
 // Acesso à base compartilhada da equipe pelo servidor (/api/data/<operação>).
-// Mantém os mesmos nomes e assinaturas que as telas usavam com o IndexedDB.
 
 export const SESSION_EXPIRED_EVENT = 'guardlist:session-expired';
 

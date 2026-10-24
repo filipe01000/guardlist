@@ -154,81 +154,6 @@ a {
   gap: 20px;
 }
 
-.page-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.page-heading h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: 1.35rem;
-  font-weight: 710;
-  letter-spacing: -0.025em;
-  line-height: 1.25;
-}
-
-.page-heading p {
-  max-width: 70ch;
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.page-safety {
-  padding: 6px 9px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.61rem;
-  white-space: nowrap;
-}
-
-.workspace-overview__title {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.workspace-overview__title h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: 1.55rem;
-  font-weight: 720;
-  letter-spacing: -0.025em;
-  line-height: 1.2;
-}
-
-.workspace-overview__title p {
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
-.workspace-overview__storage {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 6px 9px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 0.61rem;
-  text-transform: uppercase;
-}
-
-.workspace-overview__storage > span {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--success);
-}
-
 .workspace-summary {
   display: grid;
   overflow: hidden;
@@ -362,100 +287,9 @@ a {
   color: var(--warning);
 }
 
-.client-ledger-heading {
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 14px;
-}
-
-.client-tile,
 .client-ledger-table {
   border-radius: 11px !important;
   background: var(--surface) !important;
-}
-
-.client-tile:hover {
-  background: var(--surface-raised) !important;
-}
-
-.client-tile__metrics {
-  display: grid;
-  margin: 18px 0 14px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.client-tile__metrics > div {
-  min-width: 0;
-  padding: 12px 10px;
-}
-
-.client-tile__metrics > div:first-child {
-  padding-left: 0;
-}
-
-.client-tile__metrics > div + div {
-  border-left: 1px solid var(--line);
-}
-
-.client-tile__metrics span {
-  display: block;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 620;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.client-tile__metrics strong {
-  display: block;
-  margin-top: 5px;
-  color: var(--text);
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.client-tile__review {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 14px;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.client-tile__review-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-
-.client-tile__review-label svg {
-  width: 13px;
-  height: 13px;
-}
-
-.client-tile__review-value {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: flex-end;
-  font-family: var(--font-mono);
-  text-align: right;
-}
-
-.client-tile__review-value strong {
-  color: var(--text-soft);
-  font-size: 0.8rem;
-  font-weight: 620;
-}
-
-.client-tile__review-value small {
-  margin-top: 3px;
-  font-size: 0.75rem;
 }
 
 .app-shell .bg-slate-900,
@@ -496,13 +330,6 @@ a {
 
 .app-shell button {
   box-shadow: none !important;
-}
-
-.app-shell button.disabled-action:disabled {
-  border-color: var(--line) !important;
-  background-color: #12223f !important;
-  color: #7488aa !important;
-  cursor: not-allowed;
 }
 
 .app-shell button[class*="bg-purple-600"],
@@ -655,31 +482,11 @@ a {
   border-color: var(--accent);
 }
 
-.app-shell .animate-in {
-  animation: none !important;
-}
-
-.nav-scroll {
-  scrollbar-width: none;
-}
-
-.nav-scroll::-webkit-scrollbar {
-  display: none;
-}
-
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 760px) {
-  .workspace-overview__title {
-    align-items: center;
-  }
-
-  .workspace-overview__storage {
-    padding: 5px 7px;
-  }
-
   .workspace-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -699,13 +506,6 @@ a {
 
   .workspace-summary__item:nth-child(n + 3) {
     border-top: 1px solid var(--line);
-  }
-}
-
-@media (max-width: 420px) {
-  .workspace-overview__storage,
-  .page-safety {
-    display: none;
   }
 }
 

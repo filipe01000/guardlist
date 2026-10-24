@@ -78,14 +78,8 @@ Contas novas e senhas redefinidas recebem uma senha provisória, trocada obrigat
 
 Defina no Render `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `REPORT_EMAILS` e `BACKUP_EMAILS` (veja `.env.example`). Com isso o servidor envia, no dia 1º, o relatório geral do mês anterior (HTML com a marca + planilha CSV) e, todo dia, um backup compactado (.json.gz). Falhas aparecem em Administração → Status do sistema e num aviso para os administradores. O Neon também permite restaurar o banco para um horário anterior (Branches → Restore); a janela disponível depende do plano.
 
-### Migrar os dados de antes
-
-Versões anteriores guardavam os dados no navegador de cada pessoa. Um administrador que abrir **Backup e ajustes** no navegador onde estavam esses dados vê a opção **Enviar para a equipe**. Outra forma é baixar o backup .json na versão antiga e usar **Restaurar backup**.
-
 ## Limitações das integrações CTI
 
-As ocorrências e correlações entre clientes são calculadas com os dados locais reais do aplicativo. Quando uma chave não está configurada, os campos correspondentes permanecem demonstrativos e aparecem identificados como tal na interface. Quando o provedor responde, a interface substitui esses campos pelos dados reais e mostra o estado individual da conexão.
-
-Para dados CTI reais, use um backend autenticado que mantenha as chaves fora do navegador, aplique limites de requisição, cache e tratamento de erros. AbuseIPDB e GreyNoise exigem chaves para consultas completas; o AlienVault OTX também usa chave para recursos autenticados e limites adequados. Nunca coloque essas chaves em variáveis `VITE_*`, porque elas ficam visíveis no JavaScript entregue ao usuário.
+As ocorrências e correlações entre clientes são calculadas com os dados reais do aplicativo. As consultas ao AbuseIPDB, GreyNoise e OTX são feitas pelo servidor, com as chaves em `ABUSEIPDB_API_KEY`, `GREYNOISE_API_KEY` e `OTX_API_KEY`, cache e limite por usuário. Quando uma chave não está configurada ou o provedor não responde, a fonte aparece como indisponível e nenhum dado é inventado. Nunca coloque essas chaves em variáveis `VITE_*`, porque elas ficariam visíveis no JavaScript entregue ao usuário.
 
 Os links externos do dossiê abrem páginas públicas de investigação para o indicador selecionado, mas não substituem uma integração de API.

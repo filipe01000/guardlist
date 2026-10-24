@@ -258,16 +258,6 @@
   outline-offset: -2px;
 }
 
-.gl-search kbd {
-  flex: 0 0 auto !important;
-  padding: 2px 6px;
-  border: 1px solid var(--sb-divider);
-  border-radius: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  color: var(--muted);
-}
-
 .gl-nav {
   position: relative;
   flex: 0 1 auto;
@@ -286,32 +276,6 @@
 
 .gl-nav .gl-row.active {
   color: var(--sb-band-text);
-}
-
-.gl-indicator {
-  position: absolute;
-  inset: 0;
-  height: var(--sb-row);
-  translate: 0 calc(var(--active-row) * var(--sb-row));
-  background: var(--sb-band);
-  transition: translate 0.38s cubic-bezier(0.34, 1.16, 0.42, 1), background 0.3s;
-  pointer-events: none;
-}
-
-.gl-indicator::after {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 0;
-  translate: 0 -50%;
-  width: 3px;
-  height: 22px;
-  border-radius: 0 3px 3px 0;
-  background: var(--accent);
-}
-
-.gl-backup.is-warning {
-  color: var(--warning);
 }
 
 .gl-logout:hover {
@@ -448,7 +412,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .gl-sidebar,
-  .gl-indicator,
   .app-shell .studio-main,
   .app-shell .studio-footer {
     transition: none;

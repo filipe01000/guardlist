@@ -218,14 +218,6 @@ kbd.key {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.comment-count {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  color: var(--accent);
-}
 
 /* ---------- Gráficos ---------- */
 

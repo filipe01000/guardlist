@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileSearch, History, Upload } from 'lucide-react';
+import { FileSearch, History, Loader2, Upload } from 'lucide-react';
 import { Client, ImportHistoryRecord } from '../types';
 import { getHistoryRecords } from '../db/store';
 import { PageHeader } from './PageHeader';
@@ -69,7 +69,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({ clients, onStartImport
         }
       />
 
-      {records.length === 0 ? (
+      {isLoading && records.length === 0 ? (
+        <div className="data-panel">
+          <div className="empty-state"><Loader2 className="animate-spin" aria-hidden="true" /><p>Carregando o histórico…</p></div>
+        </div>
+      ) : records.length === 0 ? (
         <div className="data-panel">
           <div className="empty-state">
             <History aria-hidden="true" />

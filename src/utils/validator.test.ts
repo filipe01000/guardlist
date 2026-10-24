@@ -12,7 +12,7 @@ import {
   ipv4ToNumber
 } from './validator';
 import { generateFullCSV, generateNanoFormattedTxt } from './exporter';
-import { analyzeImportBatch, extractTokensFromRawInput, extractValidIndicatorsFromText } from './importer';
+import { analyzeImportBatch, extractValidIndicatorsFromText } from './importer';
 import { parseCsv, toCsv } from './csv';
 
 export interface TestResult {
@@ -275,7 +275,6 @@ export function runValidatorTests(): {
   // --- 7. Teste de Higienização de Cabeçalhos e Múltiplos IPs por Linha ---
   const sExtract = 'Extração Inteligente de Cabeçalhos e Múltiplos IPs';
   const messyInput = '=== IPS ÚNICOS === 200.219.11.15 93.187.128.69 === REDES CIDR === 45.205.1.240/29';
-  const tokens = extractTokensFromRawInput(messyInput);
   const valids = extractValidIndicatorsFromText(messyInput);
 
   assertEqual(
