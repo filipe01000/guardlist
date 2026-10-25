@@ -2,15 +2,7 @@ import React from 'react';
 import { Laptop, LogOut, Smartphone } from 'lucide-react';
 import type { SessionInfo } from '../db/store';
 import { formatDateTimeBR } from '../utils/csv';
-
-// Descrição curta do navegador a partir do user-agent.
-export function describeAgent(userAgent: string | null): { label: string; mobile: boolean } {
-  const ua = userAgent || '';
-  const mobile = /Mobile|Android|iPhone|iPad/i.test(ua);
-  const browser = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Navegador';
-  const os = /Windows/.test(ua) ? 'Windows' : /Android/.test(ua) ? 'Android' : /iPhone|iPad|iOS/.test(ua) ? 'iOS' : /Mac OS X/.test(ua) ? 'macOS' : /Linux/.test(ua) ? 'Linux' : '';
-  return { label: [browser, os].filter(Boolean).join(' · ') || 'Desconhecido', mobile };
-}
+import { describeAgent } from '../utils/device';
 
 interface SessionListProps {
   sessions: SessionInfo[];

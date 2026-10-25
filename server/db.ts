@@ -104,6 +104,20 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions (user_id);
 
+-- Avisos de acesso novo (navegador ou rede fora do histórico da conta), mostrados nas outras sessões da pessoa.
+CREATE TABLE IF NOT EXISTS login_alerts (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ip TEXT,
+  user_agent TEXT,
+  new_device BOOLEAN NOT NULL,
+  new_network BOOLEAN NOT NULL,
+  dismissed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS login_alerts_user_idx ON login_alerts (user_id, created_at);
+
 -- Conversa curta em cada item da lista.
 CREATE TABLE IF NOT EXISTS comments (
   id BIGSERIAL PRIMARY KEY,

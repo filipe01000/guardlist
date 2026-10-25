@@ -37,6 +37,8 @@ export interface SessionInfo {
 // Bloqueio temporário: depois de MAX_FAILED_LOGINS senhas erradas seguidas, a conta trava por LOCK_MINUTES.
 export const MAX_FAILED_LOGINS = Number(process.env.MAX_FAILED_LOGINS || 5);
 export const LOCK_MINUTES = Number(process.env.LOGIN_LOCK_MINUTES || 15);
+// Sessão parada (sem mouse, teclado ou toque) por mais que isso deixa de valer. A atividade chega por touchSession.
+export const SESSION_IDLE_MS = Number(process.env.SESSION_IDLE_MINUTES || 60) * 60_000;
 
 export interface PublicUser {
   id: number;
@@ -174,33 +176,35 @@ export function createUsers(db: Database) {
          VALUES ($1, $2, $3, now() + make_interval(secs => $4::double precision), $5, $6)`,
         [hashSessionId(sid), row.id, row.session_version, SESSION_TTL_MS / 1000, ip, (userAgent || '').slice(0, 300) || null]
       );
-      // Faxina: sessões vencidas ou encerradas há mais de 30 dias.
-      await db.query("DELETE FROM sessions WHERE expires_at < now() - interval '30 days' OR revoked_at < now() - interval '30 days'");
+      // Faxina: sessões vencidas ou encerradas há mais de 90 dias (o histórico serve ao aviso de acesso novo).
+      await db.query("DELETE FROM sessions WHERE expires_at < now() - interval '90 days' OR revoked_at < now() - interval '90 days'");
       return sid;
     },
 
-    // Usuário da sessão, se ela segue aberta, dentro da validade e na versão atual do usuário.
+    // Usuário da sessão, se ela segue aberta, dentro da validade, sem passar do tempo parada e na versão atual.
+    // Consultar não conta como atividade: a atualização automática do app manteria a sessão viva para sempre.
     async bySession(sid: string): Promise<(UserRow & { session_id: string }) | null> {
-      const id = hashSessionId(sid);
-      const rows = await db.query<UserRow & { session_id: string; last_seen_at: string }>(
-        `SELECT u.*, s.id AS session_id, s.last_seen_at FROM sessions s JOIN users u ON u.id = s.user_id
-         WHERE s.id = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND s.version = u.session_version AND u.active`,
-        [id]
+      const rows = await db.query<UserRow & { session_id: string }>(
+        `SELECT u.*, s.id AS session_id FROM sessions s JOIN users u ON u.id = s.user_id
+         WHERE s.id = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND s.version = u.session_version AND u.active
+           AND s.last_seen_at > now() - make_interval(secs => $2::double precision)`,
+        [hashSessionId(sid), SESSION_IDLE_MS / 1000]
       );
-      const row = rows[0];
-      if (!row) return null;
-      if (Date.now() - new Date(row.last_seen_at).getTime() > 5 * 60_000) {
-        await db.query('UPDATE sessions SET last_seen_at = now() WHERE id = $1', [id]);
-      }
-      return row;
+      return rows[0] ?? null;
+    },
+
+    // Atividade da pessoa (mouse, teclado, toque) renova o prazo de inatividade.
+    async touchSession(sessionId: string) {
+      await db.query('UPDATE sessions SET last_seen_at = now() WHERE id = $1', [sessionId]);
     },
 
     async listSessions(userId: number, currentSessionId?: string): Promise<SessionInfo[]> {
       const rows = await db.query<{ id: string; created_at: string; last_seen_at: string; expires_at: string; ip: string | null; user_agent: string | null }>(
         `SELECT s.id, s.created_at, s.last_seen_at, s.expires_at, s.ip, s.user_agent FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.user_id = $1 AND s.revoked_at IS NULL AND s.expires_at > now() AND s.version = u.session_version
+           AND s.last_seen_at > now() - make_interval(secs => $2::double precision)
          ORDER BY s.last_seen_at DESC`,
-        [userId]
+        [userId, SESSION_IDLE_MS / 1000]
       );
       return rows.map((r) => ({
         id: r.id,
@@ -235,6 +239,12 @@ export function createUsers(db: Database) {
       await db.query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL', [userId]);
       await audit(actor.username, 'session.revoke_all', { username: row.username });
       return null;
+    },
+
+    // "Não fui eu": encerra as outras sessões da pessoa e mantém a atual.
+    async revokeOtherSessions(userId: number, currentSessionId: string, username: string) {
+      await db.query('UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND id <> $2 AND revoked_at IS NULL', [userId, currentSessionId]);
+      await audit(username, 'session.revoke_others', {});
     },
 
     async revokeSessionById(sessionId: string) {

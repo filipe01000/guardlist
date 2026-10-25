@@ -8,6 +8,8 @@ import './Login.css';
 
 interface LoginProps {
   onLogin: (user: SessionUser) => void;
+  // Motivo de ter voltado ao login (por exemplo, sessão encerrada por inatividade).
+  notice?: string;
 }
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -120,11 +122,11 @@ export const GlassShell: React.FC<{
   );
 };
 
-export const Login: React.FC<LoginProps> = ({ onLogin }) => {
+export const Login: React.FC<LoginProps> = ({ onLogin, notice }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(notice ?? null);
   const [submitting, setSubmitting] = useState(false);
   const [lock, setLock] = useState<LockState>('open');
   const [alarmKey, setAlarmKey] = useState(0);

@@ -4,6 +4,7 @@ import { Navbar, type AppTab } from './components/Navbar';
 import { PageBoundary } from './components/PageBoundary';
 import { AmbientLight } from './components/AmbientLight';
 import { AccountModal } from './components/AccountModal';
+import { LoginAlertBanner } from './components/LoginAlertBanner';
 import { DashboardView } from './components/DashboardView';
 import { QuickSearchModal } from './components/QuickSearchView';
 import { TestRunnerModal } from './components/TestRunnerModal';
@@ -486,6 +487,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
           onOpenAssistant={ai.configured ? () => setIsAiOpen((v) => !v) : undefined}
           isAssistantOpen={isAiOpen}
         />
+        <LoginAlertBanner onNotMe={() => setIsAccountOpen(true)} />
         {dataLoadError && (
           <div className="banner" role="alert">
             <AlertTriangle aria-hidden="true" />

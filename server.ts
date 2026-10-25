@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createSessionToken, createStepToken, readSession, readStepToken, setSessionCookie, setStepCookie, type StepKind } from './auth.ts';
+import { createSessionToken, createStepToken, hashSessionId, readSession, readStepToken, setSessionCookie, setStepCookie, type StepKind } from './auth.ts';
 import { createMfa } from './server/mfa/service.ts';
 import { aiConfigured, aiSettings, createAi, type AiEvent } from './server/ai.ts';
 import { fetchLogoFromSite, LogoError } from './server/logo.ts';
@@ -16,7 +16,8 @@ import { createJobs } from './server/jobs.ts';
 import { recipients, sendMail, smtpConfigured } from './server/mailer.ts';
 import { seedDemoData } from './server/seed.ts';
 import { createStore, PUBLIC_OPS, StoreError, type Actor } from './server/store.ts';
-import { createUsers, toActor, toPublic, type UserRow } from './server/users.ts';
+import { createLoginAlerts } from './server/loginAlerts.ts';
+import { createUsers, SESSION_IDLE_MS, toActor, toPublic, type UserRow } from './server/users.ts';
 
 const app = express();
 config({ path: ['.env.local', '.env'], quiet: true });
@@ -36,6 +37,7 @@ const configuredOrigin = (process.env.PUBLIC_URL || process.env.RENDER_EXTERNAL_
 const db = await openDatabase(rootDir);
 const store = createStore(db);
 const users = createUsers(db);
+const loginAlerts = createLoginAlerts(db);
 // O ícone só vai no QR com endereço https: o aplicativo do celular busca a imagem pela internet.
 const mfa = createMfa(db, { iconUrl: /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin) ? `${configuredOrigin}/brand/guardlist-icon.png` : undefined });
 const cti = createCti(db);
@@ -126,8 +128,12 @@ async function currentUser(req: express.Request): Promise<(UserRow & { session_i
 }
 
 async function startSession(req: express.Request, res: express.Response, row: UserRow) {
-  const sid = await users.createSession(row, req.ip || null, req.get('user-agent') || null);
+  const ip = req.ip || null;
+  const userAgent = req.get('user-agent') || null;
+  const sid = await users.createSession(row, ip, userAgent);
   setSessionCookie(req, res, createSessionToken(sessionSecret, sid));
+  // O aviso de acesso novo nunca impede o login.
+  await loginAlerts.record(row.id, hashSessionId(sid), ip, userAgent).catch((error: unknown) => console.error(error));
 }
 
 function sendError(res: express.Response, error: unknown) {
@@ -141,7 +147,7 @@ const jsonSmall = express.json({ limit: '8kb' });
 app.get('/api/auth/me', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const row = await currentUser(req).catch(() => null);
-  return res.json({ authEnabled: true, user: row ? toPublic(row) : null });
+  return res.json({ authEnabled: true, user: row ? toPublic(row) : null, idleTimeoutMs: SESSION_IDLE_MS });
 });
 
 app.post('/api/auth/login', loginLimit, jsonSmall, async (req, res) => {
@@ -276,6 +282,44 @@ app.get('/api/sessions', async (_req, res) => {
   try {
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ sessions: await users.listSessions(res.locals.userId, res.locals.sessionId) });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// Atividade da pessoa no navegador (mouse, teclado, toque): renova o prazo de inatividade da sessão.
+app.post('/api/activity', async (_req, res) => {
+  try {
+    await users.touchSession(res.locals.sessionId);
+    return res.json({ ok: true });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// Avisos de acesso novo à conta, mostrados nas outras sessões da pessoa.
+app.get('/api/alerts', async (_req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ alerts: await loginAlerts.listFor(res.locals.userId, res.locals.sessionId) });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.post('/api/alerts/:id/dismiss', async (req, res) => {
+  try {
+    await loginAlerts.dismiss(res.locals.userId, Number(req.params.id));
+    return res.json({ ok: true });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+app.post('/api/sessions/revoke-others', async (_req, res) => {
+  try {
+    await users.revokeOtherSessions(res.locals.userId, res.locals.sessionId, (res.locals.actor as Actor).username);
+    return res.json({ ok: true });
   } catch (error) {
     return sendError(res, error);
   }

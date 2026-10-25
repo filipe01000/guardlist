@@ -217,6 +217,13 @@ export const listMySessions = () => http<{ sessions: SessionInfo[] }>('GET', '/a
 export const revokeSession = (id: string) => http<{ ok: true }>('DELETE', `/api/sessions/${encodeURIComponent(id)}`);
 export const listUserSessions = (userId: number) => http<{ sessions: SessionInfo[] }>('GET', `/api/users/${userId}/sessions`);
 export const revokeAllUserSessions = (userId: number) => http<{ ok: true }>('POST', `/api/users/${userId}/sessions/revoke-all`);
+export const revokeOtherSessions = () => http<{ ok: true }>('POST', '/api/sessions/revoke-others');
+export const sendActivity = () => http<{ ok: true }>('POST', '/api/activity');
+
+// Avisos de acesso novo à conta (navegador ou rede fora do histórico).
+export interface LoginAlert { id: number; createdAt: string; ip: string | null; userAgent: string | null; newDevice: boolean; newNetwork: boolean }
+export const listLoginAlerts = () => http<{ alerts: LoginAlert[] }>('GET', '/api/alerts');
+export const dismissLoginAlert = (id: number) => http<{ ok: true }>('POST', `/api/alerts/${id}/dismiss`);
 export const unlockUser = (userId: number) => http<{ user: unknown }>('PATCH', `/api/users/${userId}`, { unlock: true });
 
 // Verificação em duas etapas (MFA).

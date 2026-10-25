@@ -3,13 +3,14 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import App from './App.tsx';
 import { GlassShell, Login } from './components/Login';
 import { ChangePasswordForm } from './components/ChangePasswordForm';
+import { IdleGuard } from './components/IdleGuard';
 import { SESSION_EXPIRED_EVENT } from './db/store';
 import { SessionUser } from './types';
 
 type AuthState =
   | { status: 'loading' }
   | { status: 'error' }
-  | { status: 'ready'; user: SessionUser | null };
+  | { status: 'ready'; user: SessionUser | null; notice?: string };
 
 // Aplica o tema salvo antes do App montar, para a tela de login seguir a mesma preferência.
 function applySavedTheme() {
@@ -28,12 +29,16 @@ function applySavedTheme() {
 
 export default function AuthGate() {
   const [auth, setAuth] = useState<AuthState>({ status: 'loading' });
+  const [idleTimeoutMs, setIdleTimeoutMs] = useState(60 * 60_000);
 
   const loadSession = useCallback(() => {
     setAuth({ status: 'loading' });
     fetch('/api/auth/me', { cache: 'no-store' })
       .then((response) => (response.ok ? response.json() : Promise.reject()))
-      .then((body) => setAuth({ status: 'ready', user: body.user ?? null }))
+      .then((body) => {
+        if (typeof body.idleTimeoutMs === 'number' && body.idleTimeoutMs > 0) setIdleTimeoutMs(body.idleTimeoutMs);
+        setAuth({ status: 'ready', user: body.user ?? null });
+      })
       .catch(() => setAuth({ status: 'error' }));
   }, []);
 
@@ -52,6 +57,11 @@ export default function AuthGate() {
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
     setAuth({ status: 'ready', user: null });
   };
+
+  const handleIdle = useCallback(async () => {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+    setAuth({ status: 'ready', user: null, notice: 'Sessão encerrada por inatividade. Entre novamente.' });
+  }, []);
 
   if (auth.status === 'loading' || auth.status === 'error') {
     const loading = auth.status === 'loading';
@@ -76,7 +86,7 @@ export default function AuthGate() {
   }
 
   if (!auth.user) {
-    return <Login onLogin={(user) => setAuth({ status: 'ready', user })} />;
+    return <Login notice={auth.notice} onLogin={(user) => setAuth({ status: 'ready', user })} />;
   }
 
   if (auth.user.mustChangePassword) {
@@ -96,10 +106,13 @@ export default function AuthGate() {
   }
 
   return (
-    <App
-      currentUser={auth.user}
-      onLogout={handleLogout}
-      onUserChange={(user) => setAuth({ status: 'ready', user })}
-    />
+    <>
+      <App
+        currentUser={auth.user}
+        onLogout={handleLogout}
+        onUserChange={(user) => setAuth({ status: 'ready', user })}
+      />
+      <IdleGuard timeoutMs={idleTimeoutMs} onExpire={handleIdle} />
+    </>
   );
 }
