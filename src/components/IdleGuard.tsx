@@ -2,12 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
 import { sendActivity } from '../db/store';
 
-// Sessão por inatividade: mouse, teclado, toque e rolagem contam como uso. A última atividade fica no localStorage,
-// compartilhada entre abas, para uma aba esquecida não derrubar a sessão de outra em uso.
-// O servidor é quem decide: sem atividade enviada, ele recusa a sessão depois do mesmo prazo.
+// Sessão por inatividade: mouse, teclado, toque e rolagem contam como uso e viram um sinal ao servidor (no máximo a cada
+// HEARTBEAT_MS). O relógio conta a partir do último sinal enviado, o mesmo que o servidor usa: contar pela última atividade
+// local deixava o servidor encerrar a sessão até um sinal antes, durante o aviso. O último sinal fica no localStorage,
+// compartilhado entre abas, para uma aba esquecida não derrubar a sessão de outra em uso.
 
 const KEY = 'guardlist-last-activity';
-const HEARTBEAT_MS = 60_000;
+const HEARTBEAT_MS = 30_000;
 const WARN_MS = 60_000;
 const EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'scroll'] as const;
 
@@ -33,30 +34,29 @@ interface IdleGuardProps {
 }
 
 export const IdleGuard: React.FC<IdleGuardProps> = ({ timeoutMs, onExpire }) => {
-  const lastLocal = useRef(Date.now());
-  const lastSent = useRef(Date.now());
+  const lastSent = useRef(0);
   const warningRef = useRef(false);
   const [left, setLeft] = useState<number | null>(null);
 
-  const lastActivity = () => Math.max(lastLocal.current, readShared());
+  // Último sinal enviado por qualquer aba desta sessão.
+  const lastBeat = () => Math.max(lastSent.current, readShared());
 
   const markActive = useCallback((force = false) => {
     const now = Date.now();
-    lastLocal.current = now;
+    if (!force && now - lastBeat() < HEARTBEAT_MS) return;
+    lastSent.current = now;
     writeShared(now);
-    if (force || now - lastSent.current >= HEARTBEAT_MS) {
-      lastSent.current = now;
-      sendActivity().catch(() => undefined);
-    }
+    sendActivity().catch(() => undefined);
   }, []);
 
   useEffect(() => {
-    writeShared(Date.now());
+    // Abrir ou recarregar a página também é uso.
+    markActive(true);
     // Com o aviso aberto, só o botão renova: mexer o mouse por acaso não deve esconder o aviso.
     const onActivity = () => { if (!warningRef.current) markActive(); };
     EVENTS.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
     const tick = window.setInterval(() => {
-      const idle = Date.now() - lastActivity();
+      const idle = Date.now() - lastBeat();
       if (idle >= timeoutMs) {
         window.clearInterval(tick);
         onExpire();
