@@ -16,9 +16,14 @@
     <meta property="og:image:alt" content="GuardList — Gestão de blocklists por cliente" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="__APP_ORIGIN__/og-image.jpg" />
+    <link rel="alternate" type="text/markdown" href="/index.md" />
+    <link rel="service-desc" type="application/json" href="/openapi.json" />
+    <!-- Texto para robôs e navegadores sem JavaScript: fica no HTML, mas só aparece sem JS (o React troca o conteúdo de #root). -->
+    <style>.gl-static { visibility: hidden; }</style>
+    <noscript><style>.gl-static { visibility: visible; max-width: 760px; margin: 0 auto; padding: 40px 20px; }</style></noscript>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!--gl-static-home--></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

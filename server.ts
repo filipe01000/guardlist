@@ -9,6 +9,7 @@ import { createSessionToken, createStepToken, hashSessionId, readSession, readSt
 import { createMfa } from './server/mfa/service.ts';
 import { aiConfigured, aiSettings, createAi, type AiEvent } from './server/ai.ts';
 import { fetchLogoFromSite, LogoError } from './server/logo.ts';
+import { agentRouter, notFound, STATIC_HOME_MARK, staticHome } from './server/agentDocs.ts';
 import { createCti, ctiConfigured } from './server/cti.ts';
 import { classifyIndicator, normalizeIndicator } from './src/utils/validator.ts';
 import { openDatabase } from './server/db.ts';
@@ -751,21 +752,26 @@ app.post('/api/status/run/:job', adminOnly, adminAction, async (req, res) => {
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota de API não encontrada.' }));
 
+const originFor = (req: express.Request): string => {
+  if (/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin)) return configuredOrigin;
+  const hostHeader = req.get('host') || '';
+  return /^[a-z0-9.-]+(:\d+)?$/i.test(hostHeader) ? `${req.protocol}://${hostHeader}` : '';
+};
+
+app.use(agentRouter(originFor));
+
 if (production) {
   // index.html recebe a origem pública para que og:image tenha URL absoluta (exigida pelas prévias de link).
-  const indexHtml = readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8');
-  const originFor = (req: express.Request): string => {
-    if (/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(configuredOrigin)) return configuredOrigin;
-    const hostHeader = req.get('host') || '';
-    return /^[a-z0-9.-]+(:\d+)?$/i.test(hostHeader) ? `${req.protocol}://${hostHeader}` : '';
-  };
+  const indexHtml = readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8').replace(STATIC_HOME_MARK, staticHome());
   const sendIndex: RequestHandler = (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.type('html').send(indexHtml.replaceAll('__APP_ORIGIN__', originFor(req)));
   };
 
   app.use(express.static(path.join(rootDir, 'dist'), { index: false }));
-  app.get('*', sendIndex);
+  // O app vive todo em "/": qualquer outro caminho não existe.
+  app.get('/', sendIndex);
+  app.get('*', notFound);
 } else {
   const { createServer } = await import('vite');
   const vite = await createServer({ root: rootDir, server: { middlewareMode: true }, appType: 'spa' });
