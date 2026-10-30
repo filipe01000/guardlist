@@ -21,12 +21,11 @@ export const VerdictBadge: React.FC<{ summary: CtiSummary }> = ({ summary }) => 
 export const CtiInline: React.FC<{ summary: CtiSummary }> = ({ summary }) => (
   <span className="cti-meta">
     <VerdictBadge summary={summary} />
-    {summary.totalReports !== null && <span>{summary.totalReports} ocorrência{summary.totalReports === 1 ? '' : 's'}</span>}
-    {(summary.domain || summary.isp) && (
-      <span className="cti-meta__domain" title={[summary.domain, summary.isp, summary.asn].filter(Boolean).join(' · ')}>
-        {summary.domain || summary.isp}
-      </span>
-    )}
-    {summary.countryCode && <span title={summary.countryCode}>{summary.countryCode}</span>}
+    {/* Sempre as quatro colunas, mesmo vazias, para alinhar uma linha com a outra. */}
+    <span>{summary.totalReports !== null && `${summary.totalReports} ocorrência${summary.totalReports === 1 ? '' : 's'}`}</span>
+    <span title={summary.countryCode || undefined}>{summary.countryCode}</span>
+    <span className="cti-meta__domain" title={[summary.domain, summary.isp, summary.asn].filter(Boolean).join(' · ') || undefined}>
+      {summary.domain || summary.isp}
+    </span>
   </span>
 );

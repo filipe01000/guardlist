@@ -144,7 +144,8 @@ kbd.key {
 .verdict--unknown { color: var(--muted); }
 
 .cti-meta {
-  display: flex;
+  display: grid;
+  grid-template-columns: 112px 104px 24px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   min-width: 0;
@@ -154,7 +155,6 @@ kbd.key {
 }
 .cti-meta span { white-space: nowrap; }
 .cti-meta .cti-meta__domain {
-  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--text-soft);

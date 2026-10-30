@@ -192,6 +192,18 @@ export function analyzeImportBatch(
   };
 }
 
+/**
+ * Texto do lote depois de uma edição na pré-visualização: troca a linha `index` por `value`, tira a linha se
+ * `value` for nulo ou vazio, e acrescenta no fim se `index` passar do último item.
+ */
+export function editBatchText(items: ImportPreviewItem[], index: number, value: string | null): string {
+  const lines = items.map((item) => item.indicator);
+  const next = value?.trim();
+  if (next) lines.splice(index, index < lines.length ? 1 : 0, next);
+  else lines.splice(index, 1);
+  return lines.join('\n');
+}
+
 export type OrganizeMode = 'number' | 'range';
 
 /**

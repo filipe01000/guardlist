@@ -941,10 +941,11 @@ select.field {
   accent-color: var(--warning);
 }
 
+/* Colunas fixas: indicador (largura do maior da aba), tipo, reputação, situação e ações. */
 .preview-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--preview-ip, 20ch) 74px minmax(0, 1fr) auto auto;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 8px 10px;
   border-radius: 7px;
@@ -953,6 +954,21 @@ select.field {
 
 .preview-row:hover {
   background: var(--surface-raised);
+}
+
+.preview-row__ip { min-width: 0; }
+.preview-row__ip b, .preview-row__ip small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-row__ip b { font-weight: 600; color: var(--text); }
+.preview-row__ip small { font-family: var(--font-sans); font-size: 11px; color: var(--muted); }
+.preview-row__actions { display: flex; gap: 2px; }
+.preview-row__edit { grid-column: 1 / -2; display: flex; gap: 8px; min-width: 0; }
+.preview-row__edit input, .preview-add input { flex: 1; min-width: 0; }
+.preview-add { display: flex; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--line); }
+
+@media (max-width: 760px) {
+  .preview-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .preview-row > .cti-meta { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; }
+  .preview-row__edit { grid-column: 1 / -1; }
 }
 
 /* ---------- DiÃ¡logos ---------- */

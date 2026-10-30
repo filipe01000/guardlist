@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { analyzeImportBatch } from './importer.ts';
+import { analyzeImportBatch, editBatchText } from './importer.ts';
 import { buildImportReport, reportSections } from './importReport.ts';
 
 test('relatório da importação: cada item na seção certa, sem contar repetido duas vezes', () => {
@@ -28,4 +28,16 @@ test('modo substituir: os que já estavam aparecem como mantidos', () => {
   assert.deepEqual(r.kept, ['194.26.29.112']);
   assert.deepEqual(r.saved, ['45.95.147.10']);
   assert.deepEqual(r.alreadyExists, []);
+});
+
+test('editar o lote na pré-visualização: corrige, remove e acrescenta sem perder os outros itens', () => {
+  const { items } = analyzeImportBatch('1.1.1.1\nip-ruim\n2.2.2.2', new Set());
+  assert.equal(editBatchText(items, 1, '3.3.3.3'), '1.1.1.1\n3.3.3.3\n2.2.2.2');
+  assert.equal(editBatchText(items, 0, null), 'ip-ruim\n2.2.2.2');
+  assert.equal(editBatchText(items, 1, '   '), '1.1.1.1\n2.2.2.2');
+  assert.equal(editBatchText(items, items.length, '4.4.4.4'), '1.1.1.1\nip-ruim\n2.2.2.2\n4.4.4.4');
+  // Reanalisar leva o item corrigido para a categoria certa.
+  const again = analyzeImportBatch(editBatchText(items, 1, '3.3.3.3'), new Set());
+  assert.equal(again.invalidCount, 0);
+  assert.equal(again.newCount, 3);
 });

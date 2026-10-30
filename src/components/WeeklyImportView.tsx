@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  FileText, AlertTriangle, XCircle, RotateCcw, Check, Trash2, Eye, ListChecks, ArrowLeft, Info, ShieldOff, Loader2,
+  FileText, AlertTriangle, XCircle, RotateCcw, Check, Trash2, Pencil, Plus, Eye, ListChecks, ArrowLeft, Info, ShieldOff, Loader2,
   ArrowDown01, Network, Hourglass, Copy, FileSignature
 } from 'lucide-react';
 import {
   AppSettings, BlocklistEntry, Client, CtiSummary, ImportOutcome, ImportPreviewItem, ImportPreviewSummary, PendingImport
 } from '../types';
-import { analyzeImportBatch, extractValidIndicatorsFromText, organizeIndicators, type OrganizeMode } from '../utils/importer';
+import { analyzeImportBatch, editBatchText, extractValidIndicatorsFromText, organizeIndicators, type OrganizeMode } from '../utils/importer';
 import { enrichIndicators, getClientActiveIndicatorsSet, listPendingImports, type ImportBatchPayload } from '../db/store';
 import { getIsoWeek, ipv4ToNumber, isValidIPv4 } from '../utils/validator';
 import { formatDateTimeBR } from '../utils/csv';
@@ -68,6 +68,10 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [preview, setPreview] = useState<ImportPreviewSummary | null>(null);
   const [activeTab, setActiveTab] = useState<PreviewTab>('new');
+  // Edição direto na pré-visualização: posição do item em preview.items, texto dele e campo de acrescentar.
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [addValue, setAddValue] = useState('');
   const [includeReservedAlerts, setIncludeReservedAlerts] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -138,22 +142,40 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
   };
 
   // Executar análise contra a base do cliente
-  const handleAnalyze = async () => {
-    if (!selectedClientId || !rawText.trim()) return;
+  const analyze = async (text: string) => {
     setIsAnalyzing(true);
     setSubmitError(null);
     try {
       const { activeSet, activeCidrs } = await getClientActiveIndicatorsSet(selectedClientId);
-      const summary = analyzeImportBatch(rawText, activeSet, activeCidrs, importMode, exceptions);
+      const summary = analyzeImportBatch(text, activeSet, activeCidrs, importMode, exceptions);
       setPreview(summary);
-      const first = TABS.find(([id]) => summary.items.some((i) => i.category === id));
-      setActiveTab(first ? first[0] : 'new');
       enrich(summary.items);
+      return summary;
     } catch (err) {
       console.error('Erro ao analisar lote:', err);
+      setSubmitError('Não foi possível analisar o lote. Tente novamente.');
+      return null;
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const handleAnalyze = async () => {
+    if (!selectedClientId || !rawText.trim()) return;
+    const summary = await analyze(rawText);
+    if (!summary) return;
+    const first = TABS.find(([id]) => summary.items.some((i) => i.category === id));
+    setActiveTab(first ? first[0] : 'new');
+  };
+
+  // Corrige, tira ou acrescenta um item e reanalisa o lote: o item vai para a aba certa, sem sair da pré-visualização.
+  const applyEdit = async (index: number, value: string | null) => {
+    if (!preview) return;
+    const text = editBatchText(preview.items, index, value);
+    setEditingIndex(null);
+    setRawText(text);
+    if (text.trim()) await analyze(text);
+    else setPreview(null);
   };
 
   const legitItems = useMemo(
@@ -306,17 +328,6 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
     const filteredItems = preview.items.filter(i => i.category !== 'invalid');
     setPreview({ ...preview, invalidCount: 0, totalLines: filteredItems.length, items: filteredItems });
     if (activeTab === 'invalid') setActiveTab('new');
-  };
-
-  const handleRemoveInvalidItem = (itemToRemove: ImportPreviewItem) => {
-    if (!preview) return;
-    const filteredItems = preview.items.filter(item => item !== itemToRemove);
-    setPreview({
-      ...preview,
-      invalidCount: filteredItems.filter(i => i.category === 'invalid').length,
-      totalLines: filteredItems.length,
-      items: filteredItems
-    });
   };
 
   const countOf = (tab: PreviewTab) => itemsOfTab(tab).length;
@@ -641,7 +652,11 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
           )}
 
           <div className="rounded-xl border border-slate-800 overflow-hidden">
-            <div key={activeTab} className="view-enter max-h-[460px] overflow-y-auto p-1.5 font-mono text-xs">
+            <div
+              key={activeTab}
+              className="view-enter max-h-[460px] overflow-y-auto p-1.5 font-mono text-xs"
+              style={{ '--preview-ip': `${Math.min(40, Math.max(16, ...itemsOfTab(activeTab).map((i) => i.indicator.length + 1)))}ch` } as React.CSSProperties}
+            >
               {(() => {
                 const currentItems = itemsOfTab(activeTab);
                 if (currentItems.length === 0) {
@@ -655,18 +670,36 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
                 return currentItems.map((item, idx) => {
                   const rep = cti[item.indicator];
                   const skipped = skipLegit && rep?.verdict === 'legit' && item.category === 'new';
+                  const index = preview.items.indexOf(item);
+                  if (editingIndex === index) {
+                    return (
+                      <div key={idx} className="preview-row">
+                        <form className="preview-row__edit" onSubmit={(e) => { e.preventDefault(); void applyEdit(index, editValue); }}>
+                          <input
+                            className="field font-mono"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Escape') setEditingIndex(null); }}
+                            aria-label={`Corrigir ${item.indicator}`}
+                            autoFocus
+                          />
+                          <button type="submit" className="btn btn--sm btn--primary" disabled={isAnalyzing}>Salvar</button>
+                          <button type="button" className="btn btn--sm" onClick={() => setEditingIndex(null)}>Cancelar</button>
+                        </form>
+                        <span />
+                      </div>
+                    );
+                  }
                   return (
                     <div key={idx} className={`preview-row ${skipped ? 'opacity-50' : ''}`}>
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="font-semibold text-white truncate">{item.indicator}</span>
-                        {item.original !== item.indicator && (
-                          <span className="text-[11px] text-slate-500 font-sans truncate">original: {item.original}</span>
-                        )}
-                        <span className="data-tag">{item.type.replace('_', ' ')}</span>
-                        {rep && <CtiInline summary={rep} />}
+                      <div className="preview-row__ip">
+                        <b title={item.indicator}>{item.indicator}</b>
+                        {item.original !== item.indicator && <small title={item.original}>original: {item.original}</small>}
                       </div>
+                      <span className="data-tag justify-self-start">{item.type.replace('_', ' ')}</span>
+                      {rep ? <CtiInline summary={rep} /> : <span />}
 
-                      <div className="font-sans text-xs shrink-0">
+                      <div className="font-sans text-xs text-right">
                         {item.category === 'new' && (skipped ? <span className="text-sky-300">Legítimo · não será gravado</span> : <span className="text-emerald-400">Será gravado</span>)}
                         {item.category === 'dup_in_file' && <span className="text-slate-400">Repetido no arquivo</span>}
                         {item.category === 'already_exists' && <span className="text-slate-400">{importMode === 'replace' ? 'Já está na lista · continua' : 'Já está na lista'}</span>}
@@ -677,20 +710,35 @@ export const WeeklyImportView: React.FC<WeeklyImportViewProps> = ({
                           <span className="text-rose-400">Exceção <span className="font-mono">{item.exceptionHit}</span></span>
                         )}
                         {item.category === 'invalid' && (
-                          <span className="flex items-center gap-2">
-                            <span className="text-rose-400">{item.error}</span>
-                            <button type="button" onClick={() => handleRemoveInvalidItem(item)} className="btn btn--sm btn--icon btn--quiet" title="Remover esta linha" aria-label={`Remover ${item.indicator}`}>
-                              <Trash2 aria-hidden="true" />
-                            </button>
-                          </span>
+                          <span className="text-rose-400">{item.error}</span>
                         )}
                         {item.category === 'reserved_warning' && <span className="text-amber-400">{item.reservedReason}</span>}
+                      </div>
+                      <div className="preview-row__actions">
+                        <button type="button" onClick={() => { setEditingIndex(index); setEditValue(item.indicator); }} disabled={isAnalyzing} className="btn btn--sm btn--icon btn--quiet" title="Corrigir" aria-label={`Corrigir ${item.indicator}`}>
+                          <Pencil aria-hidden="true" />
+                        </button>
+                        <button type="button" onClick={() => void applyEdit(index, null)} disabled={isAnalyzing} className="btn btn--sm btn--icon btn--quiet" title="Tirar do lote" aria-label={`Tirar ${item.indicator} do lote`}>
+                          <Trash2 aria-hidden="true" />
+                        </button>
                       </div>
                     </div>
                   );
                 });
               })()}
             </div>
+            <form
+              className="preview-add"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!addValue.trim()) return;
+                void applyEdit(preview.items.length, addValue);
+                setAddValue('');
+              }}
+            >
+              <input className="field font-mono text-xs" value={addValue} onChange={(e) => setAddValue(e.target.value)} placeholder="Acrescentar IP, CIDR ou domínio" aria-label="Acrescentar indicador ao lote" />
+              <button type="submit" className="btn btn--sm" disabled={isAnalyzing || !addValue.trim()}><Plus aria-hidden="true" /> Acrescentar</button>
+            </form>
           </div>
         </div>
       )}
