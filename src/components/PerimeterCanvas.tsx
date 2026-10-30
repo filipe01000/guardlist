@@ -23,10 +23,11 @@ const pick = <T,>(list: T[]) => list[Math.floor(Math.random() * list.length)];
 const fakeAddress = () => pick(DOC_NETS) + Math.floor(Math.random() * 250 + 2);
 
 // Anéis segmentados: raio e espessura relativos ao raio base, quantidade de segmentos, lacuna e velocidade.
+// As cores vêm da paleta ativa (variáveis CSS).
 const RINGS = [
-  { r: 1.0, w: 0.17, segs: 5, gap: 0.16, speed: 0.06, c0: '#4aa8ff', c1: '#1d6ff2' },
-  { r: 0.74, w: 0.11, segs: 4, gap: 0.22, speed: -0.1, c0: '#2f6bff', c1: '#3aa0ff' },
-  { r: 0.56, w: 0.03, segs: 24, gap: 0.45, speed: 0.18, c0: '#7dd3fc', c1: '#38bdf8' }
+  { r: 1.0, w: 0.17, segs: 5, gap: 0.16, speed: 0.06, c0: '--pal-ring-1a', c1: '--pal-ring-1b' },
+  { r: 0.74, w: 0.11, segs: 4, gap: 0.22, speed: -0.1, c0: '--pal-ring-2a', c1: '--pal-ring-2b' },
+  { r: 0.56, w: 0.03, segs: 24, gap: 0.45, speed: 0.18, c0: '--pal-hot', c1: '--pal-accent' }
 ];
 
 interface Particle { a: number; d: number; v: number; blocked: boolean; address: string; trail: [number, number][] }
@@ -48,6 +49,13 @@ export const PerimeterCanvas: React.FC<PerimeterCanvasProps> = ({ alarmKey, seal
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
+    const css = getComputedStyle(document.documentElement);
+    const palette = (name: string) => css.getPropertyValue(name).trim();
+    const hot = palette('--pal-hot-rgb');
+    const accent = palette('--pal-accent-rgb');
+    const dot = palette('--pal-dot-rgb');
+    const deep = palette('--pal-deep-rgb');
+    const glint = palette('--pal-glint');
     if (!canvas || !ctx) return;
 
     const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -128,14 +136,14 @@ export const PerimeterCanvas: React.FC<PerimeterCanvasProps> = ({ alarmKey, seal
         const x = d.x * W, y = d.y * H;
         const near = Math.hypot(x - ox, y - oy) / (R * 2.2);
         const alpha = 0.1 + 0.25 * Math.max(0, Math.sin(t * 0.8 + d.p)) * Math.min(1, near);
-        ctx.fillStyle = `rgba(147, 197, 253, ${alpha})`;
+        ctx.fillStyle = `rgba(${dot}, ${alpha})`;
         ctx.fillRect(x, y, 1.6, 1.6);
       }
 
       const halo = ctx.createRadialGradient(ox, oy, 0, ox, oy, R * 1.6);
-      halo.addColorStop(0, `rgba(56, 189, 248, ${0.2 + seal * 0.35})`);
-      halo.addColorStop(0.5, 'rgba(37, 99, 235, 0.08)');
-      halo.addColorStop(1, 'rgba(37, 99, 235, 0)');
+      halo.addColorStop(0, `rgba(${accent}, ${0.2 + seal * 0.35})`);
+      halo.addColorStop(0.5, `rgba(${deep}, 0.08)`);
+      halo.addColorStop(1, `rgba(${deep}, 0)`);
       ctx.fillStyle = halo;
       ctx.beginPath(); ctx.arc(ox, oy, R * 1.6, 0, Math.PI * 2); ctx.fill();
 
@@ -143,14 +151,14 @@ export const PerimeterCanvas: React.FC<PerimeterCanvasProps> = ({ alarmKey, seal
       ctx.save();
       ctx.translate(ox, oy);
       ctx.rotate(t * 0.03 * spin);
-      ctx.strokeStyle = 'rgba(125, 211, 252, 0.22)';
+      ctx.strokeStyle = `rgba(${hot}, 0.22)`;
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(0, 0, R * 1.28, 0, Math.PI * 2 * ease); ctx.stroke();
       for (let i = 0; i < 72; i++) {
         const a = (i / 72) * Math.PI * 2;
         const long = i % 6 === 0;
         const outer = R * (long ? 1.36 : 1.32);
-        ctx.strokeStyle = `rgba(125, 211, 252, ${long ? 0.5 : 0.18})`;
+        ctx.strokeStyle = `rgba(${hot}, ${long ? 0.5 : 0.18})`;
         ctx.beginPath();
         ctx.moveTo(Math.cos(a) * R * 1.28, Math.sin(a) * R * 1.28);
         ctx.lineTo(Math.cos(a) * outer, Math.sin(a) * outer);
@@ -161,10 +169,10 @@ export const PerimeterCanvas: React.FC<PerimeterCanvasProps> = ({ alarmKey, seal
       // Feixe de radar.
       if (!reduce && 'createConicGradient' in ctx) {
         const sweep = ctx.createConicGradient(t * 1.1 * spin, ox, oy);
-        sweep.addColorStop(0, 'rgba(125, 211, 252, 0)');
-        sweep.addColorStop(0.86, 'rgba(125, 211, 252, 0)');
-        sweep.addColorStop(0.995, 'rgba(125, 211, 252, 0.22)');
-        sweep.addColorStop(1, 'rgba(125, 211, 252, 0)');
+        sweep.addColorStop(0, `rgba(${hot}, 0)`);
+        sweep.addColorStop(0.86, `rgba(${hot}, 0)`);
+        sweep.addColorStop(0.995, `rgba(${hot}, 0.22)`);
+        sweep.addColorStop(1, `rgba(${hot}, 0)`);
         ctx.fillStyle = sweep;
         ctx.beginPath(); ctx.arc(ox, oy, R * 1.26, 0, Math.PI * 2); ctx.fill();
       }
@@ -176,12 +184,12 @@ export const PerimeterCanvas: React.FC<PerimeterCanvasProps> = ({ alarmKey, seal
         const gap = ring.gap * (1 - seal);
         const segA = (Math.PI * 2) / ring.segs;
         const g = ctx.createLinearGradient(ox - rr, oy - rr, ox + rr, oy + rr);
-        g.addColorStop(0, state.alarm > 0 ? `rgba(251, 113, 133, ${0.6 + state.alarm * 0.4})` : ring.c0);
-        g.addColorStop(1, ring.c1);
+        g.addColorStop(0, state.alarm > 0 ? `rgba(251, 113, 133, ${0.6 + state.alarm * 0.4})` : palette(ring.c0));
+        g.addColorStop(1, palette(ring.c1));
         ctx.strokeStyle = g;
         ctx.lineWidth = R * ring.w;
         ctx.lineCap = 'butt';
-        ctx.shadowColor = seal > 0 ? 'rgba(125, 211, 252, 0.9)' : 'rgba(56, 189, 248, 0.35)';
+        ctx.shadowColor = seal > 0 ? `rgba(${hot}, 0.9)` : `rgba(${accent}, 0.35)`;
         ctx.shadowBlur = 18 + seal * 30;
         for (let s = 0; s < ring.segs; s++) {
           const start = rot + s * segA + segA * gap * 0.5;
@@ -196,9 +204,9 @@ export const PerimeterCanvas: React.FC<PerimeterCanvasProps> = ({ alarmKey, seal
         h.life -= dt * 1.4;
         if (h.life <= 0) { hits.splice(i, 1); continue; }
         const spread = 0.12 + (1 - h.life) * 0.1;
-        ctx.strokeStyle = h.blocked ? `rgba(251, 113, 133, ${h.life})` : `rgba(125, 211, 252, ${h.life * 0.8})`;
+        ctx.strokeStyle = h.blocked ? `rgba(251, 113, 133, ${h.life})` : `rgba(${hot}, ${h.life * 0.8})`;
         ctx.lineWidth = R * 0.17 * (0.5 + h.life * 0.5);
-        ctx.shadowColor = h.blocked ? 'rgba(244, 63, 94, 0.9)' : 'rgba(56, 189, 248, 0.9)';
+        ctx.shadowColor = h.blocked ? 'rgba(244, 63, 94, 0.9)' : `rgba(${accent}, 0.9)`;
         ctx.shadowBlur = 24;
         ctx.beginPath(); ctx.arc(ox, oy, R, h.a - spread, h.a + spread); ctx.stroke();
         ctx.shadowBlur = 0;
@@ -238,11 +246,11 @@ export const PerimeterCanvas: React.FC<PerimeterCanvasProps> = ({ alarmKey, seal
         ctx.lineCap = 'round';
         for (let k = 1; k < p.trail.length; k++) {
           const a = k / p.trail.length;
-          ctx.strokeStyle = p.blocked ? `rgba(251, 146, 160, ${a * 0.8})` : `rgba(125, 211, 252, ${a * 0.8})`;
+          ctx.strokeStyle = p.blocked ? `rgba(251, 146, 160, ${a * 0.8})` : `rgba(${hot}, ${a * 0.8})`;
           ctx.lineWidth = 2.2 * a;
           ctx.beginPath(); ctx.moveTo(p.trail[k - 1][0], p.trail[k - 1][1]); ctx.lineTo(p.trail[k][0], p.trail[k][1]); ctx.stroke();
         }
-        ctx.fillStyle = p.blocked ? '#fecdd3' : '#e0f2fe';
+        ctx.fillStyle = p.blocked ? '#fecdd3' : glint;
         ctx.beginPath(); ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
       }
 
@@ -261,7 +269,7 @@ export const PerimeterCanvas: React.FC<PerimeterCanvasProps> = ({ alarmKey, seal
         const lh = lw * (740 / 640);
         ctx.save();
         ctx.globalAlpha = ease;
-        ctx.shadowColor = 'rgba(56, 189, 248, 0.6)';
+        ctx.shadowColor = `rgba(${accent}, 0.6)`;
         ctx.shadowBlur = 30 + seal * 40;
         ctx.drawImage(logo, ox - lw / 2, oy - lh / 2, lw, lh);
         ctx.restore();

@@ -1,30 +1,7 @@
 /* Fundo de faixas de luz e painéis de vidro fosco. Carregado por último (App.tsx) para valer sobre os estilos de cada tela. */
 
 :root {
-  --glass: rgba(12, 28, 58, 0.52);
-  --glass-strong: rgba(10, 24, 50, 0.86);
-  --glass-line: rgba(148, 197, 255, 0.13);
-  --glass-line-hover: rgba(148, 197, 255, 0.24);
-  --glass-hi: rgba(255, 255, 255, 0.055);
   --glass-blur: blur(18px) saturate(135%);
-  --ambient-streak: 37, 150, 235;
-  --ambient-hot: 125, 211, 252;
-  --ambient-strength: 0.75;
-  --ambient-mark: 0.11;
-  --ambient-mark-blend: screen;
-}
-
-:root[data-theme="light"] {
-  --glass: rgba(255, 255, 255, 0.62);
-  --glass-strong: rgba(255, 255, 255, 0.92);
-  --glass-line: rgba(15, 40, 80, 0.09);
-  --glass-line-hover: rgba(15, 40, 80, 0.18);
-  --glass-hi: rgba(255, 255, 255, 0.7);
-  --ambient-streak: 59, 130, 246;
-  --ambient-hot: 147, 197, 253;
-  --ambient-strength: 0.55;
-  --ambient-mark: 0.09;
-  --ambient-mark-blend: multiply;
 }
 
 /* ---------- Fundo ---------- */

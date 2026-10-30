@@ -244,11 +244,11 @@ const shell = (title: string, body: string, canonical?: string) => `<!doctype ht
 <link rel="icon" type="image/png" href="/brand/guardlist-mark.png">
 <style>
 :root { color-scheme: dark; }
-body { margin: 0; background: #050d1f; color: #c0cee4; font: 16px/1.6 "Segoe UI", system-ui, sans-serif; }
+body { margin: 0; background: #0E0D15; color: #D5CCD8; font: 16px/1.6 "Segoe UI", system-ui, sans-serif; }
 main { box-sizing: border-box; max-width: 760px; margin: 0 auto; padding: 40px 20px; }
-h1, h2 { color: #f1f6fd; line-height: 1.25; }
-a { color: #5bb9ff; }
-code { font-family: Consolas, monospace; font-size: .9em; color: #f1f6fd; }
+h1, h2 { color: #F3F0F6; line-height: 1.25; }
+a { color: #BFA9BA; }
+code { font-family: Consolas, monospace; font-size: .9em; color: #F3F0F6; }
 </style>
 </head>
 <body><main>${body}</main></body>

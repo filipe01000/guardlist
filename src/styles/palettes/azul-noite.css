@@ -1,0 +1,130 @@
+/* Paleta Azul-noite (a anterior, guardada): fundo profundo, painéis navy e azul-ciano de destaque.
+   Só as cores ficam aqui: para trocar de paleta, mude o @import no topo de src/index.css.
+   As paletas precisam ter os mesmos tokens (server/palettes.test.ts confere). */
+
+:root {
+  --app-bg: #050d1f;
+  --sidebar: #07132b;
+  --surface: #0a1a36;
+  --surface-raised: #0e2244;
+  --surface-subtle: #071429;
+  --line: #17305a;
+  --line-strong: #24467c;
+  --text: #f1f6fd;
+  --text-soft: #c0cee4;
+  --muted: #8094b6;
+  --accent: #2ea6ff;
+  --action: #2ea6ff;
+  --action-hover: #5bb9ff;
+  --action-text: #04132b;
+  --accent-soft: rgba(46, 166, 255, 0.12);
+  --danger: #ff6b7a;
+  --warning: #f2b04f;
+  --success: #3fd69b;
+  --glass: rgba(12, 28, 58, 0.52);
+  --glass-strong: rgba(10, 24, 50, 0.86);
+  --glass-line: rgba(148, 197, 255, 0.13);
+  --glass-line-hover: rgba(148, 197, 255, 0.24);
+  --glass-hi: rgba(255, 255, 255, 0.055);
+  --ambient-streak: 37, 150, 235;
+  --ambient-hot: 125, 211, 252;
+  --ambient-strength: 0.75;
+  --ambient-mark: 0.11;
+  --ambient-mark-blend: screen;
+  --pal-stage-text: #eef5ff;
+  --pal-stage-soft: #b6c6df;
+  --pal-stage-muted: #7c90b2;
+  --pal-action-rgb: 46, 166, 255;
+  --pal-stage-glow: #15387d;
+  --pal-stage-1: #0f2a62;
+  --pal-stage-2: #0b1e48;
+  --pal-stage-3: #08163a;
+  --pal-veil-1-rgb: 8, 22, 58;
+  --pal-veil-2-rgb: 3, 9, 22;
+  --pal-veil-3-rgb: 6, 16, 40;
+  --pal-deep: #2563eb;
+  --pal-deep-rgb: 37, 99, 235;
+  --pal-line-rgb: 148, 197, 255;
+  --pal-accent: #38bdf8;
+  --pal-accent-rgb: 56, 189, 248;
+  --pal-hot: #7dd3fc;
+  --pal-hot-rgb: 125, 211, 252;
+  --pal-hot-soft: #bae6fd;
+  --pal-glint: #e0f2fe;
+  --pal-submit-1: #4fb3ff;
+  --pal-submit-2: #1d87f0;
+  --pal-submit-text: #04132b;
+  --pal-submit-glow-rgb: 29, 135, 240;
+  --pal-ring-1a: #4aa8ff;
+  --pal-ring-1b: #1d6ff2;
+  --pal-ring-2a: #2f6bff;
+  --pal-ring-2b: #3aa0ff;
+  --pal-dot-rgb: 147, 197, 253;
+  --pal-avatar-1: #2ea6ff;
+  --pal-avatar-2: #0b3d8c;
+  --pal-cover-1: #10284f;
+  --pal-cover-2: #081733;
+  --pal-cover-shade-rgb: 6, 16, 36;
+  --pal-cover-chip-rgb: 8, 20, 42;
+  --pal-cover-text: #cfe2ff;
+  --pal-cover-text-soft: #dbe7f7;
+}
+
+:root[data-theme="light"] {
+  --app-bg: #f2f6fb;
+  --sidebar: #ffffff;
+  --surface: #ffffff;
+  --surface-raised: #f5f7fa;
+  --surface-subtle: #edf1f5;
+  --line: #d6e1ee;
+  --line-strong: #b4c4d8;
+  --text: #0b1a33;
+  --text-soft: #2c3f5c;
+  --muted: #5a6c87;
+  --accent: #0a6fc2;
+  --action: #0a6fc2;
+  --action-hover: #085a9e;
+  --action-text: #ffffff;
+  --accent-soft: rgba(10, 111, 194, 0.1);
+  --danger: #b4233c;
+  --warning: #9a5b08;
+  --success: #167653;
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.92);
+  --glass-line: rgba(15, 40, 80, 0.09);
+  --glass-line-hover: rgba(15, 40, 80, 0.18);
+  --glass-hi: rgba(255, 255, 255, 0.7);
+  --ambient-streak: 59, 130, 246;
+  --ambient-hot: 147, 197, 253;
+  --ambient-strength: 0.55;
+  --ambient-mark: 0.09;
+  --ambient-mark-blend: multiply;
+  --pal-band: #e6f2fd;
+}
+
+/* Tela de entrada: tem cores próprias, nos dois temas. */
+.gl-entry {
+  --gl-panel: rgba(10, 18, 36, 0.58);
+  --gl-panel-glow: rgba(37, 99, 235, 0.10);
+  --gl-field-bg: rgba(255, 255, 255, 0.045);
+  --gl-field-line: rgba(148, 197, 255, 0.18);
+  --gl-text: #eef5ff;
+  --gl-soft: #b6c6df;
+  --gl-muted: #7c90b2;
+  --gl-accent: #38bdf8;
+  --gl-accent-hot: #7dd3fc;
+  --gl-danger: #fb7185;
+}
+
+:root[data-theme="light"] .gl-entry {
+  --gl-panel: rgba(244, 248, 253, 0.66);
+  --gl-panel-glow: rgba(37, 99, 235, 0.08);
+  --gl-field-bg: #ffffff;
+  --gl-field-line: rgba(14, 60, 120, 0.18);
+  --gl-text: #0b1a33;
+  --gl-soft: #33476a;
+  --gl-muted: #5a6c87;
+  --gl-accent: #0a6fc2;
+  --gl-accent-hot: #0284c7;
+  --gl-danger: #be123c;
+}

@@ -2,32 +2,32 @@
 name: GuardList
 description: Perímetro operacional para manutenção e investigação de blocklists isoladas por cliente.
 colors:
-  night-bg: "#050d1f"
-  night-sidebar: "#07132b"
-  night-surface: "#0a1a36"
-  night-surface-raised: "#0e2244"
-  night-surface-subtle: "#071429"
-  night-line: "#17305a"
-  night-line-strong: "#24467c"
-  night-text: "#f1f6fd"
-  night-text-soft: "#c0cee4"
-  night-muted: "#8094b6"
-  night-action: "#2ea6ff"
-  night-action-hover: "#5bb9ff"
-  night-action-text: "#04132b"
-  night-accent-soft: "rgba(46, 166, 255, 0.12)"
-  day-bg: "#f2f6fb"
+  night-bg: "#0E0D15"
+  night-sidebar: "#11121E"
+  night-surface: "#182346"
+  night-surface-raised: "#1F2D58"
+  night-surface-subtle: "#131A35"
+  night-line: "#2C3C68"
+  night-line-strong: "#3D5387"
+  night-text: "#F3F0F6"
+  night-text-soft: "#D5CCD8"
+  night-muted: "#9EA4C8"
+  night-action: "#BFA9BA"
+  night-action-hover: "#D3C2CF"
+  night-action-text: "#0E0D15"
+  night-accent-soft: "rgba(191, 169, 186, 0.14)"
+  day-bg: "#F1EEF3"
   day-surface: "#ffffff"
-  day-surface-raised: "#f5f7fa"
-  day-line: "#d6e1ee"
-  day-text: "#0b1a33"
-  day-muted: "#5a6c87"
-  day-action: "#0a6fc2"
-  day-action-hover: "#085a9e"
-  glass-night: "rgba(12, 28, 58, 0.52)"
+  day-surface-raised: "#F6F3F7"
+  day-line: "#DAD4E0"
+  day-text: "#182346"
+  day-muted: "#5D6389"
+  day-action: "#3D5387"
+  day-action-hover: "#182346"
+  glass-night: "rgba(24, 35, 70, 0.52)"
   glass-day: "rgba(255, 255, 255, 0.62)"
-  glass-line-night: "rgba(148, 197, 255, 0.13)"
-  cyan-hot: "#7dd3fc"
+  glass-line-night: "rgba(191, 169, 186, 0.13)"
+  cyan-hot: "#D9CCD6"
   danger: "#ff6b7a"
   warning: "#f2b04f"
   success: "#3fd69b"
@@ -118,6 +118,8 @@ components:
 ---
 
 # Design System: GuardList
+
+> **Paletas:** as cores ficam em `src/styles/palettes/`. A ativa é a Evening Mix (`evening-mix.css`); a anterior, Azul-noite, está guardada em `azul-noite.css`. Para trocar, mude o `@import` no topo de `src/index.css`. Os valores do cabeçalho acima são os da paleta ativa; menções a azul ou ciano no texto abaixo descrevem a Azul-noite. Vermelho, âmbar e verde ficam fora da paleta de marca: são alertas.
 
 ## Overview
 

@@ -7,7 +7,7 @@
   --sb-divider: var(--line);
   --sb-surface: var(--surface-raised);
   --sb-surface-hover: var(--surface-subtle);
-  --sb-tooltip-bg: #0e2244;
+  --sb-tooltip-bg: var(--surface-raised);
   --sb-tooltip-text: #ffffff;
   --sb-gap: 24px;
   --sb-width: 280px;
@@ -29,8 +29,8 @@
 
 :root[data-theme="light"] {
   --sb-card: #ffffff;
-  --sb-band: #e6f2fd;
-  --sb-band-text: #0a6fc2;
+  --sb-band: var(--pal-band);
+  --sb-band-text: var(--accent);
   --sb-divider: #edeef2;
   --sb-surface: #f2f4f7;
   --sb-surface-hover: #eaeaec;
@@ -196,7 +196,7 @@
   height: var(--sb-avatar);
   border-radius: 50%;
   border: 3px solid var(--sb-card);
-  background: linear-gradient(140deg, #2ea6ff, #0b3d8c);
+  background: linear-gradient(140deg, var(--pal-avatar-1), var(--pal-avatar-2));
   color: #fff;
   font-size: 0.8rem;
   font-weight: 750;

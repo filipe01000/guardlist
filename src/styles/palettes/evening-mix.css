@@ -1,0 +1,130 @@
+/* Paleta Evening Mix (ativa): #0E0D15, #182346, #3D5387, #7C83AD e #BFA9BA.
+   Só as cores ficam aqui: para trocar de paleta, mude o @import no topo de src/index.css.
+   As paletas precisam ter os mesmos tokens (server/palettes.test.ts confere). */
+
+:root {
+  --app-bg: #0E0D15;
+  --sidebar: #11121E;
+  --surface: #182346;
+  --surface-raised: #1F2D58;
+  --surface-subtle: #131A35;
+  --line: #2C3C68;
+  --line-strong: #3D5387;
+  --text: #F3F0F6;
+  --text-soft: #D5CCD8;
+  --muted: #9EA4C8;
+  --accent: #BFA9BA;
+  --action: #BFA9BA;
+  --action-hover: #D3C2CF;
+  --action-text: #0E0D15;
+  --accent-soft: rgba(191, 169, 186, 0.14);
+  --danger: #ff6b7a;
+  --warning: #f2b04f;
+  --success: #3fd69b;
+  --glass: rgba(24, 35, 70, 0.52);
+  --glass-strong: rgba(24, 35, 70, 0.86);
+  --glass-line: rgba(191, 169, 186, 0.13);
+  --glass-line-hover: rgba(191, 169, 186, 0.24);
+  --glass-hi: rgba(255, 255, 255, 0.055);
+  --ambient-streak: 61, 83, 135;
+  --ambient-hot: 217, 204, 214;
+  --ambient-strength: 0.75;
+  --ambient-mark: 0.11;
+  --ambient-mark-blend: screen;
+  --pal-stage-text: #F3F0F6;
+  --pal-stage-soft: #D5CCD8;
+  --pal-stage-muted: #9EA4C8;
+  --pal-action-rgb: 191, 169, 186;
+  --pal-stage-glow: #1F2D58;
+  --pal-stage-1: #182346;
+  --pal-stage-2: #121A36;
+  --pal-stage-3: #0E0D15;
+  --pal-veil-1-rgb: 14, 13, 21;
+  --pal-veil-2-rgb: 14, 13, 21;
+  --pal-veil-3-rgb: 14, 13, 21;
+  --pal-deep: #3D5387;
+  --pal-deep-rgb: 61, 83, 135;
+  --pal-line-rgb: 191, 169, 186;
+  --pal-accent: #BFA9BA;
+  --pal-accent-rgb: 191, 169, 186;
+  --pal-hot: #D9CCD6;
+  --pal-hot-rgb: 217, 204, 214;
+  --pal-hot-soft: #D9CCD6;
+  --pal-glint: #EDE6EB;
+  --pal-submit-1: #D3C2CF;
+  --pal-submit-2: #BFA9BA;
+  --pal-submit-text: #0E0D15;
+  --pal-submit-glow-rgb: 191, 169, 186;
+  --pal-ring-1a: #7C83AD;
+  --pal-ring-1b: #3D5387;
+  --pal-ring-2a: #3D5387;
+  --pal-ring-2b: #7C83AD;
+  --pal-dot-rgb: 191, 169, 186;
+  --pal-avatar-1: #7C83AD;
+  --pal-avatar-2: #3D5387;
+  --pal-cover-1: #1F2D58;
+  --pal-cover-2: #121A36;
+  --pal-cover-shade-rgb: 14, 13, 21;
+  --pal-cover-chip-rgb: 14, 13, 21;
+  --pal-cover-text: #D9CCD6;
+  --pal-cover-text-soft: #EDE6EB;
+}
+
+:root[data-theme="light"] {
+  --app-bg: #F1EEF3;
+  --sidebar: #ffffff;
+  --surface: #ffffff;
+  --surface-raised: #F6F3F7;
+  --surface-subtle: #EBE7EE;
+  --line: #DAD4E0;
+  --line-strong: #BFA9BA;
+  --text: #182346;
+  --text-soft: #2F3C66;
+  --muted: #5D6389;
+  --accent: #3D5387;
+  --action: #3D5387;
+  --action-hover: #182346;
+  --action-text: #ffffff;
+  --accent-soft: rgba(61, 83, 135, 0.1);
+  --danger: #b4233c;
+  --warning: #9a5b08;
+  --success: #167653;
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.92);
+  --glass-line: rgba(24, 35, 70, 0.09);
+  --glass-line-hover: rgba(24, 35, 70, 0.18);
+  --glass-hi: rgba(255, 255, 255, 0.7);
+  --ambient-streak: 124, 131, 173;
+  --ambient-hot: 191, 169, 186;
+  --ambient-strength: 0.55;
+  --ambient-mark: 0.09;
+  --ambient-mark-blend: multiply;
+  --pal-band: #ECE6EE;
+}
+
+/* Tela de entrada: tem cores próprias, nos dois temas. */
+.gl-entry {
+  --gl-panel: rgba(14, 13, 21, 0.58);
+  --gl-panel-glow: rgba(61, 83, 135, 0.10);
+  --gl-field-bg: rgba(255, 255, 255, 0.045);
+  --gl-field-line: rgba(191, 169, 186, 0.18);
+  --gl-text: #F3F0F6;
+  --gl-soft: #D5CCD8;
+  --gl-muted: #9EA4C8;
+  --gl-accent: #BFA9BA;
+  --gl-accent-hot: #D9CCD6;
+  --gl-danger: #fb7185;
+}
+
+:root[data-theme="light"] .gl-entry {
+  --gl-panel: rgba(246, 243, 247, 0.72);
+  --gl-panel-glow: rgba(61, 83, 135, 0.08);
+  --gl-field-bg: #ffffff;
+  --gl-field-line: rgba(24, 35, 70, 0.18);
+  --gl-text: #182346;
+  --gl-soft: #2F3C66;
+  --gl-muted: #5D6389;
+  --gl-accent: #3D5387;
+  --gl-accent-hot: #3D5387;
+  --gl-danger: #be123c;
+}

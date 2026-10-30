@@ -1742,24 +1742,24 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
 }
 .logo-preview img { width: 100%; height: 100%; padding: 14px 20px; background: #fff; object-fit: contain; }
 
-/* Capa sempre em azul-noite (nos dois temas): as logos dos sites costumam ser feitas para fundo
+/* Capa sempre escura (nos dois temas): as logos dos sites costumam ser feitas para fundo
    escuro, e o nome em degradê claro fica legível em qualquer tema. */
 .cl-card__cover,
 .cl-card__cover.has-logo {
   background:
     radial-gradient(120% 90% at 85% 0%, color-mix(in srgb, var(--cl-tone) 26%, transparent), transparent 60%),
-    linear-gradient(160deg, #10284f 0%, #081733 100%);
+    linear-gradient(160deg, var(--pal-cover-1) 0%, var(--pal-cover-2) 100%);
   border-bottom-color: rgb(255 255 255 / 0.06);
 }
 .cl-card__cover::after {
-  background: linear-gradient(180deg, transparent 35%, rgb(6 16 36 / 0.85) 100%);
+  background: linear-gradient(180deg, transparent 35%, rgba(var(--pal-cover-shade-rgb), 0.85) 100%);
 }
 .cl-card__cover img { opacity: 0.42; }
-.cl-card__initials { color: #cfe2ff; opacity: 0.2; }
+.cl-card__initials { color: var(--pal-cover-text); opacity: 0.2; }
 .cl-card__cover .cl-card__status {
   border-color: rgb(255 255 255 / 0.12);
-  background: rgb(8 20 42 / 0.72);
-  color: #dbe7f7;
+  background: rgba(var(--pal-cover-chip-rgb), 0.72);
+  color: var(--pal-cover-text-soft);
   backdrop-filter: blur(6px);
 }
 
@@ -1798,7 +1798,7 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
 .cl-card__initials {
   max-width: 100%;
   overflow: hidden;
-  color: #cfe2ff;
+  color: var(--pal-cover-text);
   font-size: 1.25rem;
   font-weight: 750;
   letter-spacing: 0.04em;

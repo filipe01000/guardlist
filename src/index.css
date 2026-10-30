@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Paleta ativa. A anterior está guardada em ./styles/palettes/azul-noite.css: basta trocar esta linha. */
+@import "./styles/palettes/evening-mix.css";
 
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
@@ -10,47 +12,10 @@
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  /* Paleta azul-noite (identidade Horus Line): fundo profundo, painéis navy e azul-ciano de destaque. */
-  --app-bg: #050d1f;
-  --sidebar: #07132b;
-  --surface: #0a1a36;
-  --surface-raised: #0e2244;
-  --surface-subtle: #071429;
-  --line: #17305a;
-  --line-strong: #24467c;
-  --text: #f1f6fd;
-  --text-soft: #c0cee4;
-  --muted: #8094b6;
-  --accent: #2ea6ff;
-  --action: #2ea6ff;
-  --action-hover: #5bb9ff;
-  --action-text: #04132b;
-  --accent-soft: rgba(46, 166, 255, 0.12);
-  --danger: #ff6b7a;
-  --warning: #f2b04f;
-  --success: #3fd69b;
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --app-bg: #f2f6fb;
-  --sidebar: #ffffff;
-  --surface: #ffffff;
-  --surface-raised: #f5f7fa;
-  --surface-subtle: #edf1f5;
-  --line: #d6e1ee;
-  --line-strong: #b4c4d8;
-  --text: #0b1a33;
-  --text-soft: #2c3f5c;
-  --muted: #5a6c87;
-  --accent: #0a6fc2;
-  --action: #0a6fc2;
-  --action-hover: #085a9e;
-  --action-text: #ffffff;
-  --accent-soft: rgba(10, 111, 194, 0.1);
-  --danger: #b4233c;
-  --warning: #9a5b08;
-  --success: #167653;
 }
 
 * {
@@ -338,7 +303,7 @@ a {
 .app-shell button[class*="bg-cyan-600"],
 .app-shell button[class*="bg-emerald-600"],
 .app-shell button[class*="bg-indigo-600"] {
-  border-color: rgba(46, 166, 255, 0.42) !important;
+  border-color: rgba(var(--pal-action-rgb), 0.42) !important;
   background-color: #0f3d78 !important;
   color: #eef7ff !important;
 }
@@ -359,12 +324,12 @@ a {
 
 .app-shell [class*="border-purple-"],
 .app-shell [class*="border-cyan-"] {
-  border-color: rgba(46, 166, 255, 0.36) !important;
+  border-color: rgba(var(--pal-action-rgb), 0.36) !important;
 }
 
 .app-shell [class*="bg-purple-"],
 .app-shell [class*="bg-cyan-"] {
-  background-color: rgba(46, 166, 255, 0.1) !important;
+  background-color: rgba(var(--pal-action-rgb), 0.1) !important;
 }
 
 .app-shell details > summary {

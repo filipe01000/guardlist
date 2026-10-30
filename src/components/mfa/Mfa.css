@@ -3,11 +3,11 @@
 
 .gl-mfa {
   --mfa-field: var(--gl-field-bg, var(--surface-subtle, rgba(255, 255, 255, 0.045)));
-  --mfa-line: var(--gl-field-line, var(--line-strong, rgba(148, 197, 255, 0.18)));
-  --mfa-text: var(--gl-text, var(--text, #f1f6fd));
-  --mfa-muted: var(--gl-muted, var(--muted, #8094b6));
-  --mfa-accent: var(--gl-accent, var(--action, #2ea6ff));
-  --mfa-danger: var(--gl-danger, var(--danger, #ff6b7a));
+  --mfa-line: var(--gl-field-line, var(--line-strong, rgba(var(--pal-line-rgb), 0.18)));
+  --mfa-text: var(--gl-text, var(--text));
+  --mfa-muted: var(--gl-muted, var(--muted));
+  --mfa-accent: var(--gl-accent, var(--action));
+  --mfa-danger: var(--gl-danger, var(--danger));
 }
 
 .gl-mfa__slots {
@@ -33,7 +33,7 @@
 .gl-mfa__slots input:focus {
   outline: none;
   border-color: var(--mfa-accent);
-  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.16);
+  box-shadow: 0 0 0 4px rgba(var(--pal-accent-rgb), 0.16);
 }
 
 .gl-mfa__slots input.is-filled { border-color: color-mix(in srgb, var(--mfa-accent) 55%, transparent); }
@@ -51,9 +51,9 @@
   position: fixed;
   z-index: 60;
   translate: -50% -50%;
-  color: #7dd3fc;
+  color: var(--pal-hot);
   font: 600 24px var(--font-mono);
-  text-shadow: 0 0 12px rgba(56, 189, 248, 0.9);
+  text-shadow: 0 0 12px rgba(var(--pal-accent-rgb), 0.9);
   pointer-events: none;
 }
 
@@ -80,7 +80,7 @@
   height: 3px;
   overflow: hidden;
   border-radius: 3px;
-  background: rgba(148, 197, 255, 0.15);
+  background: rgba(var(--pal-line-rgb), 0.15);
 }
 
 .gl-mfa__timer i {
