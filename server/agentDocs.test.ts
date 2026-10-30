@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import test, { type TestContext } from 'node:test';
 import express from 'express';
-import { agentRouter, HOME, notFound, pageMarkdown, STATIC_HOME_MARK, staticHome } from './agentDocs.ts';
+import { ABOUT, agentRouter, CONTACT, HEAD_MARK, headTags, HOME, notFound, pageHtml, pageMarkdown, PRIVACY, STATIC_HOME_MARK, staticHome } from './agentDocs.ts';
 
 const ORIGIN = 'https://guardlist.example';
 
@@ -29,7 +29,27 @@ test('home: mais de 500 caracteres em HTML puro, H1 e títulos em sequência', (
 test('index.html: conteúdo dentro de #root e escondido só com JavaScript', () => {
   const index = readFileSync('index.html', 'utf8');
   assert.ok(index.includes(`<div id="root">${STATIC_HOME_MARK}</div>`));
+  assert.ok(index.includes(HEAD_MARK));
   assert.match(index, /<noscript><style>\.gl-static \{ visibility: visible;/);
+});
+
+test('home: URL canônica e JSON-LD válido', () => {
+  const head = headTags(ORIGIN);
+  assert.ok(head.includes(`<link rel="canonical" href="${ORIGIN}/" />`));
+  const data = JSON.parse(head.match(/<script type="application\/ld\+json">(.*)<\/script>/)![1]);
+  assert.equal(data['@type'], 'SoftwareApplication');
+  assert.equal(data.name, 'GuardList');
+  assert.equal(data.url, `${ORIGIN}/`);
+});
+
+test('páginas de confiança: mais de 500 caracteres em HTML, com URL canônica', async (t) => {
+  const get = await start(t);
+  for (const [path, page] of [['/about', ABOUT], ['/contact', CONTACT], ['/privacy', PRIVACY]] as const) {
+    assert.ok(pageHtml(page).replace(/<[^>]+>/g, '').length >= 500, path);
+    const html = await (await get(path, 'text/html')).text();
+    assert.ok(html.includes(`<link rel="canonical" href="${ORIGIN}${path}">`), path);
+    assert.match((await get(path, 'text/markdown')).headers.get('content-type')!, /^text\/markdown/);
+  }
 });
 
 test('home: negocia Markdown e mantém HTML', async (t) => {
@@ -65,6 +85,7 @@ test('arquivos para máquinas', async (t) => {
   const llms = await (await get('/llms.txt')).text();
   assert.match(llms, /^# GuardList\n\n> /);
   assert.ok(llms.includes(`${ORIGIN}/openapi.json`));
+  assert.match(llms, /## Quando usar/);
 
   const spec = await (await get('/openapi.json')).json();
   assert.equal(spec.openapi, '3.1.0');
@@ -76,13 +97,23 @@ test('arquivos para máquinas', async (t) => {
     assert.match(path, /^\/(healthz|api\/auth\/)/);
   }
 
+  // Pronta para chamada de função: id único, descrição e resposta tipada em toda operação.
+  const operations = Object.values(spec.paths).flatMap((p) => Object.values(p as object)) as Array<Record<string, any>>;
+  assert.equal(new Set(operations.map((o) => o.operationId)).size, operations.length);
+  for (const op of operations) {
+    assert.ok(op.description, op.operationId);
+    assert.ok(Object.values(op.responses as object).every((r: any) => r.content), op.operationId);
+  }
+  assert.ok(spec.components.headers.RetryAfter);
+
   const robots = await (await get('/robots.txt')).text();
   assert.match(robots, /Disallow: \/api\//);
   assert.ok(robots.includes(`Sitemap: ${ORIGIN}/sitemap.xml`));
 
   const sitemap = await get('/sitemap.xml');
   assert.match(sitemap.headers.get('content-type')!, /xml/);
-  assert.ok((await sitemap.text()).includes(`<loc>${ORIGIN}/docs</loc>`));
+  const map = await sitemap.text();
+  for (const path of ['/', '/docs', '/about', '/contact', '/privacy']) assert.ok(map.includes(`<loc>${ORIGIN}${path}</loc><lastmod>`), path);
 
   const docs = await get('/docs', 'text/html');
   assert.match(await docs.text(), /<title>[^<]*GuardList/);

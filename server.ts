@@ -9,8 +9,9 @@ import { createSessionToken, createStepToken, hashSessionId, readSession, readSt
 import { createMfa } from './server/mfa/service.ts';
 import { aiConfigured, aiSettings, createAi, type AiEvent } from './server/ai.ts';
 import { fetchLogoFromSite, LogoError } from './server/logo.ts';
-import { agentRouter, notFound, STATIC_HOME_MARK, staticHome } from './server/agentDocs.ts';
+import { agentRouter, headTags, HEAD_MARK, notFound, STATIC_HOME_MARK, staticHome } from './server/agentDocs.ts';
 import { createCti, ctiConfigured } from './server/cti.ts';
+import { rateLimit } from './server/rateLimit.ts';
 import { classifyIndicator, normalizeIndicator } from './src/utils/validator.ts';
 import { openDatabase } from './server/db.ts';
 import { createJobs } from './server/jobs.ts';
@@ -91,31 +92,6 @@ app.use((req, res, next) => {
 
 // Health check usado pelo Render; fica fora da autenticação.
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
-
-// Limite simples em janela fixa, para proteger a cota das APIs de CTI e o login. Depois do login a conta é
-// por usuário (a equipe toda pode sair pela mesma internet da empresa); antes, por IP.
-function rateLimit(name: string, maxPerWindow: number, windowMs = 60_000): RequestHandler {
-  const hits = new Map<string, { windowStart: number; count: number }>();
-  setInterval(() => {
-    const cutoff = Date.now() - windowMs;
-    for (const [key, entry] of hits) if (entry.windowStart < cutoff) hits.delete(key);
-  }, 60_000).unref();
-
-  return (req, res, next) => {
-    const key = res.locals.userId ? `user:${res.locals.userId}` : `ip:${req.ip || 'unknown'}`;
-    const now = Date.now();
-    const entry = hits.get(key);
-    if (!entry || now - entry.windowStart >= windowMs) {
-      hits.set(key, { windowStart: now, count: 1 });
-      return next();
-    }
-    entry.count += 1;
-    if (entry.count <= maxPerWindow) return next();
-    const retryAfter = Math.ceil((entry.windowStart + windowMs - now) / 1000);
-    res.setHeader('Retry-After', String(retryAfter));
-    return res.status(429).json({ error: `Muitas tentativas (${name}). Tente novamente em ${retryAfter}s.` });
-  };
-}
 
 const abuseSummaryLimit = rateLimit('AbuseIPDB', Number(process.env.ABUSE_SUMMARY_RATE_LIMIT_PER_MIN || 120));
 const loginLimit = rateLimit('login', 20, 15 * 60_000);
@@ -765,7 +741,8 @@ if (production) {
   const indexHtml = readFileSync(path.join(rootDir, 'dist', 'index.html'), 'utf8').replace(STATIC_HOME_MARK, staticHome());
   const sendIndex: RequestHandler = (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
-    res.type('html').send(indexHtml.replaceAll('__APP_ORIGIN__', originFor(req)));
+    const origin = originFor(req);
+    res.type('html').send(indexHtml.replace(HEAD_MARK, headTags(origin)).replaceAll('__APP_ORIGIN__', origin));
   };
 
   app.use(express.static(path.join(rootDir, 'dist'), { index: false }));
