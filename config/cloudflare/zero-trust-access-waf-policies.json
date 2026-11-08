@@ -1,0 +1,136 @@
+{
+  "$schema": "https://developers.cloudflare.com/schemas/zero-trust-reference.json",
+  "Metadata": {
+    "Project": "DonutVault Zero-Knowledge Password Manager",
+    "Phase": "5C - Critical Zero Trust & Private Network Corrections",
+    "OperationalStatus": "NOT_TESTED_IN_CLOUDFLARE_EDGE_PENDING_DEPLOYMENT",
+    "PlannedDomains": {
+      "frontend": "vault.filipeti.com.br",
+      "api": "api-vault.filipeti.com.br",
+      "publicationStatus": "DO_NOT_PUBLISH_YET"
+    }
+  },
+  "DeviceEnrollmentPolicies": {
+    "name": "DonutVault Owner Device Enrollment (WARP Client)",
+    "decision": "allow",
+    "include": [
+      {
+        "email": {
+          "email": "fars290191@gmail.com"
+        }
+      }
+    ],
+    "require": [
+      {
+        "auth_method": {
+          "auth_method": "hwk"
+        }
+      }
+    ],
+    "default_deny_all_others": true
+  },
+  "SplitTunnelConfiguration": {
+    "mode": "exclude_with_explicit_private_cidr_override",
+    "requiredAction": "Remove 10.240.7.10/32 from the default RFC1918 10.0.0.0/8 Split Tunnel Exclude list so WARP routes packets destined for 10.240.7.10/32 through the encrypted WireGuard/MASQUE tunnel."
+  },
+  "GatewayNetworkFirewallPoliciesL4": [
+    {
+      "name": "Allow Owner Enrolled WARP Devices to DonutVault App Port 3000 Only",
+      "Precedence": 1,
+      "action": "allow",
+      "traffic": "net.dst.ip == 10.240.7.10 and net.dst.port == 3000 and net.protocol == \"tcp\"",
+      "identity": "identity.email == \"fars290191@gmail.com\""
+    },
+    {
+      "name": "Block Direct Access to PostgreSQL (5432), SSH (22) and All Other Ports on Private Subnet",
+      "Precedence": 2,
+      "action": "block",
+      "traffic": "net.dst.ip in {10.240.7.0/24}"
+    }
+  ],
+  "OriginHostFirewallPolicy": {
+    "inboundDefault": "DROP (0 public ports open on 0.0.0.0/0)",
+    "postgresqlBinding": "127.0.0.1:5432 or Unix socket /var/run/postgresql (NEVER 0.0.0.0 or 10.240.7.10)",
+    "adminServices": "No public SSH or database admin panels (pgAdmin/Adminer prohibited)"
+  },
+  "ZeroTrustAccessApplications": [
+    {
+      "name": "DonutVault Web Vault (vault.filipeti.com.br)",
+      "domain": "vault.filipeti.com.br",
+      "type": "self_hosted",
+      "session_duration": "12h",
+      "auto_redirect_to_identity": true,
+      "http_only_cookie_attribute": true,
+      "same_site_cookie_attribute": "strict",
+      "jwt_signature_algorithm": "RS256",
+      "jwks_endpoint": "https://filipeti-zero-trust.cloudflareaccess.com/cdn-cgi/access/certs",
+      "policies": [
+        {
+          "name": "Owner Strict Identity + Hardware MFA + Enrolled Device Posture",
+          "decision": "allow",
+          "Precedence": 1,
+          "include": [
+            {
+              "email": {
+                "email": "fars290191@gmail.com"
+              }
+            }
+          ],
+          "require": [
+            {
+              "auth_method": {
+                "auth_method": "hwk"
+              }
+            },
+            {
+              "device_posture": {
+                "integration_uid": "warp-client-enrolled-device-check"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "DonutVault Zero-Knowledge Sync API (api-vault.filipeti.com.br)",
+      "domain": "api-vault.filipeti.com.br",
+      "type": "self_hosted",
+      "session_duration": "12h",
+      "jwt_signature_algorithm": "RS256",
+      "cors_headers": {
+        "allowed_origins": ["https://vault.filipeti.com.br"],
+        "allowed_methods": ["GET", "POST", "OPTIONS"],
+        "allowed_headers": [
+          "Content-Type",
+          "Authorization",
+          "X-Device-Id",
+          "X-User-Uid",
+          "X-CSRF-Token"
+        ],
+        "allow_credentials": true,
+        "max_age": 600
+      },
+      "policies": [
+        {
+          "name": "Require Owner Identity + FIDO2 Passkey + WARP Posture",
+          "decision": "allow",
+          "Precedence": 1,
+          "include": [
+            {
+              "email": {
+                "email": "fars290191@gmail.com"
+              }
+            }
+          ],
+          "require": [
+            {
+              "auth_method": {
+                "auth_method": "hwk"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --font-display: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Neobrutal-UI + DonutVault 90s Cartoon Tokens */
+  --radius: 14px;
+  --box-shadow-x: 4px;
+  --box-shadow-y: 4px;
+  --reverse-box-shadow-x: -4px;
+  --reverse-box-shadow-y: -4px;
+  --base-font-weight: 600;
+  --heading-font-weight: 800;
+
+  --background: #FFFDF2;
+  --secondary-background: #FFFFFF;
+  --foreground: #09090B;
+  --main: #FFD90F;
+  --main-foreground: #09090B;
+  --sky: #38BDF8;
+  --sky-foreground: #09090B;
+  --pink: #FF5CA8;
+  --pink-foreground: #FFFFFF;
+  --border: #09090B;
+  --input: #09090B;
+  --ring: #FF5CA8;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --shadow: var(--box-shadow-x) var(--box-shadow-y) 0px 0px var(--border);
+}
+
+.dark {
+  --background: #0F172A;
+  --secondary-background: #1E293B;
+  --foreground: #F8FAFC;
+  --main: #FFD90F;
+  --main-foreground: #09090B;
+  --sky: #38BDF8;
+  --sky-foreground: #09090B;
+  --pink: #FF5CA8;
+  --pink-foreground: #FFFFFF;
+  --border: #000000;
+  --input: #000000;
+  --ring: #FFD90F;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --shadow: var(--box-shadow-x) var(--box-shadow-y) 0px 0px #000000;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-secondary-background: var(--secondary-background);
+  --color-foreground: var(--foreground);
+  --color-main: var(--main);
+  --color-main-foreground: var(--main-foreground);
+  --color-sky: var(--sky);
+  --color-sky-foreground: var(--sky-foreground);
+  --color-pink: var(--pink);
+  --color-pink-foreground: var(--pink-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --shadow-shadow: var(--shadow);
+  --shadow-brutal-lg: 6px 6px 0px 0px var(--border);
+  --shadow-brutal-sm: 2px 2px 0px 0px var(--border);
+  --shadow-press: 1px 1px 0px 0px var(--border);
+
+  --spacing-boxShadowX: var(--box-shadow-x);
+  --spacing-boxShadowY: var(--box-shadow-y);
+  --spacing-pressX: 3px;
+  --spacing-pressY: 3px;
+
+  --radius-base: var(--radius);
+  --font-weight-base: var(--base-font-weight);
+  --font-weight-heading: var(--heading-font-weight);
+}
+
+@layer base {
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
+  h1, h2, h3, h4, .font-display, .font-heading {
+    font-family: var(--font-display);
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* StreamUI Comic Halftone & Pop-Art Backgrounds */
+.bg-comic-halftone {
+  background-image: radial-gradient(rgba(9, 9, 11, 0.11) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
+}
+
+.dark .bg-comic-halftone {
+  background-image: radial-gradient(rgba(255, 217, 15, 0.12) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
+}
+
+.bg-comic-stripes {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 217, 15, 0.14),
+    rgba(255, 217, 15, 0.14) 10px,
+    transparent 10px,
+    transparent 20px
+  );
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(-1.5deg);
+  }
+}
+
+@keyframes comic-pop {
+  0% {
+    transform: scale(0.85) rotate(-3deg);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.04) rotate(1deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-spin-donut {
+  animation: spin-slow 6s linear infinite;
+}
+
+.animate-float {
+  animation: float-gentle 3.5s ease-in-out infinite;
+}
+
+.animate-comic-pop {
+  animation: comic-pop 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-donut,
+  .animate-float,
+  .animate-comic-pop {
+    animation: none !important;
+  }
+}
+
