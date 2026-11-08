@@ -10,6 +10,12 @@ Node.js 24.22.1. Código identificado como DonutVault 0.9.3 pelo proprietário.
 - Health check: `/healthz`. Verifica o processo sem acordar PostgreSQL a cada sondagem.
 - Auto-deploy: desativado. Não configurar disco, worker ou banco Render.
 - Variáveis: `NODE_ENV=production` e `DATABASE_URL` do Neon como segredo.
+- WebAuthn: o RP ID e a origem são definidos pelo servidor, nunca pelo cliente. No Render,
+  `RENDER_EXTERNAL_URL` já basta. Em domínio próprio, defina `WEBAUTHN_RP_ID` (ex.: `vault.filipeti.com.br`)
+  e `WEBAUTHN_ORIGIN` (ex.: `https://vault.filipeti.com.br`). Em produção sem nenhuma delas, as rotas de
+  passkey respondem 500 em vez de aceitar qualquer origem.
+- Pareamento: um novo dispositivo só entra em conta existente com a sessão de um dispositivo já autorizado
+  (cabeçalhos `Authorization` + `X-Device-Id` ou cookie HttpOnly) ou por passkey.
 - O GuardList usa outro serviço e repositório; não é alterado por este projeto.
 
 ## Banco

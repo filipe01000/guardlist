@@ -27,8 +27,14 @@ export function parseCookieHeader(cookieHeader?: string): Record<string, string>
     const idx = part.indexOf('=');
     if (idx > 0) {
       const k = part.slice(0, idx).trim();
-      const v = decodeURIComponent(part.slice(idx + 1).trim());
-      out[k] = v;
+      const rawValue = part.slice(idx + 1).trim();
+      // decodeURIComponent lança URIError em sequências inválidas (ex.: "%E0").
+      // Como isso roda em middleware assíncrono, o erro derrubava o processo Node.
+      try {
+        out[k] = decodeURIComponent(rawValue);
+      } catch {
+        // Cookie malformado é ignorado; os nossos são sempre codificados corretamente.
+      }
     }
   }
   return out;

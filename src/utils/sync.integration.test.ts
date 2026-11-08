@@ -87,14 +87,18 @@ test('Integração 01 (Fase 4B): Sincronização real PC -> PostgreSQL -> Celula
     sessionToken: pcReg.sessionToken,
   };
 
-  // 3. Registra o Celular no PostgreSQL
-  const mobileReg = await mobileSync.registerDeviceOnBackend(baseUrl, {
-    userUid: homerUserUid,
-    email: 'homer@springfield.nuclear.fake',
-    deviceName: 'Celular DonutPhone Pro',
-    platform: 'mobile-web',
-    authMethod: 'webauthn-passkey',
-  });
+  // 3. Registra o Celular no PostgreSQL, pareado pela sessão já autorizada do PC
+  const mobileReg = await mobileSync.registerDeviceOnBackend(
+    baseUrl,
+    {
+      userUid: homerUserUid,
+      email: 'homer@springfield.nuclear.fake',
+      deviceName: 'Celular DonutPhone Pro',
+      platform: 'mobile-web',
+      authMethod: 'webauthn-passkey',
+    },
+    { deviceId: pcReg.device.deviceId, sessionToken: pcReg.sessionToken }
+  );
   mobileAuth = {
     userUid: homerUserUid,
     deviceId: mobileReg.device.deviceId,

@@ -940,13 +940,22 @@ export default function App() {
     authMethod: 'webauthn-passkey' | 'firebase-oauth' | 'session-token';
   }) => {
     try {
-      const res = await syncAdapterRef.current.registerDeviceOnBackend('', {
-        userUid: accountUid,
-        email: `${accountUid}@donutvault.local`,
-        deviceName: params.deviceName,
-        platform: params.platform,
-        authMethod: params.authMethod,
-      });
+      const res = await syncAdapterRef.current.registerDeviceOnBackend(
+        '',
+        {
+          userUid: accountUid,
+          email: `${accountUid}@donutvault.local`,
+          deviceName: params.deviceName,
+          platform: params.platform,
+          authMethod: params.authMethod,
+        },
+        syncAuthSession
+          ? {
+              deviceId: syncAuthSession.deviceId,
+              sessionToken: syncAuthSession.sessionToken,
+            }
+          : undefined
+      );
       setAuthorizedDevices((prev) => [res.device, ...prev]);
       setSyncHeadline('🔐 Novo dispositivo autorizado!');
       triggerComicToast(

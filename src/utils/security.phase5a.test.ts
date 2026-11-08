@@ -310,8 +310,8 @@ test('Fase 5A - 01 (§1): WebAuthn Passkeys com @simplewebauthn/server, assinatu
           userUid: victimUid,
           deviceName: 'Celular Espião Sr. Burns',
           platform: 'mobile-web',
+          // Sem pedir checagem estrita: o servidor exige posse da conta por padrão.
           authMethod: 'session-token',
-          enforceStrictOwnership: true,
         }),
       }
     );

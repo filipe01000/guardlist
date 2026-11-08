@@ -510,7 +510,10 @@ export class SyncAdapter {
       platform: 'desktop-web' | 'mobile-web' | 'ios' | 'android';
       authMethod: 'webauthn-passkey' | 'firebase-oauth' | 'session-token';
       webauthnCredentialId?: string;
-    }
+    },
+    // Sessão de um dispositivo já autorizado da mesma conta. O servidor exige essa prova
+    // para parear um novo dispositivo em conta existente (sem ela, só o cookie HttpOnly vale).
+    ownerAuth?: { deviceId: string; sessionToken: string }
   ): Promise<{
     device: {
       deviceId: string;
@@ -525,9 +528,16 @@ export class SyncAdapter {
     };
     sessionToken: string;
   }> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (ownerAuth) {
+      headers.Authorization = `Bearer ${ownerAuth.sessionToken}`;
+      headers['X-Device-Id'] = ownerAuth.deviceId;
+    }
     const res = await fetch(`${baseUrl}/api/v1/auth/devices/register`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(params),
     });
     const data = await res.json();

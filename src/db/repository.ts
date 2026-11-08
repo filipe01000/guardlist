@@ -138,8 +138,18 @@ export async function provisionDeviceInDb(params: {
       .from(webauthnCredentials)
       .where(eq(webauthnCredentials.userUid, params.userUid));
 
+    // Um dispositivo já autorizado também conta: fecha a janela entre o primeiro
+    // pareamento e o envio do cofre, em que a conta ainda não tem cofre nem passkey.
+    const existingDevices = await db
+      .select({ deviceId: authorizedDevices.deviceId })
+      .from(authorizedDevices)
+      .where(eq(authorizedDevices.userUid, params.userUid))
+      .limit(1);
+
     const accountHasProtectedAssets =
-      existingVaults.length > 0 || existingPasskeys.length > 0;
+      existingVaults.length > 0 ||
+      existingPasskeys.length > 0 ||
+      existingDevices.length > 0;
 
     if (
       accountHasProtectedAssets &&

@@ -52,7 +52,7 @@ import { CryptoEngine } from '../services/CryptoEngine.ts';
 import type { Argon2Params } from '../types/vault.ts';
 import type { SyncPushOperation } from '../services/SyncAdapter.ts';
 import { db } from '../db/index.ts';
-import { vaults } from '../db/schema.ts';
+import { authorizedDevices, vaults } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
 
 interface SseClientConnection {
@@ -64,6 +64,8 @@ interface SseClientConnection {
 }
 
 const sseClients = new Map<string, SseClientConnection>();
+
+const MAX_DEVICE_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 function closeSseConnectionsForDevice(deviceId: string): number {
   let closed = 0;
@@ -131,21 +133,48 @@ export function getActiveSseClientCountForDevice(deviceId: string): number {
   return count;
 }
 
-function resolveRpIdAndOrigin(req: Request): {
+/**
+ * Resolve o Relying Party do WebAuthn a partir da configuração do servidor.
+ * O RP ID e a origem esperada nunca vêm do corpo nem dos cabeçalhos da requisição:
+ * se viessem, o cliente escolheria contra o que a própria assinatura é verificada.
+ *
+ * Ordem: WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN → RENDER_EXTERNAL_URL (definida pelo Render).
+ * Fora de produção, sem configuração, usa o Host local para facilitar o desenvolvimento.
+ */
+export function resolveRpIdAndOrigin(
+  req: Request,
+  env: NodeJS.ProcessEnv = process.env
+): {
   rpId: string;
   expectedOrigin: string;
 } {
-  const customRpId = req.body?.rpId ? String(req.body.rpId).trim() : '';
-  const customOrigin = req.body?.origin ? String(req.body.origin).trim() : '';
+  const configuredRpId = env.WEBAUTHN_RP_ID?.trim();
+  const configuredOrigin = env.WEBAUTHN_ORIGIN?.trim();
+  const externalUrl = env.RENDER_EXTERNAL_URL?.trim();
+
+  if (configuredRpId || configuredOrigin || externalUrl) {
+    const origin = new URL(
+      configuredOrigin || externalUrl || `https://${configuredRpId}`
+    ).origin;
+    return {
+      rpId: configuredRpId || new URL(origin).hostname,
+      expectedOrigin: origin,
+    };
+  }
+
+  if (env.NODE_ENV === 'production') {
+    const err = new Error(
+      'WebAuthn não configurado (500): defina WEBAUTHN_RP_ID e WEBAUTHN_ORIGIN no servidor.'
+    );
+    (err as Error & { statusCode?: number }).statusCode = 500;
+    throw err;
+  }
+
   const hostHeader = req.headers.host || 'localhost:3000';
-  const hostname = customRpId || req.hostname || hostHeader.split(':')[0] || 'localhost';
-  const proto =
-    (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
-  const expectedOrigin =
-    customOrigin ||
-    req.headers.origin ||
-    `${proto}://${hostHeader}`;
-  return { rpId: hostname, expectedOrigin };
+  return {
+    rpId: hostHeader.replace(/:\d+$/, '') || 'localhost',
+    expectedOrigin: `${req.protocol || 'http'}://${hostHeader}`,
+  };
 }
 
 export function createSyncApiRouter(): express.Router {
@@ -210,8 +239,17 @@ export function createSyncApiRouter(): express.Router {
           .select()
           .from(vaults)
           .where(eq(vaults.userUid, userUid));
+        const existingDevices = await db
+          .select({ deviceId: authorizedDevices.deviceId })
+          .from(authorizedDevices)
+          .where(eq(authorizedDevices.userUid, userUid))
+          .limit(1);
 
-        if (existingPasskeys.length > 0 || existingVaults.length > 0) {
+        if (
+          existingPasskeys.length > 0 ||
+          existingVaults.length > 0 ||
+          existingDevices.length > 0
+        ) {
           const cookies = parseCookieHeader(req.headers.cookie);
           const token =
             req.headers.authorization?.replace(/^Bearer\s+/i, '').trim() ||
@@ -777,8 +815,11 @@ export function createSyncApiRouter(): express.Router {
       const publicKeySpkiB64 = req.body?.publicKeySpkiB64
         ? String(req.body.publicKeySpkiB64)
         : undefined;
+      // O cliente pode pedir uma sessão mais curta, nunca mais longa que o padrão do servidor.
       const ttlMs =
-        typeof req.body?.ttlMs === 'number' ? req.body.ttlMs : undefined;
+        typeof req.body?.ttlMs === 'number' && Number.isFinite(req.body.ttlMs)
+          ? Math.min(req.body.ttlMs, MAX_DEVICE_SESSION_TTL_MS)
+          : undefined;
 
       if (
         !userUid ||
@@ -806,18 +847,25 @@ export function createSyncApiRouter(): express.Router {
         (req.headers['x-device-id'] as string) || cookies.dvlt_did || '';
 
       if (callerToken && callerDeviceId) {
-        const existingDevice = await verifyDeviceSessionInDb({
-          expectedUserUid: userUid,
-          deviceId: callerDeviceId,
-          rawSessionToken: callerToken,
-        });
-        if (existingDevice.userUid === userUid) {
-          verifiedOwner = true;
+        try {
+          const existingDevice = await verifyDeviceSessionInDb({
+            expectedUserUid: userUid,
+            deviceId: callerDeviceId,
+            rawSessionToken: callerToken,
+          });
+          verifiedOwner = existingDevice.userUid === userUid;
+        } catch (sessionError) {
+          // Sessão ausente, expirada, revogada ou de outra conta: segue como não comprovado.
+          // Falhas de banco continuam sendo erro.
+          if (!(sessionError as Error & { statusCode?: number }).statusCode) {
+            throw sessionError;
+          }
         }
       }
 
-      const enforceStrict = Boolean(req.body?.enforceStrictOwnership);
-
+      // A posse da conta é sempre exigida quando ela já existe. Antes, a checagem só valia
+      // se o próprio cliente pedisse (`enforceStrictOwnership`), o que permitia a qualquer um
+      // abrir uma sessão em qualquer conta conhecendo o userUid.
       const { device, rawSessionToken, rawCsrfToken } =
         await provisionDeviceInDb({
           userUid,
@@ -829,8 +877,7 @@ export function createSyncApiRouter(): express.Router {
           publicKeySpkiB64,
           ttlMs,
           verifiedOwner,
-          enforceStrictOwnershipIfVaultExists:
-            enforceStrict || Boolean(callerToken && !verifiedOwner),
+          enforceStrictOwnershipIfVaultExists: true,
         });
 
       setSecureSessionCookies(res, device.deviceId, rawSessionToken);
