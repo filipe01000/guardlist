@@ -15,6 +15,9 @@ import {
 export const users = pgTable('users', {
   uid: text('uid').primaryKey(),
   email: text('email').notNull(),
+  // Hash do token de reconexão, que sai de um segredo guardado dentro do cofre cifrado. Permite a
+  // um navegador com sessão vencida provar a posse do cofre. Gravado uma vez e nunca trocado.
+  reauthVerifierSha256: text('reauth_verifier_sha256'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

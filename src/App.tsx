@@ -205,6 +205,9 @@ export default function App() {
       sessionDekRef.current = null;
     }
     setUnlockedPayload(null);
+    // O próximo desbloqueio pede uma sessão nova ao servidor (renova a atual ou prova a posse do
+    // cofre). Mantida aqui, uma sessão vencida com a aba aberta travava a sincronização.
+    setSyncAuthSession(null);
     setNewCredentialModalOpen(false);
     setMobileMenuOpen(false);
   }, []);
@@ -475,6 +478,20 @@ export default function App() {
           setAccountUid(vaultBasedUid);
 
           const thisDevice = describeThisDevice();
+          // Prova de posse do cofre: deixa este navegador voltar a sincronizar quando a sessão
+          // no servidor vencer (o cookie dura 30 dias desde o último desbloqueio).
+          const reauthSecret = unlockedPayload.settings?.syncReauthSecretHex;
+          let vaultReauthToken: string | undefined;
+          try {
+            vaultReauthToken = reauthSecret
+              ? CryptoEngine.deriveVaultReauthToken(
+                  reauthSecret,
+                  storedEnvelope.vaultId || unlockedPayload.vaultId
+                )
+              : undefined;
+          } catch {
+            // Segredo ilegível: segue sem a prova, como antes.
+          }
           const registered =
             await syncAdapterRef.current.registerDeviceOnBackend('', {
               userUid: vaultBasedUid,
@@ -483,6 +500,7 @@ export default function App() {
               platform: thisDevice.platform,
               // Sessão de aparelho; passkeys ainda não são usadas no navegador.
               authMethod: 'session-token',
+              vaultReauthToken,
             });
           if (cancelled) return;
           currentAuth = {
@@ -671,6 +689,7 @@ export default function App() {
         autoLockMinutes: 5,
         theme: 'light',
         syncEnabled: enableSync,
+        syncReauthSecretHex: CryptoEngine.generateVaultReauthSecret(),
       },
     };
     const { envelope, sessionDek } = await createEncryptedVaultEnvelope(
@@ -694,14 +713,60 @@ export default function App() {
     );
   };
 
+  // Cofres sem segredo de reconexão (criados antes dele) ganham um ao abrir. Ele entra antes de o
+  // cofre aberto chegar ao estado do app, para nenhuma cópia em memória ficar sem ele (a
+  // sincronização regrava o cofre a partir dessas cópias). Se a gravação falhar, o cofre abre
+  // assim mesmo, sem o segredo, e nada é enviado ao servidor.
+  const ensureSyncReauthSecret = async (
+    envelope: EncryptedVaultEnvelope,
+    sessionDek: Uint8Array,
+    payload: VaultPayload,
+    preferredSecret?: string
+  ): Promise<{ envelope: EncryptedVaultEnvelope; payload: VaultPayload }> => {
+    if (payload.settings?.syncReauthSecretHex) {
+      return { envelope, payload };
+    }
+    const withSecret: VaultPayload = {
+      ...payload,
+      settings: {
+        ...payload.settings,
+        syncReauthSecretHex:
+          preferredSecret || CryptoEngine.generateVaultReauthSecret(),
+      },
+    };
+    try {
+      const resealed = await updateEncryptedVaultPayload(
+        envelope,
+        sessionDek,
+        withSecret
+      );
+      return { envelope: resealed, payload: withSecret };
+    } catch {
+      return { envelope, payload };
+    }
+  };
+
   const handleUnlockVault = async (masterPassword: string) => {
     if (!storedEnvelope) {
       throw new Error('Nenhum cofre encontrado neste navegador.');
     }
-    const { payload, sessionDek } = await unlockEncryptedVaultEnvelope(
+    const { payload: openedPayload, sessionDek } =
+      await unlockEncryptedVaultEnvelope(storedEnvelope, masterPassword);
+    let payload = openedPayload;
+    const ensured = await ensureSyncReauthSecret(
       storedEnvelope,
-      masterPassword
+      sessionDek,
+      openedPayload
     );
+    if (ensured.envelope !== storedEnvelope) {
+      try {
+        await saveEncryptedEnvelopeToIdb(ensured.envelope);
+        setStoredEnvelope(ensured.envelope);
+        payload = ensured.payload;
+      } catch {
+        // Sem gravar, o segredo não vale: seguir sem ele evita perdê-lo depois.
+      }
+    }
     sessionDekRef.current = sessionDek;
     setUnlockedPayload(payload);
     setTheme(payload.settings?.theme || 'light');
@@ -781,7 +846,17 @@ export default function App() {
     const replacingAnotherVault = Boolean(
       storedEnvelope && storedEnvelope.vaultId !== validatedEnvelope.vaultId
     );
-    await saveEncryptedEnvelopeToIdb(validatedEnvelope);
+    // Backup antigo do mesmo cofre, sem segredo de reconexão: mantém o que este navegador já usa,
+    // porque é ele que o servidor conhece.
+    const restored = await ensureSyncReauthSecret(
+      validatedEnvelope,
+      importedDek,
+      importedPayload,
+      replacingAnotherVault
+        ? undefined
+        : unlockedPayload?.settings?.syncReauthSecretHex
+    );
+    await saveEncryptedEnvelopeToIdb(restored.envelope);
     if (replacingAnotherVault) {
       await resetSyncStateForReplacedVault();
     }
@@ -789,8 +864,8 @@ export default function App() {
       zeroizeBuffer(sessionDekRef.current);
     }
     sessionDekRef.current = importedDek;
-    setStoredEnvelope(validatedEnvelope);
-    setUnlockedPayload(importedPayload);
+    setStoredEnvelope(restored.envelope);
+    setUnlockedPayload(restored.payload);
     setTheme(importedPayload.settings?.theme || 'light');
     setActiveTab('dashboard');
     triggerComicToast(

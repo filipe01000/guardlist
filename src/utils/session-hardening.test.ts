@@ -204,6 +204,105 @@ test('Cookie de sessão falso não esconde varredura de contas', async () => {
   });
 });
 
+test('Token de reconexão: estável, um por cofre, e recusa segredo inválido', () => {
+  const secret = CryptoEngine.generateVaultReauthSecret();
+  assert.match(secret, /^[0-9a-f]{64}$/);
+  const token = CryptoEngine.deriveVaultReauthToken(secret, 'vault-a');
+  assert.match(token, /^[0-9a-f]{64}$/);
+  assert.equal(token, CryptoEngine.deriveVaultReauthToken(secret, 'vault-a'));
+  assert.notEqual(token, CryptoEngine.deriveVaultReauthToken(secret, 'vault-b'));
+  assert.throws(() => CryptoEngine.deriveVaultReauthToken('nao-e-hex', 'vault-a'));
+});
+
+test('Navegador com sessão vencida volta a sincronizar provando a posse do cofre', async () => {
+  await withServer(async (baseUrl) => {
+    const vaultId = CryptoEngine.randomId('vault');
+    const userUid = `usr-${vaultId.slice(0, 24)}`;
+    const token = CryptoEngine.deriveVaultReauthToken(
+      CryptoEngine.generateVaultReauthSecret(),
+      vaultId
+    );
+    const otherToken = () =>
+      CryptoEngine.deriveVaultReauthToken(
+        CryptoEngine.generateVaultReauthSecret(),
+        vaultId
+      );
+    const body = deviceBody(userUid);
+
+    // Primeiro aparelho da conta: a conta guarda a prova.
+    const first = await registerDevice(baseUrl, { ...body, vaultReauthToken: token });
+    assert.equal(first.res.status, 201);
+
+    // Cookie vencido (nenhuma sessão): sem prova, ou com prova errada, a conta recusa.
+    assert.equal((await registerDevice(baseUrl, body)).res.status, 403);
+    assert.equal(
+      (await registerDevice(baseUrl, { ...body, vaultReauthToken: otherToken() })).res
+        .status,
+      403
+    );
+
+    // Com a prova certa, o navegador ganha uma sessão nova e volta a sincronizar.
+    const back = await registerDevice(baseUrl, { ...body, vaultReauthToken: token });
+    assert.equal(back.res.status, 201);
+    const list = await fetch(`${baseUrl}/api/v1/auth/devices`, {
+      headers: {
+        Authorization: `Bearer ${back.data.sessionToken}`,
+        'X-Device-Id': back.data.device.deviceId,
+      },
+    });
+    assert.equal(list.status, 200);
+
+    // Quem tem uma sessão não troca a prova da conta por uma sua.
+    const thiefToken = otherToken();
+    const thief = await registerDevice(
+      baseUrl,
+      { ...body, vaultReauthToken: thiefToken },
+      { Cookie: cookieHeaderFrom(back.res) }
+    );
+    assert.equal(thief.res.status, 200);
+    assert.equal(
+      (await registerDevice(baseUrl, { ...body, vaultReauthToken: thiefToken })).res
+        .status,
+      403
+    );
+    assert.equal(
+      (await registerDevice(baseUrl, { ...body, vaultReauthToken: token })).res.status,
+      201
+    );
+  });
+});
+
+test('Conta criada antes da prova a recebe pela sessão válida', async () => {
+  await withServer(async (baseUrl) => {
+    const vaultId = CryptoEngine.randomId('vault');
+    const userUid = `usr-${vaultId.slice(0, 24)}`;
+    const token = CryptoEngine.deriveVaultReauthToken(
+      CryptoEngine.generateVaultReauthSecret(),
+      vaultId
+    );
+    const body = deviceBody(userUid);
+
+    const first = await registerDevice(baseUrl, body);
+    assert.equal(first.res.status, 201);
+    assert.equal(
+      (await registerDevice(baseUrl, { ...body, vaultReauthToken: token })).res.status,
+      403,
+      'sem prova guardada na conta, o token sozinho não basta'
+    );
+
+    const renewed = await registerDevice(
+      baseUrl,
+      { ...body, vaultReauthToken: token },
+      { Cookie: cookieHeaderFrom(first.res) }
+    );
+    assert.equal(renewed.res.status, 200);
+    assert.equal(
+      (await registerDevice(baseUrl, { ...body, vaultReauthToken: token })).res.status,
+      201
+    );
+  });
+});
+
 test('Eventos anônimos repetidos da mesma origem gravam uma linha só', async () => {
   resetRateLimitsForTests();
   const eventType = `TEST_ANON_SAMPLING_${CryptoEngine.randomId('evt')}`;

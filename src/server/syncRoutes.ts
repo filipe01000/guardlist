@@ -29,6 +29,8 @@ import {
   saveWebAuthnCredentialInDb,
   verifyAndAdvanceWebAuthnCounterInDb,
   verifyDeviceSessionInDb,
+  bindUserReauthVerifierInDb,
+  verifyUserReauthTokenInDb,
 } from '../db/repository.ts';
 import {
   type AuthenticatedSyncRequest,
@@ -866,6 +868,53 @@ export function createSyncApiRouter(): express.Router {
         }
       }
 
+      // Sessão vencida: o navegador ainda pode provar a posse do cofre com o token de reconexão,
+      // que sai de um segredo guardado dentro do cofre cifrado. Antes, depois de 30 dias sem abrir
+      // o app, o servidor recusava o navegador para sempre e a sincronização parava.
+      const vaultReauthToken =
+        typeof req.body?.vaultReauthToken === 'string' &&
+        /^[0-9a-f]{64}$/.test(req.body.vaultReauthToken)
+          ? (req.body.vaultReauthToken as string)
+          : undefined;
+      let provedByVaultKey = false;
+      if (!verifiedOwner && vaultReauthToken) {
+        const allowance = scannerDetector.checkBruteForceAllowance({
+          clientIp,
+          targetAccount: userUid,
+          scope: 'vault-reauth',
+        });
+        if (!allowance.allowed) {
+          res.setHeader('Retry-After', String(allowance.retryAfterSeconds));
+          res.status(429).json({
+            error: allowance.reason || 'Muitas tentativas de reconexão (429).',
+            retryAfterSeconds: allowance.retryAfterSeconds,
+          });
+          return;
+        }
+        provedByVaultKey = await verifyUserReauthTokenInDb({
+          userUid,
+          reauthToken: vaultReauthToken,
+        });
+        if (provedByVaultKey) {
+          verifiedOwner = true;
+          scannerDetector.recordAuthSuccess({
+            clientIp,
+            targetAccount: userUid,
+            scope: 'vault-reauth',
+          });
+        } else {
+          scannerDetector.recordAuthFailure({
+            clientIp,
+            targetAccount: userUid,
+            scope: 'vault-reauth',
+            method: req.method,
+            path: req.originalUrl || req.path,
+            statusCode: 403,
+            failureThreshold: 5,
+          });
+        }
+      }
+
       // O app chama este cadastro a cada desbloqueio. Quando o navegador já tem sessão própria,
       // ela é renovada no mesmo registro e o token antigo deixa de valer; antes cada desbloqueio
       // criava outro aparelho com sessão de 30 dias. Passkeys continuam criando um registro novo.
@@ -896,6 +945,15 @@ export function createSyncApiRouter(): express.Router {
             enforceStrictOwnershipIfVaultExists: true,
           });
 
+      // A conta guarda a prova na primeira vez que um aparelho autorizado a apresenta: o primeiro
+      // cadastro da conta ou um navegador com sessão válida. Depois disso ela não muda mais.
+      if (vaultReauthToken && !provedByVaultKey) {
+        await bindUserReauthVerifierInDb({
+          userUid,
+          reauthVerifierSha256: CryptoEngine.computeVaultReauthVerifier(vaultReauthToken),
+        });
+      }
+
       setSecureSessionCookies(res, device.deviceId, rawSessionToken);
 
       await recordAuthAuditEvent({
@@ -907,6 +965,7 @@ export function createSyncApiRouter(): express.Router {
           platform,
           authMethod,
           verifiedOwner,
+          provedByVaultKey,
         },
       });
 

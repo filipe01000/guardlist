@@ -291,6 +291,48 @@ export async function provisionDeviceInDb(params: {
   }
 }
 
+/**
+ * Grava o verificador de reconexão da conta só se ainda não houver um. Nunca sobrescreve: quem
+ * roubar uma sessão não consegue trocar a prova da conta por uma sua.
+ */
+export async function bindUserReauthVerifierInDb(params: {
+  userUid: string;
+  reauthVerifierSha256: string;
+}): Promise<boolean> {
+  checkSimulatedDbFailure();
+  const updated = await db
+    .update(users)
+    .set({ reauthVerifierSha256: params.reauthVerifierSha256 })
+    .where(and(eq(users.uid, params.userUid), isNull(users.reauthVerifierSha256)))
+    .returning({ uid: users.uid });
+  return updated.length > 0;
+}
+
+/**
+ * Confere o token de reconexão de um navegador cuja sessão venceu. O token sai de um segredo
+ * guardado dentro do cofre cifrado, então só quem abre o cofre consegue apresentá-lo.
+ */
+export async function verifyUserReauthTokenInDb(params: {
+  userUid: string;
+  reauthToken: string;
+}): Promise<boolean> {
+  checkSimulatedDbFailure();
+  // O hash é calculado antes da consulta para o tempo não depender de a conta existir.
+  const presented = Buffer.from(
+    CryptoEngine.computeVaultReauthVerifier(params.reauthToken),
+    'utf8'
+  );
+  const rows = await db
+    .select({ verifier: users.reauthVerifierSha256 })
+    .from(users)
+    .where(eq(users.uid, params.userUid))
+    .limit(1);
+  const verifier = rows[0]?.verifier;
+  if (!verifier) return false;
+  const stored = Buffer.from(verifier, 'utf8');
+  return stored.length === presented.length && timingSafeEqual(stored, presented);
+}
+
 // Teto de sessões ativas por conta. Ao passar dele, as usadas há mais tempo são revogadas, então
 // nenhuma conta junta sessões de 30 dias sem limite, seja qual for o caminho que as criou.
 export const MAX_ACTIVE_DEVICES_PER_ACCOUNT = 20;

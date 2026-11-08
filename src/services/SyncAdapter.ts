@@ -518,6 +518,8 @@ export class SyncAdapter {
       platform: 'desktop-web' | 'mobile-web' | 'ios' | 'android';
       authMethod: 'webauthn-passkey' | 'firebase-oauth' | 'session-token';
       webauthnCredentialId?: string;
+      // Prova de posse do cofre (CryptoEngine.deriveVaultReauthToken), usada quando a sessão venceu.
+      vaultReauthToken?: string;
     },
     // Sessão de um dispositivo já autorizado da mesma conta. O servidor exige essa prova
     // para parear um novo dispositivo em conta existente (sem ela, só o cookie HttpOnly vale).

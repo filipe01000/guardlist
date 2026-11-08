@@ -1335,6 +1335,39 @@ export class CryptoEngine {
   }
 
   /**
+   * Segredo de reconexão (256 bits). Fica só dentro do cofre cifrado e vai junto no backup.
+   */
+  static generateVaultReauthSecret(): string {
+    return bytesToHex(CryptoEngine.getRandomBytes(32));
+  }
+
+  /**
+   * Token que prova ao servidor a posse do cofre quando a sessão do navegador venceu. Sai do
+   * segredo de reconexão, não da DEK, porque a DEK muda a cada troca de Senha Mestra.
+   */
+  static deriveVaultReauthToken(secretHex: string, vaultId: string): string {
+    if (!/^[0-9a-f]{64}$/.test(secretHex) || !vaultId) {
+      throw new Error('Segredo de reconexão inválido.');
+    }
+    return bytesToHex(
+      hkdf(
+        sha256,
+        hexToBytes(secretHex),
+        utf8ToBytes('DONUTVAULT_SYNC_REAUTH_V1'),
+        utf8ToBytes(vaultId),
+        32
+      )
+    );
+  }
+
+  /**
+   * O que o servidor guarda para conferir o token de reconexão: só o hash dele.
+   */
+  static computeVaultReauthVerifier(reauthTokenHex: string): string {
+    return bytesToHex(sha256(utf8ToBytes(reauthTokenHex)));
+  }
+
+  /**
    * Encapsula uma cópia independente da DEK de 256 bits do cofre usando uma Chave de Recuperação
    * de alta entropia (256 bits CSPRNG) e AES-256-GCM com AAD vinculado a `vaultId`, `keyEpoch` e `recoveryKeyVersion`.
    */

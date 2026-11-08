@@ -72,6 +72,9 @@ export interface VaultPayload {
     // Sincronização com o servidor. Cofres novos começam com `false` e o usuário ativa.
     // Ausente (cofres antigos) equivale a `true`, para não cortar quem já sincroniza.
     syncEnabled?: boolean;
+    // Segredo de reconexão (64 hex). Com ele o navegador prova a posse do cofre quando a sessão
+    // no servidor vence. Fica só aqui dentro, cifrado; o servidor recebe um token derivado.
+    syncReauthSecretHex?: string;
   };
 }
 
