@@ -110,7 +110,7 @@ export function runVaultSecurityAudit(
     if (isReused) {
       reasons.push(`Reutilizada em ${reusedOccurrences} contas`);
       recommendations.push(
-        `Gere uma senha exclusiva para "${cred.serviceName}" — repetir senhas permite ataques de credential stuffing.`
+        `Gere uma senha exclusiva para "${cred.serviceName}": se uma senha vazar, as outras contas que a usam ficam expostas.`
       );
     }
     if (isOld) {
@@ -166,7 +166,7 @@ export function runVaultSecurityAudit(
     healthHeadline = 'Várias senhas precisam ser trocadas logo.';
   } else if (overallScore < 75 || weakCount > 0 || reusedCount > 0) {
     healthStatus = 'warning';
-    healthHeadline = 'Hmm... algumas rosquinhas estão dando sopa! Revise os alertas abaixo.';
+    healthHeadline = 'Algumas senhas precisam de atenção. Veja abaixo o que trocar.';
   } else if (overallScore < 90) {
     healthStatus = 'good';
     healthHeadline = 'Mandou bem! Cofre bem protegido, só faltam pequenos ajustes.';

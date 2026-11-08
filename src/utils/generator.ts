@@ -209,7 +209,7 @@ export function evaluatePasswordStrength(
     label: 'Forte',
     funnyMessage: 'Excelente! Essa senha é difícil de quebrar.',
     mascotMood: 'celebrating',
-    crackTimeDisplay: score === 4 ? 'Séculos (Inquebrável!)' : 'Décadas',
+    crackTimeDisplay: score === 4 ? 'Séculos' : 'Décadas',
     entropyGuessesLog10: Math.round(result.guesses_log10 * 10) / 10,
     suggestions: [],
   };

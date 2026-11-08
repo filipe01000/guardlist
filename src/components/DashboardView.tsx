@@ -111,9 +111,6 @@ export function DashboardView({
                 }
                 tone={auditReport.overallScore >= 85 ? 'emerald' : 'pink'}
               />
-              <span className="text-xs font-black uppercase tracking-wider text-[#09090B]/80">
-                Início
-              </span>
             </div>
 
             <ComicSpeechBubble
