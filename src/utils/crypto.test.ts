@@ -44,7 +44,7 @@ test('Adversarial 01: Senha mestra incorreta deve ser rejeitada por autenticaç�
     async () => {
       await vault.unlockVault('SenhaErradaDoBurns!');
     },
-    /Senha mestra incorreta/
+    /Senha mestra incorreta/i
   );
   assert.equal(vault.session.isUnlocked(), false);
   vault.session.dispose();
@@ -447,7 +447,7 @@ test('Adversarial 10: Alteração de senha mestra rotaciona salt Argon2id e DEK 
     async () => {
       await vault.unlockVault(oldPassword);
     },
-    /Senha mestra incorreta/
+    /Senha mestra incorreta/i
   );
 
   // Senha nova deve desbloquear normalmente

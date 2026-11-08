@@ -407,5 +407,30 @@ export class StorageService {
       };
     });
   }
+
+  /**
+   * Apaga o estado de sincronização (cursor, fila e conflitos). Ele pertence ao cofre que estava
+   * neste navegador; quando outro cofre o substitui, o novo precisa começar do zero.
+   */
+  static async clearPersistentSyncState(): Promise<void> {
+    if (!StorageService.isIndexedDbAvailable()) {
+      StorageService.memoryFallbackStore.delete(StorageService.SYNC_STATE_KEY);
+      return;
+    }
+
+    const db = await StorageService.openDatabase();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete(StorageService.SYNC_STATE_KEY);
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error || new Error('Falha ao limpar a fila offline do IndexedDB.'));
+      };
+    });
+  }
 }
 

@@ -49,7 +49,7 @@ export function SecretNotesView({
   const [editingNote, setEditingNote] = useState<SecretNote | null>(null);
 
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('Segredos de Springfield');
+  const [category, setCategory] = useState('Geral');
   const [content, setContent] = useState('');
   const [colorTint, setColorTint] = useState<SecretNote['colorTint']>('yellow');
   const [favorite, setFavorite] = useState(false);
@@ -80,7 +80,7 @@ export function SecretNotesView({
   const openCreate = () => {
     setEditingNote(null);
     setTitle('');
-    setCategory('Segredos de Springfield');
+    setCategory('Geral');
     setContent('');
     setColorTint('yellow');
     setFavorite(false);
@@ -112,7 +112,7 @@ export function SecretNotesView({
     });
     onNotify?.(
       'SECRETO!',
-      `Nota "${title.trim()}" criptografada com AES-256-GCM!`,
+      `Nota "${title.trim()}" salva.`,
       'success'
     );
     setIsModalOpen(false);
@@ -124,7 +124,7 @@ export function SecretNotesView({
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="font-display text-2xl sm:text-3xl font-black">
-              📝 Notas Secretas Criptografadas
+              Notas seguras
             </h1>
             <ComicActionCallout
               text={`${activeNotesCount} NOTAS`}
@@ -132,7 +132,7 @@ export function SecretNotesView({
             />
           </div>
           <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
-            Guarde códigos de recuperação, receitas secretas, chaves de licença e alarmes com criptografia AES-256-GCM.
+            Guarde códigos de recuperação, chaves de licença e outros segredos. Tudo cifrado neste aparelho.
           </p>
         </div>
 
@@ -366,10 +366,10 @@ export function SecretNotesView({
                     }
                     className="w-full h-11 px-3 text-sm font-bold bg-background border-3 border-border rounded-base"
                   >
-                    <option value="yellow">Amarelo Springfield</option>
+                    <option value="yellow">Amarelo</option>
                     <option value="pink">Rosa Rosquinha</option>
                     <option value="blue">Azul Celeste</option>
-                    <option value="mint">Verde Usina</option>
+                    <option value="mint">Verde</option>
                   </select>
                 </div>
               </div>

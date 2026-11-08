@@ -11,7 +11,7 @@ import {
   Lock,
   CheckCircle2,
   AlertTriangle,
-  Rocket,
+
 } from 'lucide-react';
 import type {
   BackupRestoreStrategy,
@@ -113,7 +113,7 @@ export function SettingsView({
       setConfirmNewPwd('');
       setPwdStatus({
         type: 'success',
-        text: 'WOO-HOO! Senha Mestra alterada com novo salt Argon2id e nova chave DEK!',
+        text: 'Senha Mestra trocada.',
       });
     } catch (err) {
       setPwdStatus({
@@ -156,8 +156,8 @@ export function SettingsView({
       );
       setImportStatus(
         importStrategy === 'merge'
-          ? 'Backup validado via SHA-256 e mesclado sem perda de dados existentes!'
-          : 'Backup validado via SHA-256 e restaurado substituindo o cofre!'
+          ? 'Backup verificado e mesclado. Nada do que já estava no cofre se perdeu.'
+          : 'Backup verificado. Ele substituiu o cofre atual.'
       );
       setImportPassword('');
       setImportJson('');
@@ -175,9 +175,9 @@ export function SettingsView({
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="font-display text-2xl sm:text-3xl font-black">
-              ⚙️ Configurações & Engenharia do Cofre
+              Configurações
             </h1>
-            <ComicActionCallout text="SETOR 7G" tone="yellow" />
+            
           </div>
           <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
             Gerencie sua Senha Mestra, bloqueio por inatividade, backups criptografados e tema visual.
@@ -206,9 +206,9 @@ export function SettingsView({
             <CardContent className="space-y-5">
               <div className="flex items-center justify-between gap-4 pb-4 border-b-2 border-border">
                 <div>
-                  <p className="font-extrabold text-sm">Tema de Springfield</p>
+                  <p className="font-extrabold text-sm">Tema</p>
                   <p className="text-xs font-semibold text-stone-600 dark:text-slate-400">
-                    Alterne entre o modo ensolarado diurno e o turno noturno da usina
+                    Alterne entre o tema claro e o escuro.
                   </p>
                 </div>
                 <Button
@@ -241,7 +241,7 @@ export function SettingsView({
                     <span>Bloqueio Automático por Inatividade</span>
                   </label>
                   <p className="text-xs font-semibold text-stone-600 dark:text-slate-400">
-                    Limpa a chave DEK da memória RAM quando você se afasta
+                    Tranca o cofre quando você fica um tempo sem usar.
                   </p>
                 </div>
 
@@ -269,7 +269,7 @@ export function SettingsView({
                 <CardTitle>Alterar Senha Mestra</CardTitle>
               </div>
               <CardDescription>
-                Re-deriva a chave Argon2id com novo salt de 128 bits e rotaciona a DEK
+                Troque a senha que abre o cofre. As senhas guardadas continuam as mesmas.
               </CardDescription>
             </CardHeader>
 
@@ -341,7 +341,7 @@ export function SettingsView({
                   className="w-full"
                 >
                   {isRotating
-                    ? 'Re-derivando Argon2id e Re-criptografando...'
+                    ? 'Trocando a senha…'
                     : 'Atualizar Senha Mestra'}
                 </Button>
               </form>
@@ -449,8 +449,8 @@ export function SettingsView({
                   />
                   <Button type="submit" variant="pink" size="sm">
                     {importStrategy === 'merge'
-                      ? 'Validar SHA-256 e Mesclar Sem Perda de Dados'
-                      : 'Validar SHA-256 e Substituir Cofre Atual'}
+                      ? 'Verificar e mesclar'
+                      : 'Verificar e substituir o cofre atual'}
                   </Button>
                 </form>
               )}
@@ -469,7 +469,7 @@ export function SettingsView({
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
                 <CardTitle className="text-lg">
-                  Especificações de Segurança e Criptografia Ativas
+                  Detalhes técnicos
                 </CardTitle>
               </div>
             </CardHeader>
@@ -506,7 +506,7 @@ export function SettingsView({
               </div>
 
               <p className="text-[11px] font-semibold text-stone-600 dark:text-slate-400 leading-relaxed">
-                Nota de transparência: Embora o DonutVault implemente primitivas criptográficas reais (Argon2id + AES-256-GCM + CSPRNG sem viés), nenhum software deve ser considerado pronto para guardar credenciais críticas de produção sem passar por uma auditoria de segurança independente.
+                O DonutVault usa Argon2id, AES-256-GCM e o gerador aleatório do navegador. O código ainda não passou por auditoria de segurança independente.
               </p>
             </CardContent>
           </Card>
@@ -515,10 +515,10 @@ export function SettingsView({
           <Card className="bg-rose-100 dark:bg-rose-950/40">
             <CardContent className="space-y-3">
               <h2 className="font-display text-lg font-black text-rose-800 dark:text-rose-300">
-                Zona de Perigo Setor 7G
+                Zona de perigo
               </h2>
               <p className="text-xs font-semibold text-stone-800 dark:text-slate-200">
-                Excluir o cofre apaga permanentemente o envelope criptografado do IndexedDB deste navegador.
+                Excluir o cofre apaga de vez o cofre cifrado guardado neste navegador.
               </p>
               {!confirmDeleteVault ? (
                 <Button
@@ -555,47 +555,6 @@ export function SettingsView({
         </div>
       </div>
 
-      {/* Seção de Roadmap Futuro */}
-      <Card>
-        <CardHeader className="border-b-3 border-border">
-          <div className="flex items-center gap-2">
-            <Rocket className="w-5 h-5 text-pink" />
-            <CardTitle>
-              Roadmap Futuro do DonutVault (Planejado — Não Implementado na v1.0)
-            </CardTitle>
-          </div>
-          <CardDescription>
-            A arquitetura modular de envelopes criptografados do DonutVault já está estruturada para receber nas próximas versões:
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-          <div className="p-4 rounded-base bg-[#FEF08A] text-[#09090B] border-3 border-border shadow-[2px_2px_0px_0px_var(--border)]">
-            <p className="font-display font-black text-sm">Extensões Chrome & Firefox</p>
-            <p className="font-semibold mt-1">
-              Preenchimento automático seguro de credenciais direto nas páginas web.
-            </p>
-          </div>
-          <div className="p-4 rounded-base bg-[#E0F2FE] text-[#09090B] border-3 border-border shadow-[2px_2px_0px_0px_var(--border)]">
-            <p className="font-display font-black text-sm">Passkeys (WebAuthn) & TOTP</p>
-            <p className="font-semibold mt-1">
-              Suporte futuro a chaves de acesso sem senha e gerador de códigos 2FA.
-            </p>
-          </div>
-          <div className="p-4 rounded-base bg-[#FCE7F3] text-[#09090B] border-3 border-border shadow-[2px_2px_0px_0px_var(--border)]">
-            <p className="font-display font-black text-sm">Apps Android & iOS</p>
-            <p className="font-semibold mt-1">
-              Desbloqueio biométrico móvel e integração com Autofill nativo.
-            </p>
-          </div>
-          <div className="p-4 rounded-base bg-[#DCFCE7] text-[#09090B] border-3 border-border shadow-[2px_2px_0px_0px_var(--border)]">
-            <p className="font-display font-black text-sm">Sincronização E2EE & Cofres</p>
-            <p className="font-semibold mt-1">
-              Compartilhamento ponta a ponta criptografado e autenticação multifator.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

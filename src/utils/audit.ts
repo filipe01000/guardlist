@@ -159,11 +159,11 @@ export function runVaultSecurityAudit(
   );
 
   let healthStatus: VaultSecurityAuditReport['healthStatus'] = 'excellent';
-  let healthHeadline = 'Woo-hoo! Suas rosquinhas estão blindadas nível Usina Nuclear!';
+  let healthHeadline = 'Suas senhas estão em dia.';
 
   if (overallScore < 50 || weakCount > 0 && weakCount >= total / 2) {
     healthStatus = 'critical';
-    healthHeadline = 'D’oh! Alerta vermelho no Setor 7G! Várias senhas precisam de troca urgente.';
+    healthHeadline = 'Várias senhas precisam ser trocadas logo.';
   } else if (overallScore < 75 || weakCount > 0 || reusedCount > 0) {
     healthStatus = 'warning';
     healthHeadline = 'Hmm... algumas rosquinhas estão dando sopa! Revise os alertas abaixo.';

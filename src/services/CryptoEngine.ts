@@ -585,7 +585,7 @@ export class CryptoEngine {
         );
       } catch {
         throw new Error(
-          'D’oh! Senha mestra incorreta. Nem o Sr. Burns conseguiu adivinhar!'
+          'Senha Mestra incorreta.'
         );
       }
 
@@ -1527,7 +1527,7 @@ export class CryptoEngine {
         vaultId: params.recoveryMetadata.vaultId,
         revision: 1,
         keyEpoch: params.recoveryMetadata.keyEpoch,
-        vaultName: params.vaultName || 'Cofre Recuperado de Springfield',
+        vaultName: params.vaultName || 'Cofre recuperado',
         createdAt: now,
         updatedAt: now,
         credentials,

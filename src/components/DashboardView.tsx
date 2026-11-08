@@ -106,13 +106,13 @@ export function DashboardView({
               <ComicActionCallout
                 text={
                   auditReport.overallScore >= 85
-                    ? 'WOO-HOO! COFRE BLINDADO!'
-                    : 'D’OH! ALERTA NO SETOR 7G!'
+                    ? 'COFRE EM DIA'
+                    : 'ATENÇÃO'
                 }
                 tone={auditReport.overallScore >= 85 ? 'emerald' : 'pink'}
               />
               <span className="text-xs font-black uppercase tracking-wider text-[#09090B]/80">
-                🏠 Minha Springfield · Central do Guardião
+                Início
               </span>
             </div>
 
@@ -126,7 +126,7 @@ export function DashboardView({
                 {auditReport.healthHeadline}
               </span>
               <span className="text-xs font-semibold text-stone-600 dark:text-slate-300 block mt-0.5">
-                Suas credenciais estão trancadas com AES-256-GCM (AAD estruturado) e chave derivada por Argon2id.
+                Tudo aqui é cifrado neste aparelho com a sua Senha Mestra.
               </span>
             </ComicSpeechBubble>
           </div>
@@ -220,7 +220,7 @@ export function DashboardView({
       </section>
 
       {/* Dashboard de Sincronização Zero-Knowledge (PC & Celular — Fase 4B) */}
-      {syncDashboardProps && <SyncDashboardPanel {...syncDashboardProps} />}
+      {syncDashboardProps && <SyncDashboardPanel {...syncDashboardProps} compact />}
 
       {/* Indicador de Segurança Geral + Tabela Neobrutal-UI de Credenciais Recentes */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
@@ -228,13 +228,10 @@ export function DashboardView({
         <Card className="lg:col-span-5 justify-between">
           <CardHeader className="border-b-3 border-border">
             <div className="flex items-center justify-between">
-              <CardTitle>Indicador de Segurança Geral</CardTitle>
-              <span className="font-mono text-xs font-black px-2 py-0.5 bg-main text-main-foreground border-2 border-border">
-                SETOR 7G
-              </span>
+              <CardTitle>Saúde das senhas</CardTitle>
             </div>
             <CardDescription>
-              Pontuação calculada localmente pelo motor zxcvbn
+              Calculada neste aparelho, sem enviar nada
             </CardDescription>
           </CardHeader>
 

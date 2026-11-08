@@ -115,15 +115,12 @@ export function GeneratorView({
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="font-display text-2xl sm:text-3xl font-black">
-              🎲 Gerador de Senhas da Usina
+              Gerador de senhas
             </h1>
-            <ComicActionCallout text="CSPRNG SEM VIÉS!" tone="sky" />
+            <ComicActionCallout text="ALEATÓRIO DE VERDADE" tone="sky" />
           </div>
           <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
-            Geração criptográfica sem viés estatístico usando exclusivamente{' '}
-            <code className="font-mono text-xs bg-main text-main-foreground px-1.5 py-0.5 border border-border rounded">
-              crypto.getRandomValues()
-            </code>
+            Cada caractere é sorteado pelo gerador criptográfico do navegador, sem viés.
           </p>
         </div>
       </div>

@@ -10,6 +10,7 @@ import {
   Lock,
   AlertTriangle,
   CheckCircle2,
+  Download,
 } from 'lucide-react';
 import {
   DonutVaultLogo,
@@ -38,12 +39,20 @@ interface WelcomeScreenProps {
   onCreateVault: (
     masterPassword: string,
     vaultName: string,
-    includeSampleData: boolean,
-    enableSync: boolean
+    enableSync: boolean,
+    replaceExisting: boolean
   ) => Promise<void>;
   onUnlockVault: (masterPassword: string) => Promise<void>;
-  onImportBackupFile: (fileContent: string, masterPassword: string) => Promise<void>;
+  onImportBackupFile: (
+    fileContent: string,
+    masterPassword: string,
+    replaceExisting: boolean
+  ) => Promise<void>;
+  // Baixa o backup cifrado do cofre salvo; funciona com o cofre trancado.
+  onExportExistingVault?: () => void;
 }
+
+type WelcomePanel = 'none' | 'create' | 'unlock' | 'import' | 'confirm-replace';
 
 export function WelcomeScreen({
   hasExistingVault,
@@ -51,14 +60,20 @@ export function WelcomeScreen({
   onCreateVault,
   onUnlockVault,
   onImportBackupFile,
+  onExportExistingVault,
 }: WelcomeScreenProps) {
-  const [activeModal, setActiveModal] = useState<'none' | 'create' | 'unlock' | 'import'>(
+  const [activeModal, setActiveModal] = useState<WelcomePanel>(
     hasExistingVault ? 'unlock' : 'none'
   );
-  const [vaultName, setVaultName] = useState('Cofre da Família de Springfield');
+  // Com um cofre salvo, criar outro ou restaurar um backup apaga esse cofre deste navegador.
+  // As duas ações passam antes por uma confirmação explícita.
+  const [replaceIntent, setReplaceIntent] = useState<'create' | 'import'>('create');
+  const [replaceAcknowledged, setReplaceAcknowledged] = useState(false);
+  const [replaceConfirmed, setReplaceConfirmed] = useState(false);
+  const [backupDownloaded, setBackupDownloaded] = useState(false);
+  const [vaultName, setVaultName] = useState('Meu cofre');
   const [masterPassword, setMasterPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [includeSampleData, setIncludeSampleData] = useState(true);
   const [enableSync, setEnableSync] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [importedJson, setImportedJson] = useState<string>('');
@@ -72,7 +87,7 @@ export function WelcomeScreen({
 
   const strength = evaluatePasswordStrength(masterPassword);
 
-  const resetForm = (nextModal: 'none' | 'create' | 'unlock' | 'import') => {
+  const resetForm = (nextModal: WelcomePanel) => {
     setErrorMsg(null);
     setMasterPassword('');
     setConfirmPassword('');
@@ -80,9 +95,54 @@ export function WelcomeScreen({
     setActiveModal(nextModal);
   };
 
+  const existingVaultDate = existingVaultUpdatedAt
+    ? new Date(existingVaultUpdatedAt).toLocaleDateString('pt-BR')
+    : null;
+
+  const requestReplace = (intent: 'create' | 'import') => {
+    if (!hasExistingVault || replaceConfirmed) {
+      if (intent === 'create') resetForm('create');
+      else fileInputRef.current?.click();
+      return;
+    }
+    setReplaceIntent(intent);
+    setReplaceAcknowledged(false);
+    resetForm('confirm-replace');
+  };
+
+  const confirmReplace = () => {
+    if (!replaceAcknowledged) return;
+    setReplaceConfirmed(true);
+    if (replaceIntent === 'create') {
+      resetForm('create');
+    } else if (importedJson) {
+      resetForm('import');
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const cancelReplace = () => {
+    setReplaceConfirmed(false);
+    setReplaceAcknowledged(false);
+    setImportedJson('');
+    setImportedFileName('');
+    resetForm('unlock');
+  };
+
+  const handleDownloadExistingBackup = () => {
+    onExportExistingVault?.();
+    setBackupDownloaded(true);
+  };
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (hasExistingVault && !replaceConfirmed) {
+      requestReplace('create');
+      return;
+    }
 
     const policy = checkMasterPasswordPolicy(masterPassword);
     if (!policy.ok) {
@@ -90,7 +150,7 @@ export function WelcomeScreen({
       return;
     }
     if (masterPassword !== confirmPassword) {
-      setErrorMsg('D’oh! As duas senhas mestras digitadas não conferem.');
+      setErrorMsg('As duas senhas não são iguais.');
       return;
     }
 
@@ -100,9 +160,9 @@ export function WelcomeScreen({
       await new Promise((r) => setTimeout(r, 350));
       await onCreateVault(
         masterPassword,
-        vaultName.trim() || 'Cofre de Springfield',
-        includeSampleData,
-        enableSync
+        vaultName.trim() || 'Meu cofre',
+        enableSync,
+        replaceConfirmed
       );
     } catch (err) {
       setVaultDoorOpen(false);
@@ -117,7 +177,7 @@ export function WelcomeScreen({
     setErrorMsg(null);
 
     if (!masterPassword) {
-      setErrorMsg('Digite sua Senha Mestra para girar o volante do cofre!');
+      setErrorMsg('Digite sua Senha Mestra.');
       return;
     }
 
@@ -141,10 +201,18 @@ export function WelcomeScreen({
     reader.onload = () => {
       if (typeof reader.result === 'string') {
         setImportedJson(reader.result);
-        setActiveModal('import');
         setErrorMsg(null);
+        if (hasExistingVault && !replaceConfirmed) {
+          setReplaceIntent('import');
+          setReplaceAcknowledged(false);
+          setActiveModal('confirm-replace');
+        } else {
+          setActiveModal('import');
+        }
       }
     };
+    // Permite escolher o mesmo arquivo de novo depois de cancelar.
+    e.target.value = '';
     reader.readAsText(file);
   };
 
@@ -160,11 +228,15 @@ export function WelcomeScreen({
       setErrorMsg('Digite a Senha Mestra usada quando esse backup foi exportado.');
       return;
     }
+    if (hasExistingVault && !replaceConfirmed) {
+      requestReplace('import');
+      return;
+    }
 
     try {
       setIsProcessing(true);
       setVaultDoorOpen(true);
-      await onImportBackupFile(importedJson, masterPassword);
+      await onImportBackupFile(importedJson, masterPassword, replaceConfirmed);
     } catch (err) {
       setVaultDoorOpen(false);
       setErrorMsg(err instanceof Error ? err.message : 'Erro ao importar o backup.');
@@ -177,8 +249,8 @@ export function WelcomeScreen({
     <div className="min-h-screen bg-background bg-comic-halftone text-foreground flex flex-col justify-between">
       {/* Top Bar Neobrutalista (3 zonas limpas) */}
       <header className="w-full bg-secondary-background border-b-4 border-border">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-8 px-6 py-4">
-          <div className="flex items-center gap-3 shrink-0">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-8 px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               type="button"
               onClick={() => setDonutClicks((c) => c + 1)}
@@ -187,23 +259,20 @@ export function WelcomeScreen({
             >
               <DonutVaultLogo size={48} spinning={isProcessing} />
             </button>
-            <span className="font-display text-2xl font-black tracking-tight whitespace-nowrap shrink-0">
+            <span className="font-display text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap shrink-0">
               DonutVault
             </span>
           </div>
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-extrabold">
             <a href="#criptografia" className="hover:text-pink transition-colors whitespace-nowrap shrink-0">
-              AES-256-GCM
-            </a>
-            <a href="#argon2id" className="hover:text-pink transition-colors whitespace-nowrap shrink-0">
-              Argon2id KDF
+              Como protege
             </a>
             <a href="#auditoria" className="hover:text-pink transition-colors whitespace-nowrap shrink-0">
-              Auditoria Local
+              Saúde das senhas
             </a>
-            <a href="#zero-knowledge" className="hover:text-pink transition-colors whitespace-nowrap shrink-0">
-              Zero-Knowledge
+            <a href="#sincronizacao" className="hover:text-pink transition-colors whitespace-nowrap shrink-0">
+              Sincronização
             </a>
           </nav>
 
@@ -228,7 +297,7 @@ export function WelcomeScreen({
               <ComicActionCallout text="EDIÇÃO ANOS 90!" tone="pink" />
               <span className="text-xs sm:text-sm font-extrabold text-stone-700 dark:text-slate-300 flex items-center gap-1.5">
                 <ShieldCheck className="w-4 h-4 text-[#0284C7]" />
-                <span>Guardião Oficial de Credenciais · 100% Client-Side</span>
+                <span>Gerenciador de senhas · criptografia feita no seu navegador</span>
               </span>
             </div>
 
@@ -243,46 +312,73 @@ export function WelcomeScreen({
             </h1>
 
             <p className="text-base sm:text-lg font-semibold text-stone-700 dark:text-slate-300 max-w-2xl leading-relaxed">
-              O <strong>DonutVault</strong> une a estética vibrante de quadrinhos e desenhos animados dos anos 90 com engenharia criptográfica de verdade: <strong>AES-256-GCM autenticado</strong>, derivação <strong>Argon2id</strong> com salt aleatório e armazenamento blindado no seu navegador.
+              O <strong>DonutVault</strong> guarda suas senhas com cara de desenho animado e criptografia de verdade. Tudo é cifrado aqui, no seu navegador, antes de ser salvo, e só a sua <strong>Senha Mestra</strong> abre o cofre. Nem o servidor consegue ler.
             </p>
 
             {donutClicks >= 3 && (
               <ComicSpeechBubble speaker="EASTER EGG DO INSPETOR BARNABY" tone="yellow" tailDirection="none">
-                &ldquo;WOO-HOO! Você descobriu o estoque secreto de rosquinhas de morango de 256 bits do Setor 7G!&rdquo;
+                &ldquo;Você achou a rosquinha secreta! Ela também é cifrada.&rdquo;
               </ComicSpeechBubble>
             )}
 
-            {/* Os 3 Botões Obrigatórios da Tela Inicial usando Neobrutal-UI Button */}
+            {/* Ações principais. Com um cofre salvo, a principal é desbloquear: criar outro
+                cofre fica só como link discreto no formulário, atrás de uma confirmação. */}
             <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Button
-                type="button"
-                variant="default"
-                size="lg"
-                onClick={() => resetForm('create')}
-              >
-                <PlusCircle className="w-5 h-5 stroke-[2.5]" />
-                <span>Criar meu cofre</span>
-              </Button>
+              {hasExistingVault ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="lg"
+                    onClick={() => resetForm('unlock')}
+                  >
+                    <Unlock className="w-5 h-5 stroke-[2.5]" />
+                    <span>Desbloquear meu cofre</span>
+                  </Button>
 
-              <Button
-                type="button"
-                variant="sky"
-                size="lg"
-                onClick={() => resetForm('unlock')}
-              >
-                <Unlock className="w-5 h-5 stroke-[2.5]" />
-                <span>Desbloquear cofre</span>
-              </Button>
+                  <Button
+                    type="button"
+                    variant="neutral"
+                    size="lg"
+                    onClick={() => requestReplace('import')}
+                  >
+                    <Upload className="w-5 h-5 text-pink" />
+                    <span>Restaurar backup</span>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="lg"
+                    onClick={() => resetForm('create')}
+                  >
+                    <PlusCircle className="w-5 h-5 stroke-[2.5]" />
+                    <span>Criar meu cofre</span>
+                  </Button>
 
-              <Button
-                type="button"
-                variant="neutral"
-                size="lg"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload className="w-5 h-5 text-pink" />
-                <span>Importar backup criptografado</span>
-              </Button>
+                  <Button
+                    type="button"
+                    variant="sky"
+                    size="lg"
+                    onClick={() => resetForm('unlock')}
+                  >
+                    <Unlock className="w-5 h-5 stroke-[2.5]" />
+                    <span>Desbloquear cofre</span>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="neutral"
+                    size="lg"
+                    onClick={() => requestReplace('import')}
+                  >
+                    <Upload className="w-5 h-5 text-pink" />
+                    <span>Importar backup criptografado</span>
+                  </Button>
+                </>
+              )}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -295,13 +391,11 @@ export function WelcomeScreen({
 
             {/* Resumo técnico em texto limpo sem pílulas */}
             <div className="pt-2 flex flex-wrap items-center gap-y-2 gap-x-3 text-xs font-extrabold text-stone-700 dark:text-slate-300">
-              <span>AES-256-GCM Autenticado</span>
+              <span>AES-256-GCM e Argon2id</span>
               <span aria-hidden="true">·</span>
-              <span>Argon2id + Salt de 128 bits</span>
+              <span>Funciona sem internet</span>
               <span aria-hidden="true">·</span>
-              <span>Nonces Únicos de 96 bits</span>
-              <span aria-hidden="true">·</span>
-              <span>Auditoria Offline zxcvbn</span>
+              <span>Sincronização opcional</span>
             </div>
           </div>
 
@@ -330,15 +424,17 @@ export function WelcomeScreen({
                         className="mb-1.5 text-[10px] px-2 py-0.5"
                       />
                       <CardTitle className="text-xl text-[#09090B] dark:text-white">
-                        {activeModal === 'create'
-                          ? 'Novo Cofre Blindado'
-                          : activeModal === 'import'
-                            ? 'Restaurar Backup'
-                            : 'Portão do Setor 7G'}
+                        {activeModal === 'confirm-replace'
+                          ? 'Substituir o cofre deste navegador?'
+                          : activeModal === 'create'
+                            ? 'Novo cofre'
+                            : activeModal === 'import'
+                              ? 'Restaurar Backup'
+                              : 'Seu cofre'}
                       </CardTitle>
                       <CardDescription className="text-xs font-bold text-stone-700 dark:text-slate-300 mt-0.5">
                         {hasExistingVault
-                          ? `Cofre local pronto${existingVaultUpdatedAt ? ` · ${new Date(existingVaultUpdatedAt).toLocaleDateString('pt-BR')}` : ''}`
+                          ? `Cofre local pronto${existingVaultDate ? ` · ${existingVaultDate}` : ''}`
                           : 'Crie seu cofre criptografado em segundos!'}
                       </CardDescription>
                     </div>
@@ -358,7 +454,7 @@ export function WelcomeScreen({
                       tone="yellow"
                       tailDirection="top"
                     >
-                      &ldquo;Olá, vizinho! Eu sou o <strong>Barnaby</strong>, pai de família atrapalhado mas especialista em blindagem de rosquinhas! Suas senhas nunca saem do seu computador!&rdquo;
+                      &ldquo;Oi! Eu sou o <strong>Barnaby</strong>, o guarda deste cofre. Suas senhas são cifradas aqui mesmo, no seu navegador, antes de qualquer coisa.&rdquo;
                     </ComicSpeechBubble>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -382,9 +478,94 @@ export function WelcomeScreen({
                   </div>
                 )}
 
+                {/* Confirmação antes de substituir o cofre salvo. Momento de risco: texto direto,
+                    backup oferecido antes e ação destrutiva só depois de marcar que entendeu. */}
+                {activeModal === 'confirm-replace' && (
+                  <div className="space-y-4" aria-live="polite">
+                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border-3 border-border">
+                      <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-rose-700 dark:text-rose-300" />
+                      <div className="space-y-1.5 text-sm text-stone-900 dark:text-rose-50">
+                        <p className="font-extrabold">
+                          {replaceIntent === 'create'
+                            ? 'Criar outro cofre apaga o cofre salvo neste navegador.'
+                            : 'Restaurar um backup apaga o cofre salvo neste navegador.'}
+                        </p>
+                        <p className="font-medium leading-relaxed">
+                          O cofre atual
+                          {existingVaultDate ? `, atualizado em ${existingVaultDate},` : ''} sai
+                          daqui e o novo fica no lugar. Se ele não estiver sincronizado com o
+                          servidor nem guardado em um backup, as senhas dele se perdem.
+                        </p>
+                      </div>
+                    </div>
+
+                    {onExportExistingVault && (
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Button
+                          type="button"
+                          variant="neutral"
+                          onClick={handleDownloadExistingBackup}
+                          autoFocus
+                        >
+                          <Download className="w-4 h-4" />
+                          <span>Baixar backup do cofre atual</span>
+                        </Button>
+                        {backupDownloaded && (
+                          <span className="flex items-center gap-1.5 text-xs font-extrabold text-emerald-800 dark:text-emerald-300">
+                            <CheckCircle2 className="w-4 h-4" />
+                            Backup baixado
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <label className="flex items-start gap-2.5 text-sm font-semibold cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={replaceAcknowledged}
+                        onChange={(e) => setReplaceAcknowledged(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 accent-destructive"
+                      />
+                      <span>Entendo que o cofre atual será apagado deste navegador.</span>
+                    </label>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={!replaceAcknowledged}
+                        onClick={confirmReplace}
+                        className="flex-1"
+                      >
+                        {replaceIntent === 'create'
+                          ? 'Apagar e criar outro cofre'
+                          : 'Apagar e restaurar o backup'}
+                      </Button>
+                      <Button type="button" variant="neutral" onClick={cancelReplace}>
+                        Voltar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Formulário: CRIAR MEU COFRE */}
                 {activeModal === 'create' && (
                   <form onSubmit={handleCreateSubmit} className="space-y-3.5">
+                    {hasExistingVault && (
+                      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border-2 border-border text-xs">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-700 dark:text-rose-300" />
+                        <span className="font-semibold text-stone-900 dark:text-rose-50">
+                          Este cofre novo vai substituir o cofre salvo neste navegador.{' '}
+                          <button
+                            type="button"
+                            onClick={cancelReplace}
+                            className="font-extrabold underline underline-offset-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                          >
+                            Cancelar
+                          </button>
+                        </span>
+                      </div>
+                    )}
                     <div>
                       <label
                         htmlFor="vault-name-input"
@@ -397,7 +578,7 @@ export function WelcomeScreen({
                         type="text"
                         value={vaultName}
                         onChange={(e) => setVaultName(e.target.value)}
-                        placeholder="Ex: Cofre da Família de Springfield"
+                        placeholder="Ex.: Pessoal, Trabalho"
                         required
                       />
                     </div>
@@ -473,17 +654,6 @@ export function WelcomeScreen({
                       />
                     </div>
 
-                    <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#FEF08A]/70 dark:bg-slate-800 border-2 border-border cursor-pointer text-xs">
-                      <input
-                        type="checkbox"
-                        checked={includeSampleData}
-                        onChange={(e) => setIncludeSampleData(e.target.checked)}
-                        className="mt-0.5 accent-pink w-4 h-4"
-                      />
-                      <span className="font-semibold text-foreground">
-                        <strong>Incluir credenciais divertidas de Springfield</strong> (ótimo para testar a Auditoria, Favoritos e Categorias na hora!)
-                      </span>
-                    </label>
 
                     <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#E0F2FE]/70 dark:bg-slate-800 border-2 border-border cursor-pointer text-xs">
                       <input
@@ -500,7 +670,7 @@ export function WelcomeScreen({
                     </label>
 
                     {errorMsg && (
-                      <ComicSpeechBubble speaker="ALERTA DO SETOR 7G" tone="danger" tailDirection="none">
+                      <ComicSpeechBubble speaker="REVISE ANTES DE CONTINUAR" tone="danger" tailDirection="none">
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="w-4 h-4 shrink-0" />
                           <span>{errorMsg}</span>
@@ -518,8 +688,8 @@ export function WelcomeScreen({
                       <Lock className="w-4 h-4" />
                       <span>
                         {isProcessing
-                          ? 'Derivando Argon2id e Criptografando...'
-                          : 'Criar e Criptografar Cofre'}
+                          ? 'Criando o cofre…'
+                          : 'Criar cofre'}
                       </span>
                     </Button>
                   </form>
@@ -571,7 +741,7 @@ export function WelcomeScreen({
                     </div>
 
                     {errorMsg && (
-                      <ComicSpeechBubble speaker="D'OH! ACESSO NEGADO" tone="danger" tailDirection="none">
+                      <ComicSpeechBubble speaker="NÃO FOI POSSÍVEL ABRIR" tone="danger" tailDirection="none">
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="w-4 h-4 shrink-0" />
                           <span>{errorMsg}</span>
@@ -588,23 +758,44 @@ export function WelcomeScreen({
                       >
                         <Unlock className="w-4 h-4" />
                         <span>
-                          {isProcessing ? 'Validando Argon2id...' : 'Desbloquear Cofre'}
+                          {isProcessing ? 'Abrindo o cofre…' : 'Desbloquear Cofre'}
                         </span>
                       </Button>
-                      <Button
-                        type="button"
-                        variant="neutral"
-                        onClick={() => resetForm('create')}
-                      >
-                        Criar Novo
-                      </Button>
                     </div>
+
+                    {hasExistingVault && (
+                      <p className="text-xs font-semibold text-stone-700 dark:text-slate-300">
+                        Quer começar do zero?{' '}
+                        <button
+                          type="button"
+                          onClick={() => requestReplace('create')}
+                          className="font-extrabold text-foreground underline underline-offset-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                        >
+                          Criar outro cofre
+                        </button>
+                      </p>
+                    )}
                   </form>
                 )}
 
                 {/* Formulário: IMPORTAR BACKUP CRIPTOGRAFADO */}
                 {activeModal === 'import' && (
                   <form onSubmit={handleImportSubmit} className="space-y-4">
+                    {hasExistingVault && (
+                      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border-2 border-border text-xs">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-700 dark:text-rose-300" />
+                        <span className="font-semibold text-stone-900 dark:text-rose-50">
+                          Este backup vai substituir o cofre salvo neste navegador.{' '}
+                          <button
+                            type="button"
+                            onClick={cancelReplace}
+                            className="font-extrabold underline underline-offset-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-ring"
+                          >
+                            Cancelar
+                          </button>
+                        </span>
+                      </div>
+                    )}
                     <div className="p-3 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 border-3 border-border text-xs flex items-center gap-2.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
                       <span className="font-bold text-stone-900 dark:text-emerald-200 truncate">
@@ -647,7 +838,7 @@ export function WelcomeScreen({
                         className="flex-1"
                       >
                         {isProcessing
-                          ? 'Verificando SHA-256...'
+                          ? 'Verificando o backup…'
                           : 'Restaurar e Desbloquear'}
                       </Button>
                       <Button
@@ -665,78 +856,61 @@ export function WelcomeScreen({
           </div>
         </div>
 
-        {/* Faixa de Arquitetura de Segurança Real em Cards Neobrutal-UI */}
+        {/* Como o cofre protege, em linguagem comum */}
         <section
           id="criptografia"
           className="mt-8 pt-6 border-t-3 border-border grid grid-cols-1 md:grid-cols-4 gap-5"
         >
           <Card className="py-4 gap-2 bg-[#FEF08A] dark:bg-slate-800 text-[#09090B] dark:text-white">
             <CardContent className="px-5">
-              <p className="font-mono text-xs font-black text-[#0284C7] dark:text-[#38BDF8]">
-                01. AES-256-GCM AUTENTICADO
-              </p>
-              <h3 className="font-display text-base font-black mt-1">
-                Envelope Encryption Real
-              </h3>
+              <h3 className="font-display text-base font-black">Cifrado no seu aparelho</h3>
               <p className="text-xs font-semibold opacity-85 mt-1 leading-relaxed">
-                Chave aleatória de 256 bits (DEK) gerada via Web Crypto API e embrulhada pela chave derivada da Senha Mestra.
+                Cada senha é cifrada no navegador antes de ser salva. Sem a Senha Mestra, o que
+                fica guardado é ilegível, inclusive para o servidor.
               </p>
             </CardContent>
           </Card>
 
-          <Card id="argon2id" className="py-4 gap-2 bg-[#E0F2FE] dark:bg-slate-800 text-[#09090B] dark:text-white">
+          <Card className="py-4 gap-2 bg-[#E0F2FE] dark:bg-slate-800 text-[#09090B] dark:text-white">
             <CardContent className="px-5">
-              <p className="font-mono text-xs font-black text-pink">
-                02. ARGON2ID + SALT 128-BIT
-              </p>
-              <h3 className="font-display text-base font-black mt-1">
-                Resistente a GPU & ASIC
-              </h3>
+              <h3 className="font-display text-base font-black">Difícil de adivinhar</h3>
               <p className="text-xs font-semibold opacity-85 mt-1 leading-relaxed">
-                Derivação memory-hard Argon2id com salt único de 16 bytes e nonces exclusivos de 12 bytes a cada gravação.
+                A Senha Mestra passa pelo Argon2id, que deixa cada tentativa de adivinhação lenta
+                e cara. Por isso o cofre exige uma senha forte.
               </p>
             </CardContent>
           </Card>
 
           <Card id="auditoria" className="py-4 gap-2 bg-[#FCE7F3] dark:bg-slate-800 text-[#09090B] dark:text-white">
             <CardContent className="px-5">
-              <p className="font-mono text-xs font-black text-emerald-700 dark:text-emerald-400">
-                03. AUDITORIA ZXCVBN LOCAL
-              </p>
-              <h3 className="font-display text-base font-black mt-1">
-                Zero Vazamento de Rede
-              </h3>
+              <h3 className="font-display text-base font-black">Saúde das senhas</h3>
               <p className="text-xs font-semibold opacity-85 mt-1 leading-relaxed">
-                Análise de entropia, senhas repetidas e antigas executada 100% offline, sem enviar nada para APIs externas.
+                Mostra senhas fracas, repetidas e antigas e ajuda a trocar. A análise roda no seu
+                aparelho, sem enviar nada para fora.
               </p>
             </CardContent>
           </Card>
 
-          <Card id="zero-knowledge" className="py-4 gap-2 bg-[#DCFCE7] dark:bg-slate-800 text-[#09090B] dark:text-white">
+          <Card id="sincronizacao" className="py-4 gap-2 bg-[#DCFCE7] dark:bg-slate-800 text-[#09090B] dark:text-white">
             <CardContent className="px-5">
-              <p className="font-mono text-xs font-black text-amber-800 dark:text-amber-300">
-                04. INDEXEDDB + SHA-256
-              </p>
-              <h3 className="font-display text-base font-black mt-1">
-                Integridade Verificada
-              </h3>
+              <h3 className="font-display text-base font-black">Você escolhe onde fica</h3>
               <p className="text-xs font-semibold opacity-85 mt-1 leading-relaxed">
-                Armazenamento local criptografado com verificação de integridade SHA-256 e bloqueio automático por inatividade.
+                Use só neste navegador, exporte um backup cifrado ou ative a sincronização. O
+                cofre tranca sozinho quando você se afasta.
               </p>
             </CardContent>
           </Card>
         </section>
       </main>
 
-      {/* Rodapé Neobrutalista com aviso responsável */}
+      {/* Rodapé com a versão e uma nota honesta sobre auditoria */}
       <footer className="w-full bg-secondary-background border-t-3 border-border">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-stone-600 dark:text-slate-400">
           <span>
-            <strong>DonutVault v0.9.3</strong> — Neobrutal-UI & StreamUI Comic Edition · Web Crypto API + Argon2id.
+            <strong>DonutVault v0.9.3</strong> · Criptografia no navegador com Web Crypto e
+            Argon2id.
           </span>
-          <span>
-            Aviso técnico: Protótipo educacional e demonstrativo; recomenda-se auditoria independente antes de uso crítico.
-          </span>
+          <span>Projeto independente, ainda sem auditoria de segurança externa.</span>
         </div>
       </footer>
     </div>

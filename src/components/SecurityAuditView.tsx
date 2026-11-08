@@ -88,12 +88,12 @@ export function SecurityAuditView({
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="font-display text-2xl sm:text-3xl font-black">
-              🛡️ Segurança do Cofre & Auditoria
+              Saúde das senhas
             </h1>
-            <ComicActionCallout text="ZXCVBN OFFLINE!" tone="emerald" />
+            <ComicActionCallout text="NESTE APARELHO" tone="emerald" />
           </div>
           <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
-            Análise local via motor <strong>zxcvbn</strong>. Nenhuma senha jamais é enviada para servidores ou APIs externas.
+            A análise roda neste aparelho. Nenhuma senha é enviada para fora.
           </p>
         </div>
       </div>
@@ -120,7 +120,7 @@ export function SecurityAuditView({
                 <span className="text-xl text-stone-500">/100</span>
               </div>
               <p className="text-xs font-black uppercase tracking-wider text-pink mt-1">
-                Índice de Blindagem Setor 7G
+                Saúde das senhas
               </p>
               <ComicSpeechBubble
                 speaker="INSPETOR BARNABY"

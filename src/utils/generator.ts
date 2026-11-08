@@ -7,14 +7,14 @@ const NUMBER_CHARS = '0123456789';
 const SYMBOL_CHARS = '!@#$%^&*()-_=+[]{}|;:,.<>?';
 const AMBIGUOUS_CHARS = new Set(['0', 'O', 'o', '1', 'l', 'I', '|', '`', "'", '"']);
 
-const SPRINGFIELD_PASSPHRASE_WORDS = [
-  'rosquinha', 'cobertura', 'confeito', 'springfield', 'usina', 'nuclear',
-  'sofazinho', ' televisão', 'cerveja', 'boliche', 'saxofone', 'skate',
-  'churrasco', 'hamburguer', 'atomo', 'reator', ' sirene', 'inspetor',
+const PASSPHRASE_WORDS = [
+  'rosquinha', 'cobertura', 'confeito', 'girassol', 'biblioteca', 'montanha',
+  'travesseiro', 'janela', 'oceano', 'lanterna', 'bicicleta', 'caderno',
+  'churrasco', 'castelo', 'floresta', 'cachoeira', 'farol', 'inspetor',
   'seguranca', 'cofre', 'blindado', 'cadeado', 'escudo', 'misterio',
   'aventura', 'comedia', 'amarelo', 'nuvem', 'parque', 'escola',
   'lanchonete', 'sorvete', ' caramelo', 'morango', 'chocolate', 'baunilha',
-  'crocante', 'quente', 'fresco', 'doce', 'padaria', 'turno',
+  'crocante', 'quente', 'fresco', 'doce', 'padaria', 'tapete',
   'soneca', 'rede', 'jardim', 'vizinho', 'garagem', 'ferramenta',
   'foguete', 'astronauta', 'espaco', 'planeta', 'estrela', 'cometa',
   'trofeu', 'campeao', 'equipe', 'estadio', 'apito', 'medalha',
@@ -77,7 +77,7 @@ export function generateSecurePassword(config: PasswordGeneratorConfig): string 
     const words: string[] = [];
 
     for (let i = 0; i < count; i++) {
-      let word = SPRINGFIELD_PASSPHRASE_WORDS[getUnbiasedRandomIndex(SPRINGFIELD_PASSPHRASE_WORDS.length)];
+      let word = PASSPHRASE_WORDS[getUnbiasedRandomIndex(PASSPHRASE_WORDS.length)];
       if (config.capitalizeWords) {
         word = word.charAt(0).toUpperCase() + word.slice(1);
       }
@@ -161,10 +161,8 @@ export function evaluatePasswordStrength(
   const ptBrCommonInputs = [
     'rosquinha',
     'senha',
-    'springfield',
     'barnaby',
     'familia',
-    'usina',
     'segredo',
     'donut',
     'donutvault',
@@ -209,7 +207,7 @@ export function evaluatePasswordStrength(
     score,
     level: 'strong',
     label: 'Forte',
-    funnyMessage: 'Excelente! O cofre está bem protegido!',
+    funnyMessage: 'Excelente! Essa senha é difícil de quebrar.',
     mascotMood: 'celebrating',
     crackTimeDisplay: score === 4 ? 'Séculos (Inquebrável!)' : 'Décadas',
     entropyGuessesLog10: Math.round(result.guesses_log10 * 10) / 10,

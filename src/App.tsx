@@ -11,6 +11,16 @@ import {
   X,
   Sun,
   Moon,
+  Home,
+  KeyRound,
+  Star,
+  Dices,
+  ShieldCheck,
+  StickyNote,
+  FolderOpen,
+  Trash2,
+  Settings,
+  type LucideIcon,
 } from 'lucide-react';
 import type {
   BackupRestoreStrategy,
@@ -22,13 +32,8 @@ import type {
 } from './types/vault';
 import { CryptoEngine, NEW_VAULT_ARGON2_PARAMS } from './services/CryptoEngine';
 import { checkMasterPasswordPolicy } from './utils/generator';
-import {
-  DeviceSecurityModel,
-  type EmergencyKitDocument,
-} from './services/DeviceSecurityModel';
 import { StorageService } from './services/StorageService';
 import { SyncAdapter } from './services/SyncAdapter';
-import { signInWithGooglePopup } from './lib/firebase';
 import {
   createEncryptedVaultEnvelope,
   unlockEncryptedVaultEnvelope,
@@ -42,7 +47,6 @@ import {
   deleteEncryptedEnvelopeFromIdb,
   parseAndValidateBackupJson,
 } from './utils/storage';
-import { createSampleSpringFieldPayload } from './utils/seedData';
 import { runVaultSecurityAudit } from './utils/audit';
 import { DonutVaultLogo } from './components/CartoonIllustrations';
 import { WelcomeScreen } from './components/WelcomeScreen';
@@ -62,17 +66,59 @@ import {
   type ComicToastMessage,
 } from './components/ui/comic';
 
-const SIDEBAR_ITEMS: { id: NavigationTab; label: string }[] = [
-  { id: 'dashboard', label: '🏠 Minha Springfield' },
-  { id: 'passwords', label: '🔐 Minhas Senhas' },
-  { id: 'favorites', label: '🍩 Favoritos' },
-  { id: 'generator', label: '🎲 Gerador de Senhas' },
-  { id: 'security', label: '🛡️ Auditoria de Segurança' },
-  { id: 'notes', label: '📝 Notas Secretas' },
-  { id: 'categories', label: '📁 Categorias' },
-  { id: 'trash', label: '🗑️ Lixeira' },
-  { id: 'settings', label: '⚙️ Configurações' },
+const SIDEBAR_ITEMS: { id: NavigationTab; label: string; icon: LucideIcon }[] = [
+  { id: 'dashboard', label: 'Início', icon: Home },
+  { id: 'passwords', label: 'Senhas', icon: KeyRound },
+  { id: 'favorites', label: 'Favoritos', icon: Star },
+  { id: 'generator', label: 'Gerador de senhas', icon: Dices },
+  { id: 'security', label: 'Saúde das senhas', icon: ShieldCheck },
+  { id: 'notes', label: 'Notas seguras', icon: StickyNote },
+  { id: 'categories', label: 'Categorias', icon: FolderOpen },
+  { id: 'trash', label: 'Lixeira', icon: Trash2 },
+  { id: 'settings', label: 'Configurações', icon: Settings },
 ];
+
+// Nome legível do aparelho para a lista de aparelhos conectados ("Chrome no Windows").
+function describeThisDevice(): {
+  name: string;
+  platform: 'desktop-web' | 'mobile-web';
+} {
+  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent;
+  const browser = /Edg\//.test(ua)
+    ? 'Edge'
+    : /OPR\//.test(ua)
+      ? 'Opera'
+      : /Firefox\//.test(ua)
+        ? 'Firefox'
+        : /Chrome\//.test(ua)
+          ? 'Chrome'
+          : /Safari\//.test(ua)
+            ? 'Safari'
+            : 'Navegador';
+  const system = /Android/.test(ua)
+    ? 'Android'
+    : /iPhone|iPad|iPod/.test(ua)
+      ? 'iPhone'
+      : /Windows/.test(ua)
+        ? 'Windows'
+        : /Mac OS X/.test(ua)
+          ? 'Mac'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : null;
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/.test(ua);
+  return {
+    name: system ? `${browser} no ${system}` : `${browser} neste aparelho`,
+    platform: mobile ? 'mobile-web' : 'desktop-web',
+  };
+}
+
+const SYNC_HEADLINE_DONE = 'Tudo sincronizado.';
+const SYNC_HEADLINE_SENDING = 'Enviando alterações cifradas…';
+const SYNC_HEADLINE_OFFLINE =
+  'Sem conexão. Suas alterações ficam guardadas e sobem quando a internet voltar.';
+const SYNC_HEADLINE_FAILED =
+  'Não foi possível sincronizar agora. Suas alterações continuam na fila.';
 
 export default function App() {
   const [isInitializing, setIsInitializing] = useState(true);
@@ -96,16 +142,15 @@ export default function App() {
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
   );
-  const [simulatedOffline, setSimulatedOffline] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncHeadline, setSyncHeadline] = useState(
-    '🍩 Suas rosquinhas estão sincronizadas!'
+    SYNC_HEADLINE_DONE
   );
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
   const [conflictsCount, setConflictsCount] = useState(0);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [serverCursor, setServerCursor] = useState<number>(0);
-  const [accountUid, setAccountUid] = useState<string>('barnaby-setor-7g');
+  const [accountUid, setAccountUid] = useState<string>('');
   const [syncAuthSession, setSyncAuthSession] = useState<{
     userUid: string;
     deviceId: string;
@@ -114,10 +159,8 @@ export default function App() {
   const [authorizedDevices, setAuthorizedDevices] = useState<
     SyncDeviceViewItem[]
   >([]);
-  const [emergencyKit, setEmergencyKit] =
-    useState<EmergencyKitDocument | null>(null);
   const serverCursorRef = useRef<number>(0);
-  const effectiveOnline = isOnline && !simulatedOffline;
+  const effectiveOnline = isOnline;
   // Cofres sem a configuração (criados antes dela) seguem sincronizando como antes.
   const syncEnabled = unlockedPayload?.settings?.syncEnabled !== false;
 
@@ -174,26 +217,6 @@ export default function App() {
         const existing = await loadEncryptedEnvelopeFromIdb();
         if (!mounted) return;
         setStoredEnvelope(existing);
-
-        // Atalho de demonstração (?autostart=1): existe só no modo de desenvolvimento e só cria
-        // um cofre quando este navegador ainda não tem nenhum. Antes valia em qualquer build e,
-        // se a senha de demonstração não abrisse o cofre salvo, gravava um cofre novo por cima:
-        // um link externo apagava o cofre de quem o abrisse.
-        const params = new URLSearchParams(window.location.search);
-        if (import.meta.env.DEV && !existing && params.get('autostart') === '1') {
-          const sample = createSampleSpringFieldPayload();
-          sample.settings = { ...sample.settings, syncEnabled: false };
-          const { envelope, sessionDek } = await createEncryptedVaultEnvelope(
-            'Rosquinha2026!',
-            sample
-          );
-          await saveEncryptedEnvelopeToIdb(envelope);
-          if (!mounted) return;
-          sessionDekRef.current = sessionDek;
-          setStoredEnvelope(envelope);
-          setUnlockedPayload(sample);
-          setTheme(sample.settings.theme);
-        }
       } catch {
         // IndexedDB indisponível ou vazio
       } finally {
@@ -237,13 +260,11 @@ export default function App() {
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
-      if (!simulatedOffline) {
-        setSyncHeadline('☁️ Enviando segredos criptografados...');
-      }
+      setSyncHeadline(SYNC_HEADLINE_SENDING);
     };
     const handleOffline = () => {
       setIsOnline(false);
-      setSyncHeadline('📴 Sem internet? Relaxa, o cofre continua aqui!');
+      setSyncHeadline(SYNC_HEADLINE_OFFLINE);
     };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -251,7 +272,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [simulatedOffline]);
+  }, []);
 
   // Inicializa sessão de dispositivo e sincronização Zero-Knowledge no PostgreSQL quando o cofre é desbloqueado
   const executeIncrementalSync = useCallback(
@@ -270,14 +291,14 @@ export default function App() {
       }
 
       if (!effectiveOnline) {
-        setSyncHeadline('📴 Sem internet? Relaxa, o cofre continua aqui!');
+        setSyncHeadline(SYNC_HEADLINE_OFFLINE);
         setPendingSyncCount(syncAdapterRef.current.getPendingQueue().length);
         return;
       }
 
       try {
         setIsSyncing(true);
-        setSyncHeadline('☁️ Enviando segredos criptografados...');
+        setSyncHeadline(SYNC_HEADLINE_SENDING);
 
         const vaultId = activeEnvelope.vaultId || activePayload.vaultId;
         const keyEpoch = activeEnvelope.keyEpoch || activePayload.keyEpoch || 1;
@@ -382,7 +403,7 @@ export default function App() {
         setPendingSyncCount(queueRemaining);
         setConflictsCount(archiveConflicts);
         setLastSyncedAt(new Date().toISOString());
-        setSyncHeadline('🍩 Suas rosquinhas estão sincronizadas!');
+        setSyncHeadline(SYNC_HEADLINE_DONE);
 
         // Atualiza lista de dispositivos autorizados
         const devRes = await fetch('/api/v1/auth/devices', {
@@ -399,8 +420,13 @@ export default function App() {
           }
         }
       } catch {
+        // Antes, qualquer falha aparecia como "sem internet", mesmo com o servidor fora do ar.
         setPendingSyncCount(syncAdapterRef.current.getPendingQueue().length);
-        setSyncHeadline('📴 Sem internet? Relaxa, o cofre continua aqui!');
+        setSyncHeadline(
+          typeof navigator !== 'undefined' && !navigator.onLine
+            ? SYNC_HEADLINE_OFFLINE
+            : SYNC_HEADLINE_FAILED
+        );
       } finally {
         setIsSyncing(false);
       }
@@ -448,13 +474,15 @@ export default function App() {
           ).slice(0, 24)}`;
           setAccountUid(vaultBasedUid);
 
+          const thisDevice = describeThisDevice();
           const registered =
             await syncAdapterRef.current.registerDeviceOnBackend('', {
               userUid: vaultBasedUid,
               email: `${vaultBasedUid}@donutvault.local`,
-              deviceName: 'Computador Principal (Setor 7G)',
-              platform: 'desktop-web',
-              authMethod: 'webauthn-passkey',
+              deviceName: thisDevice.name,
+              platform: thisDevice.platform,
+              // Sessão de aparelho; passkeys ainda não são usadas no navegador.
+              authMethod: 'session-token',
             });
           if (cancelled) return;
           currentAuth = {
@@ -574,7 +602,7 @@ export default function App() {
     if (effectiveOnline && syncAuthSession) {
       await executeIncrementalSync();
     } else {
-      setSyncHeadline('📴 Sem internet? Relaxa, o cofre continua aqui!');
+      setSyncHeadline(SYNC_HEADLINE_OFFLINE);
     }
   };
 
@@ -597,42 +625,63 @@ export default function App() {
     setUnlockedPayload(updatedPayload);
   };
 
+  // O estado de sincronização (cursor, fila e conflitos) pertence ao cofre que estava neste
+  // navegador. Quando outro cofre o substitui, esse estado é descartado; sem isso o cofre novo
+  // herdava o cursor e a fila do antigo e a primeira sincronização saía errada.
+  const resetSyncStateForReplacedVault = async () => {
+    syncAdapterRef.current = new SyncAdapter();
+    serverCursorRef.current = 0;
+    setServerCursor(0);
+    setPendingSyncCount(0);
+    setConflictsCount(0);
+    setSyncAuthSession(null);
+    setAuthorizedDevices([]);
+    await StorageService.clearPersistentSyncState();
+  };
+
   // Handlers de Autenticação / Criptografia Inicial
   const handleCreateVault = async (
     masterPassword: string,
     vaultName: string,
-    includeSampleData: boolean,
-    enableSync: boolean
+    enableSync: boolean,
+    replaceExisting = false
   ) => {
+    // Criar um cofre grava por cima do que estiver salvo neste navegador. Só com confirmação.
+    if (storedEnvelope && !replaceExisting) {
+      throw new Error(
+        'Já existe um cofre neste navegador. Confirme a substituição antes de criar outro.'
+      );
+    }
     const policy = checkMasterPasswordPolicy(masterPassword);
     if (!policy.ok) {
       throw new Error(policy.reason);
     }
-    const basePayload: VaultPayload = includeSampleData
-      ? createSampleSpringFieldPayload()
-      : {
-          version: 1,
-          vaultId: CryptoEngine.randomId('vault'),
-          revision: 1,
-          vaultName,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          credentials: [],
-          notes: [],
-          settings: {
-            autoLockMinutes: 5,
-            theme: 'light' as const,
-          },
-        };
-
-    basePayload.vaultName = vaultName;
-    basePayload.settings = { ...basePayload.settings, syncEnabled: enableSync };
+    // Cofre novo começa vazio: sem credenciais ou notas de exemplo.
+    const now = new Date().toISOString();
+    const basePayload: VaultPayload = {
+      version: 1,
+      vaultId: CryptoEngine.randomId('vault'),
+      revision: 1,
+      vaultName,
+      createdAt: now,
+      updatedAt: now,
+      credentials: [],
+      notes: [],
+      settings: {
+        autoLockMinutes: 5,
+        theme: 'light',
+        syncEnabled: enableSync,
+      },
+    };
     const { envelope, sessionDek } = await createEncryptedVaultEnvelope(
       masterPassword,
       basePayload,
       NEW_VAULT_ARGON2_PARAMS
     );
     await saveEncryptedEnvelopeToIdb(envelope);
+    if (storedEnvelope) {
+      await resetSyncStateForReplacedVault();
+    }
     sessionDekRef.current = sessionDek;
     setStoredEnvelope(envelope);
     setUnlockedPayload(basePayload);
@@ -640,7 +689,7 @@ export default function App() {
     setActiveTab('dashboard');
     triggerComicToast(
       'WOO-HOO!',
-      'Cofre criado e blindado com Argon2id + AES-256-GCM!',
+      'Cofre criado. Ele é cifrado neste navegador com a sua Senha Mestra.',
       'success'
     );
   };
@@ -670,7 +719,7 @@ export default function App() {
     }
     triggerComicToast(
       'ABERTO!',
-      'Cofre de Springfield desbloqueado com sucesso!',
+      'Cofre desbloqueado.',
       'success'
     );
   };
@@ -723,13 +772,19 @@ export default function App() {
       });
       triggerComicToast(
         'MESCLADO!',
-        'Backup criptografado mesclado sem perda de dados existentes!',
+        'Backup mesclado. Nada do que já estava no cofre foi perdido.',
         'success'
       );
       return;
     }
 
+    const replacingAnotherVault = Boolean(
+      storedEnvelope && storedEnvelope.vaultId !== validatedEnvelope.vaultId
+    );
     await saveEncryptedEnvelopeToIdb(validatedEnvelope);
+    if (replacingAnotherVault) {
+      await resetSyncStateForReplacedVault();
+    }
     if (sessionDekRef.current) {
       zeroizeBuffer(sessionDekRef.current);
     }
@@ -740,9 +795,24 @@ export default function App() {
     setActiveTab('dashboard');
     triggerComicToast(
       'RESTAURADO!',
-      'Backup criptografado validado via SHA-256 e restaurado!',
+      'Backup verificado e restaurado.',
       'success'
     );
+  };
+
+  // Na tela de entrada, restaurar um backup substitui o cofre salvo neste navegador.
+  // Com um cofre já salvo, só segue com a confirmação explícita da tela.
+  const handleWelcomeImport = async (
+    fileContent: string,
+    masterPassword: string,
+    replaceExisting: boolean
+  ) => {
+    if (storedEnvelope && !replaceExisting) {
+      throw new Error(
+        'Já existe um cofre neste navegador. Confirme a substituição antes de restaurar um backup.'
+      );
+    }
+    await handleImportBackup(fileContent, masterPassword, 'replace');
   };
 
   // Handlers CRUD de Credenciais
@@ -937,7 +1007,7 @@ export default function App() {
     URL.revokeObjectURL(url);
     triggerComicToast(
       'BACKUP!',
-      'Arquivo .donutvault.json exportado com assinatura SHA-256!',
+      'Backup cifrado baixado (.donutvault.json).',
       'success'
     );
   };
@@ -948,46 +1018,7 @@ export default function App() {
     [unlockedPayload?.credentials]
   );
 
-  // Handlers de Pareamento e Gerenciamento do Dashboard de Sincronização (§5 e §8)
-  const handleAuthorizeNewDevice = async (params: {
-    deviceName: string;
-    platform: 'desktop-web' | 'mobile-web' | 'ios' | 'android';
-    authMethod: 'webauthn-passkey' | 'firebase-oauth' | 'session-token';
-  }) => {
-    try {
-      const res = await syncAdapterRef.current.registerDeviceOnBackend(
-        '',
-        {
-          userUid: accountUid,
-          email: `${accountUid}@donutvault.local`,
-          deviceName: params.deviceName,
-          platform: params.platform,
-          authMethod: params.authMethod,
-        },
-        syncAuthSession
-          ? {
-              deviceId: syncAuthSession.deviceId,
-              sessionToken: syncAuthSession.sessionToken,
-            }
-          : undefined
-      );
-      setAuthorizedDevices((prev) => [res.device, ...prev]);
-      setSyncHeadline('🔐 Novo dispositivo autorizado!');
-      triggerComicToast(
-        'PAREADO!',
-        '🔐 Novo dispositivo autorizado!',
-        'success',
-        `O aparelho "${res.device.deviceName}" agora pode baixar registros criptografados.`
-      );
-    } catch (err) {
-      triggerComicToast(
-        'D’OH!',
-        err instanceof Error ? err.message : 'Erro ao autorizar dispositivo.',
-        'danger'
-      );
-    }
-  };
-
+  // Aparelhos conectados à sincronização
   const handleRevokeDevice = async (targetDeviceId: string) => {
     if (!syncAuthSession) return;
     try {
@@ -1015,7 +1046,7 @@ export default function App() {
       );
       triggerComicToast(
         'REVOGADO!',
-        'Sessão do dispositivo revogada no servidor!',
+        'Aparelho revogado. Ele não sincroniza mais.',
         'warning'
       );
     } catch (err) {
@@ -1023,77 +1054,6 @@ export default function App() {
         'ERRO!',
         err instanceof Error ? err.message : 'Erro ao revogar dispositivo.',
         'danger'
-      );
-    }
-  };
-
-  const handleGenerateEmergencyKit = async () => {
-    if (!storedEnvelope || !sessionDekRef.current) return;
-    try {
-      const nextRecoveryVersion =
-        (emergencyKit?.recoveryMetadata?.recoveryKeyVersion || 0) + 1;
-      const kit =
-        await DeviceSecurityModel.generateVerifiedCryptographicEmergencyKit({
-          sessionDek: sessionDekRef.current,
-          vaultId: storedEnvelope.vaultId,
-          accountIdentifier: `${accountUid}@donutvault.local`,
-          keyEpoch: storedEnvelope.keyEpoch || 1,
-          recoveryKeyVersion: nextRecoveryVersion,
-          kdfProfile: storedEnvelope.kdfParams,
-        });
-      setEmergencyKit(kit);
-
-      if (kit.recoveryMetadata && syncAuthSession && effectiveOnline) {
-        await fetch('/api/v1/sync/vault/recovery', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${syncAuthSession.sessionToken}`,
-            'X-Device-Id': syncAuthSession.deviceId,
-            'X-User-Uid': syncAuthSession.userUid,
-          },
-          body: JSON.stringify({
-            vaultId: storedEnvelope.vaultId,
-            recoveryKeyVersion: kit.recoveryMetadata.recoveryKeyVersion,
-            recoverySaltHex: kit.recoveryMetadata.recoverySaltHex,
-            recoveryWrappedDekHex: kit.recoveryMetadata.recoveryWrappedDekHex,
-            recoveryDekNonceHex: kit.recoveryMetadata.recoveryDekNonceHex,
-            recoveryKeyCommitmentSha256:
-              kit.recoveryMetadata.recoveryKeyCommitmentSha256,
-          }),
-        }).catch(() => undefined);
-      }
-
-      triggerComicToast(
-        'KIT GERADO!',
-        'Kit de Emergência com Chave de Recuperação de 256 bits e DEK encapsulada criado localmente!',
-        'success'
-      );
-    } catch (err) {
-      triggerComicToast(
-        'ERRO!',
-        err instanceof Error
-          ? err.message
-          : 'Erro ao gerar Kit de Emergência criptográfico.',
-        'danger'
-      );
-    }
-  };
-
-  const handleSignInGoogle = async () => {
-    try {
-      const { user } = await signInWithGooglePopup();
-      setAccountUid(user.uid);
-      triggerComicToast(
-        'AUTENTICADO!',
-        `Conta Google (${user.email || user.uid}) conectada com sucesso!`,
-        'success'
-      );
-    } catch {
-      triggerComicToast(
-        'INFO',
-        'Mantendo autenticação local por Passkey/Token de Sessão.',
-        'info'
       );
     }
   };
@@ -1130,42 +1090,13 @@ export default function App() {
     pendingCount: pendingSyncCount,
     conflictsCount,
     lastSyncedAt,
-    serverCursor,
     currentDeviceId: syncAuthSession?.deviceId || null,
-    accountUid,
     devices: authorizedDevices,
-    emergencyKit,
     onManualSync: async () => {
       await executeIncrementalSync();
-      triggerComicToast(
-        'SYNC!',
-        '🍩 Suas rosquinhas estão sincronizadas!',
-        'success'
-      );
+      triggerComicToast('SYNC!', SYNC_HEADLINE_DONE, 'success');
     },
-    onToggleSimulatedOffline: () => {
-      setSimulatedOffline((prev) => {
-        const next = !prev;
-        if (next) {
-          setSyncHeadline('📴 Sem internet? Relaxa, o cofre continua aqui!');
-          triggerComicToast(
-            'OFFLINE!',
-            '📴 Sem internet? Relaxa, o cofre continua aqui!',
-            'warning'
-          );
-        } else {
-          setSyncHeadline('☁️ Enviando segredos criptografados...');
-          setTimeout(() => {
-            executeIncrementalSync();
-          }, 80);
-        }
-        return next;
-      });
-    },
-    onAuthorizeNewDevice: handleAuthorizeNewDevice,
     onRevokeDevice: handleRevokeDevice,
-    onGenerateEmergencyKit: handleGenerateEmergencyKit,
-    onSignInGoogle: handleSignInGoogle,
   };
 
   if (isInitializing) {
@@ -1187,7 +1118,8 @@ export default function App() {
         existingVaultUpdatedAt={storedEnvelope?.updatedAt}
         onCreateVault={handleCreateVault}
         onUnlockVault={handleUnlockVault}
-        onImportBackupFile={handleImportBackup}
+        onImportBackupFile={handleWelcomeImport}
+        onExportExistingVault={handleExportBackup}
       />
     );
   }
@@ -1232,7 +1164,10 @@ export default function App() {
                       : 'text-foreground hover:bg-white/80 dark:hover:bg-slate-800 border-3 border-transparent hover:border-border'
                   }`}
                 >
-                  <span className="truncate">{item.label}</span>
+                  <span className="flex items-center gap-2.5 min-w-0">
+                    <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{item.label}</span>
+                  </span>
                   {item.id === 'trash' && trashCount > 0 && (
                     <span className="font-mono text-xs tabular-nums">
                       ({trashCount})
@@ -1290,14 +1225,14 @@ export default function App() {
               onClick={() => setActiveTab('dashboard')}
               className="hover:text-pink cursor-pointer whitespace-nowrap"
             >
-              Visão Geral
+              Início
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('generator')}
               className="hover:text-pink cursor-pointer whitespace-nowrap"
             >
-              Gerador CSPRNG
+              Gerador
             </button>
             <button
               type="button"
@@ -1365,7 +1300,10 @@ export default function App() {
                     : 'text-foreground'
                 }`}
               >
-                <span>{item.label}</span>
+                <span className="flex items-center gap-2.5">
+                  <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>{item.label}</span>
+                </span>
               </button>
             ))}
             <Button
@@ -1529,7 +1467,7 @@ export default function App() {
                 setStoredEnvelope(rotatedEnvelope);
                 triggerComicToast(
                   'BLINDADO!',
-                  'Senha Mestra rotacionada com novo salt Argon2id!',
+                  'Senha Mestra trocada.',
                   'success'
                 );
               }}

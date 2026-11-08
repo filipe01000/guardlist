@@ -223,7 +223,7 @@ export function PasswordsView({
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!serviceName.trim()) {
-      setFormError('Informe o nome do serviço (ex: Painel Setor 7G, Netflix, Banco).');
+      setFormError('Informe o nome do serviço (ex.: E-mail, Banco, Netflix).');
       return;
     }
     if (!password) {
@@ -263,7 +263,7 @@ export function PasswordsView({
     onNotify?.(
       'WOO-HOO!',
       editingItem
-        ? `Credencial "${serviceName.trim()}" atualizada com novo nonce AES-256-GCM!`
+        ? `Credencial "${serviceName.trim()}" atualizada.`
         : `Nova senha de "${serviceName.trim()}" criptografada no cofre!`,
       'success'
     );
@@ -283,12 +283,12 @@ export function PasswordsView({
           <div className="flex items-center gap-2.5">
             <h1 className="font-display text-2xl sm:text-3xl font-black">
               {mode === 'favorites'
-                ? '🍩 Rosquinhas Favoritas'
+                ? 'Favoritos'
                 : mode === 'categories'
-                  ? '📁 Categorias de Springfield'
+                  ? 'Categorias'
                   : mode === 'trash'
-                    ? '🗑️ Lixeira do Cofre'
-                    : '🔐 Minhas Senhas'}
+                    ? 'Lixeira'
+                    : 'Senhas'}
             </h1>
             <ComicActionCallout
               text={`${filteredCredentials.length} ITENS`}
@@ -298,7 +298,7 @@ export function PasswordsView({
           <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
             {mode === 'trash'
               ? 'Credenciais excluídas podem ser restauradas ou destruídas permanentemente.'
-              : 'Todas as credenciais e metadados são criptografados com AES-256-GCM antes de salvar.'}
+              : 'Tudo aqui é cifrado neste aparelho antes de ser salvo.'}
           </p>
         </div>
 
@@ -812,7 +812,7 @@ export function PasswordsView({
                     type="text"
                     value={serviceName}
                     onChange={(e) => setServiceName(e.target.value)}
-                    placeholder="Ex: Painel Nuclear, Banco, Netflix"
+                    placeholder="Ex.: E-mail, Banco, Netflix"
                     required
                   />
                 </div>

@@ -110,7 +110,7 @@ export class VaultService {
     return this.enqueueMutation(async () => {
       const now = new Date().toISOString();
       const cleanName =
-        sanitizePlainText(vaultName, 120).trim() || 'Cofre de Springfield';
+        sanitizePlainText(vaultName, 120).trim() || 'Meu cofre';
       const basePayload: VaultPayload = includeSampleData
         ? createSampleSpringFieldPayload()
         : {
