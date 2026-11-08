@@ -24,6 +24,7 @@ import {
   registerOrUpdateVaultMetadataInDb,
   revokeUserDeviceInDb,
   revokeVaultRecoveryKeyInDb,
+  rotateDeviceSessionInDb,
   saveVaultRecoveryWrapInDb,
   saveWebAuthnCredentialInDb,
   verifyAndAdvanceWebAuthnCounterInDb,
@@ -213,9 +214,7 @@ export function createSyncApiRouter(): express.Router {
     '/auth/webauthn/register/options',
     async (req: Request, res: Response) => {
       const clientIp =
-        (req.headers['x-forwarded-for'] as string) ||
-        req.socket.remoteAddress ||
-        '127.0.0.1';
+        extractClientIp(req);
       const rl = checkRateLimit(`webauthn-reg-opt:${clientIp}`, 40, 60_000);
       if (!rl.allowed) {
         res.status(429).json({ error: 'Rate limit excedido (429).' });
@@ -326,9 +325,7 @@ export function createSyncApiRouter(): express.Router {
     '/auth/webauthn/register/verify',
     async (req: Request, res: Response) => {
       const clientIp =
-        (req.headers['x-forwarded-for'] as string) ||
-        req.socket.remoteAddress ||
-        '127.0.0.1';
+        extractClientIp(req);
       try {
         const userUid = String(req.body?.userUid || '').trim();
         const email = String(
@@ -734,9 +731,7 @@ export function createSyncApiRouter(): express.Router {
     '/auth/passkey/challenge',
     async (req: Request, res: Response) => {
       const clientIp =
-        (req.headers['x-forwarded-for'] as string) ||
-        req.socket.remoteAddress ||
-        '127.0.0.1';
+        extractClientIp(req);
       const rl = checkRateLimit(`challenge:${clientIp}`, 60, 60_000);
       if (!rl.allowed) {
         res.status(429).json({ error: 'Rate limit excedido (429).' });
@@ -785,9 +780,7 @@ export function createSyncApiRouter(): express.Router {
   // Fase 5A (§1): Bloqueia tentativas não autenticadas de registrar dispositivo em conta existente alheia!
   router.post('/auth/devices/register', async (req: Request, res: Response) => {
     const clientIp =
-      (req.headers['x-forwarded-for'] as string) ||
-      req.socket.remoteAddress ||
-      '127.0.0.1';
+      extractClientIp(req);
     const rl = checkRateLimit(`register:${clientIp}`, 40, 60_000);
     if (!rl.allowed) {
       res.status(429).json({ error: 'Rate limit excedido (429).' });
@@ -838,13 +831,16 @@ export function createSyncApiRouter(): express.Router {
 
       // Verifica se o chamador apresentou sessão autenticada válida da própria conta
       let verifiedOwner = false;
+      // Aparelho deste mesmo navegador, quando a prova veio do cookie HttpOnly dele.
+      let sameBrowserDeviceId: string | null = null;
       const cookies = parseCookieHeader(req.headers.cookie);
-      const callerToken =
-        req.headers.authorization?.replace(/^Bearer\s+/i, '').trim() ||
-        cookies.dvlt_sid ||
-        '';
+      const headerToken =
+        req.headers.authorization?.replace(/^Bearer\s+/i, '').trim() || '';
+      const callerToken = headerToken || cookies.dvlt_sid || '';
       const callerDeviceId =
         (req.headers['x-device-id'] as string) || cookies.dvlt_did || '';
+      const provedByOwnCookie =
+        !headerToken && Boolean(cookies.dvlt_sid) && Boolean(cookies.dvlt_did);
 
       if (callerToken && callerDeviceId) {
         try {
@@ -854,6 +850,13 @@ export function createSyncApiRouter(): express.Router {
             rawSessionToken: callerToken,
           });
           verifiedOwner = existingDevice.userUid === userUid;
+          if (
+            verifiedOwner &&
+            provedByOwnCookie &&
+            existingDevice.deviceId === cookies.dvlt_did
+          ) {
+            sameBrowserDeviceId = existingDevice.deviceId;
+          }
         } catch (sessionError) {
           // Sessão ausente, expirada, revogada ou de outra conta: segue como não comprovado.
           // Falhas de banco continuam sendo erro.
@@ -863,29 +866,42 @@ export function createSyncApiRouter(): express.Router {
         }
       }
 
+      // O app chama este cadastro a cada desbloqueio. Quando o navegador já tem sessão própria,
+      // ela é renovada no mesmo registro e o token antigo deixa de valer; antes cada desbloqueio
+      // criava outro aparelho com sessão de 30 dias. Passkeys continuam criando um registro novo.
+      const renewsOwnSession =
+        sameBrowserDeviceId !== null && !webauthnCredentialId && !publicKeySpkiB64;
+
       // A posse da conta é sempre exigida quando ela já existe. Antes, a checagem só valia
       // se o próprio cliente pedisse (`enforceStrictOwnership`), o que permitia a qualquer um
       // abrir uma sessão em qualquer conta conhecendo o userUid.
-      const { device, rawSessionToken, rawCsrfToken } =
-        await provisionDeviceInDb({
-          userUid,
-          email,
-          deviceName,
-          platform,
-          authMethod,
-          webauthnCredentialId,
-          publicKeySpkiB64,
-          ttlMs,
-          verifiedOwner,
-          enforceStrictOwnershipIfVaultExists: true,
-        });
+      const { device, rawSessionToken, rawCsrfToken } = renewsOwnSession
+        ? await rotateDeviceSessionInDb({
+            userUid,
+            deviceId: sameBrowserDeviceId!,
+            deviceName,
+            platform,
+            ttlMs,
+          })
+        : await provisionDeviceInDb({
+            userUid,
+            email,
+            deviceName,
+            platform,
+            authMethod,
+            webauthnCredentialId,
+            publicKeySpkiB64,
+            ttlMs,
+            verifiedOwner,
+            enforceStrictOwnershipIfVaultExists: true,
+          });
 
       setSecureSessionCookies(res, device.deviceId, rawSessionToken);
 
       await recordAuthAuditEvent({
         userUid,
         deviceId: device.deviceId,
-        eventType: 'DEVICE_AUTHORIZED',
+        eventType: renewsOwnSession ? 'DEVICE_SESSION_RENEWED' : 'DEVICE_AUTHORIZED',
         clientIp,
         metadata: {
           platform,
@@ -894,7 +910,7 @@ export function createSyncApiRouter(): express.Router {
         },
       });
 
-      res.status(201).json({
+      res.status(renewsOwnSession ? 200 : 201).json({
         device: {
           deviceId: device.deviceId,
           userUid: device.userUid,
@@ -949,9 +965,7 @@ export function createSyncApiRouter(): express.Router {
     requireDeviceOrFirebaseAuth,
     async (req: AuthenticatedSyncRequest, res: Response) => {
       const clientIp =
-        (req.headers['x-forwarded-for'] as string) ||
-        req.socket.remoteAddress ||
-        '127.0.0.1';
+        extractClientIp(req);
       try {
         const userUid = req.authContext!.userUid;
         const targetDeviceId = String(req.params.deviceId || '').trim();
@@ -997,9 +1011,7 @@ export function createSyncApiRouter(): express.Router {
     requireDeviceOrFirebaseAuth,
     async (req: AuthenticatedSyncRequest, res: Response) => {
       const clientIp =
-        (req.headers['x-forwarded-for'] as string) ||
-        req.socket.remoteAddress ||
-        '127.0.0.1';
+        extractClientIp(req);
       try {
         const userUid = req.authContext!.userUid;
         const deviceId = req.authContext!.deviceId;
@@ -1103,9 +1115,7 @@ export function createSyncApiRouter(): express.Router {
     requireDeviceOrFirebaseAuth,
     async (req: AuthenticatedSyncRequest, res: Response) => {
       const clientIp =
-        (req.headers['x-forwarded-for'] as string) ||
-        req.socket.remoteAddress ||
-        '127.0.0.1';
+        extractClientIp(req);
       try {
         const userUid = req.authContext!.userUid;
         const vaultId = String(req.body?.vaultId || '').trim();
@@ -1120,6 +1130,10 @@ export function createSyncApiRouter(): express.Router {
         const recoveryKeyCommitmentSha256 = String(
           req.body?.recoveryKeyCommitmentSha256 || ''
         ).trim();
+        // Hash do token derivado da Chave de Recuperação: é o que autoriza o pacote depois.
+        const recoveryAuthVerifierSha256 = String(
+          req.body?.recoveryAuthVerifierSha256 || ''
+        ).trim();
 
         if (
           !vaultId ||
@@ -1127,7 +1141,8 @@ export function createSyncApiRouter(): express.Router {
           recoverySaltHex.length < 32 ||
           recoveryWrappedDekHex.length < 64 ||
           recoveryDekNonceHex.length !== 24 ||
-          recoveryKeyCommitmentSha256.length !== 64
+          recoveryKeyCommitmentSha256.length !== 64 ||
+          !/^[0-9a-f]{64}$/.test(recoveryAuthVerifierSha256)
         ) {
           res.status(400).json({
             error:
@@ -1144,6 +1159,7 @@ export function createSyncApiRouter(): express.Router {
           recoveryWrappedDekHex,
           recoveryDekNonceHex,
           recoveryKeyCommitmentSha256,
+          recoveryAuthVerifierSha256,
         });
 
         await recordAuthAuditEvent({
@@ -1182,9 +1198,7 @@ export function createSyncApiRouter(): express.Router {
     requireDeviceOrFirebaseAuth,
     async (req: AuthenticatedSyncRequest, res: Response) => {
       const clientIp =
-        (req.headers['x-forwarded-for'] as string) ||
-        req.socket.remoteAddress ||
-        '127.0.0.1';
+        extractClientIp(req);
       try {
         const userUid = req.authContext!.userUid;
         const vaultId = String(req.body?.vaultId || '').trim();
@@ -1252,9 +1266,8 @@ export function createSyncApiRouter(): express.Router {
       }
 
       try {
-        const recoveryKeyCommitmentSha256 = String(
-          req.body?.recoveryKeyCommitmentSha256 || ''
-        ).trim();
+        // Prova de posse derivada da Chave de Recuperação (CryptoEngine.deriveRecoveryAuthToken).
+        const recoveryAuthToken = String(req.body?.recoveryAuthToken || '').trim();
         const newDeviceName = String(
           req.body?.deviceName || 'Dispositivo Recuperado via Emergency Kit'
         ).trim();
@@ -1264,17 +1277,16 @@ export function createSyncApiRouter(): express.Router {
           | 'ios'
           | 'android';
 
-        if (!vaultId || recoveryKeyCommitmentSha256.length !== 64) {
+        if (!vaultId || !/^[0-9a-f]{64}$/.test(recoveryAuthToken)) {
           res.status(400).json({
-            error:
-              'vaultId e recoveryKeyCommitmentSha256 (64 hex chars) são obrigatórios (400).',
+            error: 'vaultId e recoveryAuthToken (64 caracteres hex) são obrigatórios (400).',
           });
           return;
         }
 
         const bundle = await fetchEmergencyRecoveryBundleFromDb({
           vaultId,
-          recoveryKeyCommitmentSha256,
+          recoveryAuthToken,
         });
 
         scannerDetector.recordAuthSuccess({
@@ -1476,9 +1488,7 @@ export function createSyncApiRouter(): express.Router {
   // 10. Canal de Notificações em Tempo Real via SSE (Server-Sent Events)
   router.get('/sync/events', async (req: Request, res: Response) => {
     const clientIp =
-      (req.headers['x-forwarded-for'] as string) ||
-      req.socket.remoteAddress ||
-      '127.0.0.1';
+      extractClientIp(req);
 
     try {
       // REGRA ESTRITA FASE 5A (§2): Rejeita imediatamente qualquer tentativa de passar token de sessão na URL!

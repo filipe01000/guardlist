@@ -2,12 +2,14 @@ import type { Request, Response, NextFunction } from 'express';
 import { adminAuth } from '../lib/firebase-admin.ts';
 import {
   hashTokenSha256,
+  isDeviceSessionActiveInDb,
   recordAuthAuditEvent,
+  resetAnonymousAuditSamplingForTests,
   verifyDeviceSessionInDb,
 } from '../db/repository.ts';
 import { scannerDetector } from '../services/ScannerDetectionService.ts';
 import { cloudflareAccessVerifier } from '../services/CloudflareAccessVerifier.ts';
-import { extractClientIp } from './reconDefense.ts';
+import { extractClientIp } from './clientIp.ts';
 
 export interface AuthenticatedSyncRequest extends Request {
   authContext?: {
@@ -102,8 +104,79 @@ export function checkRateLimit(
 
 export function resetRateLimitsForTests(): void {
   rateLimitStore.clear();
+  verifiedSessionClaims.clear();
+  resetAnonymousAuditSamplingForTests();
   scannerDetector.resetAllForTests();
   cloudflareAccessVerifier.resetForTests();
+}
+
+/**
+ * Sessão que o pedido diz ter (cookie `dvlt_sid` + `dvlt_did`, ou `Bearer dvlt_sess_...` +
+ * `X-Device-Id`). É só uma alegação: quem decide se vale é `isSessionClaimVerified`.
+ */
+export function readSessionClaim(
+  req: Request
+): { deviceId: string; rawSessionToken: string } | null {
+  const cookies = parseCookieHeader(req.headers.cookie);
+  const authHeader = req.headers.authorization || '';
+  const rawSessionToken = authHeader.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : cookies.dvlt_sid || '';
+  const deviceId = String(
+    (req.headers['x-device-id'] as string) || cookies.dvlt_did || ''
+  ).trim();
+  if (
+    !/^dvlt_sess_[0-9a-f]{48}$/.test(rawSessionToken) ||
+    !/^[A-Za-z0-9_-]{4,128}$/.test(deviceId)
+  ) {
+    return null;
+  }
+  return { deviceId, rawSessionToken };
+}
+
+// Sessões já conferidas, por um minuto, para não consultar o banco a cada pedido.
+const SESSION_CLAIM_CACHE_MS = 60_000;
+const SESSION_CLAIM_CACHE_MAX = 5_000;
+const verifiedSessionClaims = new Map<string, number>();
+
+/**
+ * Confere no banco se a sessão alegada existe, não venceu e não foi revogada. Cada origem tem um
+ * número pequeno de conferências por minuto, para que sessões falsas não virem uma consulta ao
+ * banco por pedido. Em erro de banco, a sessão não vale (a isenção nunca é concedida às cegas).
+ */
+export async function isSessionClaimVerified(
+  req: Request,
+  clientIp: string
+): Promise<boolean> {
+  const claim = readSessionClaim(req);
+  if (!claim) return false;
+
+  const cacheKey = hashTokenSha256(`${claim.deviceId}:${claim.rawSessionToken}`);
+  const now = Date.now();
+  const cachedUntil = verifiedSessionClaims.get(cacheKey);
+  if (cachedUntil !== undefined && cachedUntil > now) return true;
+
+  if (!checkRateLimit(`session-claim:${clientIp}`, 20, 60_000).allowed) {
+    return false;
+  }
+
+  try {
+    const active = await isDeviceSessionActiveInDb(claim);
+    if (active) {
+      if (verifiedSessionClaims.size >= SESSION_CLAIM_CACHE_MAX) {
+        for (const [key, until] of verifiedSessionClaims) {
+          if (until <= now) verifiedSessionClaims.delete(key);
+        }
+        if (verifiedSessionClaims.size >= SESSION_CLAIM_CACHE_MAX) {
+          verifiedSessionClaims.clear();
+        }
+      }
+      verifiedSessionClaims.set(cacheKey, now + SESSION_CLAIM_CACHE_MS);
+    }
+    return active;
+  } catch {
+    return false;
+  }
 }
 
 const FORBIDDEN_PLAINTEXT_KEYS = new Set([

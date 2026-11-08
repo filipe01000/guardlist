@@ -240,7 +240,7 @@ test('Fase 5B - 02 (§3, §7): Força bruta, Backoff progressivo por (Conta+IP),
         },
         body: JSON.stringify({
           vaultId: 'cofre-inexistente-enum-test',
-          recoveryKeyCommitmentSha256: 'a'.repeat(64),
+          recoveryAuthToken: 'a'.repeat(64),
         }),
       }
     );

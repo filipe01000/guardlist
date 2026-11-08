@@ -649,13 +649,16 @@ test('Fase 5A - 02 (§2): Proibição de token em URL no SSE (400), Cookies Http
     );
 
     // 6. TESTE DE SESSÃO EXPIRADA (ttlMs negativo) -> 401 Unauthorized
+    // Pareamento por cabeçalho cria um aparelho à parte; pelo cookie, o servidor renovaria a sessão
+    // deste mesmo navegador.
     const expiredRegRes = await fetch(
       `${baseUrl}/api/v1/auth/devices/register`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Cookie: cookieHeader,
+          Authorization: `Bearer ${sessionToken}`,
+          'X-Device-Id': deviceId,
         },
         body: JSON.stringify({
           userUid,
@@ -791,6 +794,29 @@ test('Fase 5A - 03 (§3 & §5-F): Recuperação criptográfica real da DEK com C
       'A Recovery Key independente (256 bits) jamais deve se confundir com a Secret Key 2FA (128 bits)'
     );
 
+    // Sem o verificador da prova de posse o servidor recusa o pacote (sem ele, ninguém recuperaria).
+    const saveWithoutVerifierRes = await fetch(
+      `${baseUrl}/api/v1/sync/vault/recovery`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${primaryAuth.sessionToken}`,
+          'X-Device-Id': primaryAuth.deviceId,
+        },
+        body: JSON.stringify({
+          vaultId: container.vaultId,
+          recoveryKeyVersion: kitV1.recoveryMetadata.recoveryKeyVersion,
+          recoverySaltHex: kitV1.recoveryMetadata.recoverySaltHex,
+          recoveryWrappedDekHex: kitV1.recoveryMetadata.recoveryWrappedDekHex,
+          recoveryDekNonceHex: kitV1.recoveryMetadata.recoveryDekNonceHex,
+          recoveryKeyCommitmentSha256:
+            kitV1.recoveryMetadata.recoveryKeyCommitmentSha256,
+        }),
+      }
+    );
+    assert.equal(saveWithoutVerifierRes.status, 400);
+
     // Salva apenas os metadados públicos do encapsulamento de recuperação no PostgreSQL
     const saveRecV1Res = await fetch(`${baseUrl}/api/v1/sync/vault/recovery`, {
       method: 'POST',
@@ -807,6 +833,8 @@ test('Fase 5A - 03 (§3 & §5-F): Recuperação criptográfica real da DEK com C
         recoveryDekNonceHex: kitV1.recoveryMetadata.recoveryDekNonceHex,
         recoveryKeyCommitmentSha256:
           kitV1.recoveryMetadata.recoveryKeyCommitmentSha256,
+        recoveryAuthVerifierSha256:
+          kitV1.recoveryMetadata.recoveryAuthVerifierSha256,
       }),
     });
     assert.equal(saveRecV1Res.status, 200);
@@ -839,6 +867,8 @@ test('Fase 5A - 03 (§3 & §5-F): Recuperação criptográfica real da DEK com C
         recoveryDekNonceHex: kitV2.recoveryMetadata.recoveryDekNonceHex,
         recoveryKeyCommitmentSha256:
           kitV2.recoveryMetadata.recoveryKeyCommitmentSha256,
+        recoveryAuthVerifierSha256:
+          kitV2.recoveryMetadata.recoveryAuthVerifierSha256,
       }),
     });
     assert.equal(saveRecV2Res.status, 200);
@@ -859,6 +889,8 @@ test('Fase 5A - 03 (§3 & §5-F): Recuperação criptográfica real da DEK com C
         recoveryDekNonceHex: kitV1.recoveryMetadata.recoveryDekNonceHex,
         recoveryKeyCommitmentSha256:
           kitV1.recoveryMetadata.recoveryKeyCommitmentSha256,
+        recoveryAuthVerifierSha256:
+          kitV1.recoveryMetadata.recoveryAuthVerifierSha256,
       }),
     });
     assert.equal(
@@ -878,8 +910,11 @@ test('Fase 5A - 03 (§3 & §5-F): Recuperação criptográfica real da DEK com C
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vaultId: container.vaultId,
-          recoveryKeyCommitmentSha256:
-            kitV1.recoveryMetadata.recoveryKeyCommitmentSha256,
+          recoveryAuthToken: CryptoEngine.deriveRecoveryAuthToken(
+            kitV1.recoveryKey!,
+            container.vaultId,
+            1
+          ),
           deviceName: 'Tentativa com Kit v1 Antigo',
           platform: 'mobile-web',
         }),
@@ -891,6 +926,27 @@ test('Fase 5A - 03 (§3 & §5-F): Recuperação criptográfica real da DEK com C
       'Kit de Emergência v1 antigo não deve ser aceito após substituição pelo v2 (401)'
     );
 
+    // 3B. O compromisso fica guardado no servidor, então quem leu o banco o conhece. Ele não pode
+    // servir de prova: só o token derivado da Chave de Recuperação abre o pacote.
+    const commitmentAsProofRes = await fetch(
+      `${baseUrl}/api/v1/sync/vault/recovery/bundle`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vaultId: container.vaultId,
+          recoveryAuthToken: kitV2.recoveryMetadata.recoveryKeyCommitmentSha256,
+          deviceName: 'Quem leu o banco',
+          platform: 'desktop-web',
+        }),
+      }
+    );
+    assert.equal(
+      commitmentAsProofRes.status,
+      401,
+      'O compromisso público não pode liberar o pacote de recuperação'
+    );
+
     // 4. RECUPERAÇÃO REAL EM DISPOSITIVO TOTALMENTE NOVO (Sem dispositivo original e sem Senha Mestra antiga!)
     const bundleRes = await fetch(
       `${baseUrl}/api/v1/sync/vault/recovery/bundle`,
@@ -899,8 +955,11 @@ test('Fase 5A - 03 (§3 & §5-F): Recuperação criptográfica real da DEK com C
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vaultId: container.vaultId,
-          recoveryKeyCommitmentSha256:
-            kitV2.recoveryMetadata.recoveryKeyCommitmentSha256,
+          recoveryAuthToken: CryptoEngine.deriveRecoveryAuthToken(
+            kitV2.recoveryKey!,
+            container.vaultId,
+            2
+          ),
           deviceName: 'Novo Notebook Pós-Desastre',
           platform: 'desktop-web',
         }),
@@ -970,8 +1029,11 @@ test('Fase 5A - 03 (§3 & §5-F): Recuperação criptográfica real da DEK com C
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vaultId: container.vaultId,
-          recoveryKeyCommitmentSha256:
-            kitV2.recoveryMetadata.recoveryKeyCommitmentSha256,
+          recoveryAuthToken: CryptoEngine.deriveRecoveryAuthToken(
+            kitV2.recoveryKey!,
+            container.vaultId,
+            2
+          ),
         }),
       }
     );

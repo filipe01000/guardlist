@@ -1,0 +1,1 @@
+ALTER TABLE "vaults" ADD COLUMN "recovery_auth_verifier_sha256" text;

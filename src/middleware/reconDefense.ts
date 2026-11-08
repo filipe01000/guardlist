@@ -6,10 +6,17 @@ import {
   CloudflareAccessVerificationError,
   type VerifiedCloudflareAccessIdentity,
 } from '../services/CloudflareAccessVerifier.ts';
+import { extractClientIp } from './clientIp.ts';
+import { isSessionClaimVerified, readSessionClaim } from './auth.ts';
+
+export { extractClientIp };
 
 export interface ZeroTrustVerifiedRequest extends Request {
   cloudflareIdentity?: VerifiedCloudflareAccessIdentity;
 }
+
+// Métodos que o anti-scanner aceita de qualquer origem (os demais só de sessão conferida).
+const COMMON_HTTP_METHODS = new Set(['GET', 'POST', 'OPTIONS', 'HEAD']);
 
 /**
  * Domínios oficiais planejados para produção (Fase 5B):
@@ -20,18 +27,6 @@ const ALLOWED_PRODUCTION_ORIGINS = new Set([
   'https://vault.filipeti.com.br',
   'https://api-vault.filipeti.com.br',
 ]);
-
-export function extractClientIp(req: Request): string {
-  const cfIp = req.headers['cf-connecting-ip'];
-  if (typeof cfIp === 'string' && cfIp.trim()) {
-    return cfIp.trim();
-  }
-  const xff = req.headers['x-forwarded-for'];
-  if (typeof xff === 'string' && xff.trim()) {
-    return xff.split(',')[0].trim();
-  }
-  return req.socket?.remoteAddress || '127.0.0.1';
-}
 
 export function isOriginAllowedForCors(
   originHeader: string | undefined,
@@ -176,24 +171,38 @@ export function strictCorsDefenseMiddleware(
  * 3. Armadilha contra Reconhecimento Ativo, Varreduras Automatizadas (Nuclei, Gobuster, FFUF, HTTPx, Nmap)
  *    e Desativação Estrita de Endpoints Administrativos / Debug / Demo.
  */
-export function antiReconAndScannerTrapMiddleware(
+export async function antiReconAndScannerTrapMiddleware(
   req: ZeroTrustVerifiedRequest,
   res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
+  try {
+    await runAntiReconAndScannerTrap(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function runAntiReconAndScannerTrap(
+  req: ZeroTrustVerifiedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   const clientIp = extractClientIp(req);
   const fullPath = req.originalUrl || req.url || '/';
 
-  const hasBearerSession = Boolean(
-    req.headers.authorization &&
-      req.headers.authorization.startsWith('Bearer dvlt_sess_')
-  );
-  const hasCookieSession = Boolean(
-    req.headers.cookie && req.headers.cookie.includes('dvlt_sid=')
-  );
-  const isAuthenticatedSession = Boolean(
-    req.cloudflareIdentity || hasBearerSession || hasCookieSession
-  );
+  // A isenção de sessão só vale depois de conferida no banco. Antes bastava mandar um cookie
+  // `dvlt_sid=` qualquer (ou `Bearer dvlt_sess_...`) para escapar da penalidade. A conferência só
+  // roda quando a isenção muda o resultado: origem penalizada ou método fora do comum.
+  let isAuthenticatedSession = Boolean(req.cloudflareIdentity);
+  if (
+    !isAuthenticatedSession &&
+    readSessionClaim(req) &&
+    (scannerDetector.isOriginUnderPenalty(clientIp) ||
+      !COMMON_HTTP_METHODS.has(req.method.toUpperCase()))
+  ) {
+    isAuthenticatedSession = await isSessionClaimVerified(req, clientIp);
+  }
 
   // 3A. Verifica assinatura de ferramentas de varredura ativa, métodos HTTP anômalos, penalidade comportamental e rajadas de RPM
   const scannerCheck = scannerDetector.inspectScannerHeaders({
@@ -300,11 +309,23 @@ export function antiReconAndScannerTrapMiddleware(
  * 4. Validação Rigorosa de Entrada contra Fuzzing (FFUF / Wfuzz / SQLMap / Prototype Pollution)
  *    antes que o payload alcance os controladores de negócio.
  */
-export function inputFuzzingDefenseMiddleware(
+export async function inputFuzzingDefenseMiddleware(
   req: ZeroTrustVerifiedRequest,
   res: Response,
   next: NextFunction
-): void {
+): Promise<void> {
+  try {
+    await runInputFuzzingDefense(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function runInputFuzzingDefense(
+  req: ZeroTrustVerifiedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   const clientIp = extractClientIp(req);
   const fullPath = req.originalUrl || req.url || '/';
 
@@ -335,30 +356,26 @@ export function inputFuzzingDefenseMiddleware(
 
   // Detecção Comportamental de Varredura Horizontal de Contas/Cofres (Account/Vault Sweeping)
   // Independente de User-Agent: se uma origem não autenticada sondar >= 6 contas/cofres distintos na mesma janela, aplica 429!
-  const hasBearerSession = Boolean(
-    req.headers.authorization &&
-      req.headers.authorization.startsWith('Bearer dvlt_sess_')
-  );
-  const hasCookieSession = Boolean(
-    req.headers.cookie && req.headers.cookie.includes('dvlt_sid=')
-  );
-  const isAuthenticatedSession = Boolean(
-    req.cloudflareIdentity || hasBearerSession || hasCookieSession
-  );
-
   const targetCandidate =
     (typeof req.body?.userUid === 'string' && req.body.userUid) ||
     (typeof req.body?.vaultId === 'string' && req.body.vaultId) ||
     (typeof req.query?.vaultId === 'string' && req.query.vaultId) ||
     '';
 
-  if (
-    targetCandidate &&
-    !isAuthenticatedSession &&
-    (fullPath.includes('/auth/webauthn/authenticate') ||
-      fullPath.includes('/auth/passkey/challenge') ||
-      fullPath.includes('/sync/vault/recovery/bundle'))
-  ) {
+  const isSweepSensitivePath =
+    fullPath.includes('/auth/webauthn/authenticate') ||
+    fullPath.includes('/auth/passkey/challenge') ||
+    fullPath.includes('/sync/vault/recovery/bundle');
+
+  // Mesma regra do anti-scanner: só sessão conferida no banco fica fora da contagem.
+  const isAuthenticatedSession =
+    targetCandidate && isSweepSensitivePath
+      ? Boolean(req.cloudflareIdentity) ||
+        (readSessionClaim(req) !== null &&
+          (await isSessionClaimVerified(req, clientIp)))
+      : false;
+
+  if (targetCandidate && isSweepSensitivePath && !isAuthenticatedSession) {
     const sweep = scannerDetector.inspectBehavioralTargetSweep({
       clientIp,
       targetIdentifier: targetCandidate,

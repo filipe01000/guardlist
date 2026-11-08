@@ -25,6 +25,8 @@ export interface EmergencyRecoveryWrapMetadata {
   recoveryWrappedDekHex: string;
   recoveryDekNonceHex: string;
   recoveryKeyCommitmentSha256: string;
+  // Hash do token que prova a posse da Chave de Recuperação; é o que o servidor guarda.
+  recoveryAuthVerifierSha256: string;
   createdAt: string;
 }
 

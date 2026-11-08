@@ -16,6 +16,15 @@ Node.js 24.22.1. Código identificado como DonutVault 0.9.3 pelo proprietário.
   passkey respondem 500 em vez de aceitar qualquer origem.
 - Pareamento: um novo dispositivo só entra em conta existente com a sessão de um dispositivo já autorizado
   (cabeçalhos `Authorization` + `X-Device-Id` ou cookie HttpOnly) ou por passkey.
+- Sessões: o mesmo navegador renova a própria sessão a cada desbloqueio (o token anterior deixa de valer).
+  Cada conta tem no máximo 20 sessões ativas; ao passar disso, as usadas há mais tempo são revogadas.
+- IP do cliente: no Render vale o `CF-Connecting-IP`, posto pela Cloudflare, que recusa esse cabeçalho
+  quando vem do cliente. O `X-Forwarded-For` só conta quando vem de proxy confiável (`TRUST_PROXY`,
+  padrão `loopback`). Fora do Render, atrás da Cloudflare, defina `CLIENT_IP_HEADER=cf-connecting-ip`;
+  atrás de outro proxy, `TRUST_PROXY` com o número de saltos. Se o cabeçalho configurado faltar, o log
+  mostra `[client-ip]` e o servidor usa o endereço da conexão.
+- Kit de Emergência: o pacote de recuperação só sai com o token derivado da Chave de Recuperação
+  (o servidor guarda apenas o hash). Kits gerados antes desta versão precisam ser gerados de novo.
 - O GuardList usa outro serviço e repositório; não é alterado por este projeto.
 
 ## Banco

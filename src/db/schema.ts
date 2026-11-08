@@ -95,6 +95,8 @@ export const vaults = pgTable('vaults', {
   recoveryDekNonceHex: text('recovery_dek_nonce_hex'),
   recoveryKeyVersion: integer('recovery_key_version').default(0).notNull(),
   recoveryKeyCommitmentSha256: text('recovery_key_commitment_sha256'),
+  // Hash do token derivado da Chave de Recuperação; é o que autoriza o pacote de recuperação.
+  recoveryAuthVerifierSha256: text('recovery_auth_verifier_sha256'),
   recoveryUpdatedAt: timestamp('recovery_updated_at'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

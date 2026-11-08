@@ -1301,6 +1301,40 @@ export class CryptoEngine {
   }
 
   /**
+   * Token que prova ao servidor a posse da Chave de Recuperação, sem revelá-la.
+   * O compromisso acima é só um hash de metadados que o próprio servidor guarda, então não serve
+   * como prova: quem lesse o banco poderia recalculá-lo. Este token só sai da chave.
+   */
+  static deriveRecoveryAuthToken(
+    recoveryKey: string,
+    vaultId: string,
+    recoveryKeyVersion: number
+  ): string {
+    const normalized = recoveryKey.trim().toUpperCase();
+    if (!normalized.startsWith('DVLT-REC-') || normalized.length < 70) {
+      throw new Error(
+        'Formato de Chave de Recuperação de Emergência inválido (esperado DVLT-REC-... de 256 bits).'
+      );
+    }
+    return bytesToHex(
+      hkdf(
+        sha256,
+        utf8ToBytes(normalized),
+        utf8ToBytes('DONUTVAULT_RECOVERY_AUTH_V1'),
+        utf8ToBytes(`${vaultId}:${recoveryKeyVersion}`),
+        32
+      )
+    );
+  }
+
+  /**
+   * O que o servidor guarda para conferir o token: só o hash dele.
+   */
+  static computeRecoveryAuthVerifier(recoveryAuthTokenHex: string): string {
+    return bytesToHex(sha256(utf8ToBytes(recoveryAuthTokenHex)));
+  }
+
+  /**
    * Encapsula uma cópia independente da DEK de 256 bits do cofre usando uma Chave de Recuperação
    * de alta entropia (256 bits CSPRNG) e AES-256-GCM com AAD vinculado a `vaultId`, `keyEpoch` e `recoveryKeyVersion`.
    */
@@ -1322,6 +1356,7 @@ export class CryptoEngine {
       recoveryWrappedDekHex: string;
       recoveryDekNonceHex: string;
       recoveryKeyCommitmentSha256: string;
+      recoveryAuthVerifierSha256: string;
       createdAt: string;
     };
   }> {
@@ -1375,6 +1410,9 @@ export class CryptoEngine {
           recoveryWrappedDekHex,
           recoveryDekNonceHex,
           recoveryKeyCommitmentSha256,
+          recoveryAuthVerifierSha256: CryptoEngine.computeRecoveryAuthVerifier(
+            CryptoEngine.deriveRecoveryAuthToken(recoveryKey, vaultId, recoveryKeyVersion)
+          ),
           createdAt: new Date().toISOString(),
         },
       };

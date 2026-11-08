@@ -383,6 +383,16 @@ export class ScannerDetectionEngine {
   }
 
   /**
+   * Diz se a origem está sob penalidade comportamental, sem contar o pedido nem registrar alerta.
+   */
+  public isOriginUnderPenalty(clientIp: string): boolean {
+    const win = this.ipWindows.get(
+      this.pseudonymizeIdentifierHmac(clientIp, 'ip')
+    );
+    return Boolean(win && Date.now() < win.scannerPenaltyUntilMs);
+  }
+
+  /**
    * 1. Inspeção Combinada: Assinaturas de Scanners + Detecção Comportamental Independente de User-Agent (§4).
    * - Se uma origem não autenticada já estiver sob penalidade comportamental (varredura de rotas/contas/fuzzing)
    *   mesmo usando User-Agent de navegador comum (Chrome/Safari), bloqueia com 429.

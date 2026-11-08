@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, gt } from 'drizzle-orm';
+import { timingSafeEqual } from 'node:crypto';
+import { and, asc, desc, eq, gt, inArray, isNull, lt } from 'drizzle-orm';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import { db } from './index.ts';
@@ -77,6 +78,17 @@ export async function recordAuthAuditEvent(params: {
   metadata?: Record<string, string | number | boolean>;
 }): Promise<void> {
   try {
+    const { scannerDetector: detector } = await import(
+      '../services/ScannerDetectionService.ts'
+    );
+    const ipHash = detector.pseudonymizeIdentifierHmac(params.clientIp || '0.0.0.0', 'ip');
+    // Eventos anônimos (sondagens, varreduras) chegam sem limite e cada um virava uma linha no
+    // banco. Agora só o primeiro de cada tipo por origem a cada 10 min vai para o banco, com teto
+    // global por minuto; a telemetria em memória continua contando todos.
+    if (params.userUid === 'anonymous' && !shouldPersistAnonymousAuditEvent(params.eventType, ipHash)) {
+      return;
+    }
+
     const safeMetadata = { ...(params.metadata || {}) };
     // Garante que nenhum campo sensível jamais entre no log estruturado
     delete safeMetadata.password;
@@ -88,23 +100,90 @@ export async function recordAuthAuditEvent(params: {
     delete safeMetadata.sessionToken;
     delete safeMetadata.csrfToken;
 
-    const { scannerDetector } = await import(
-      '../services/ScannerDetectionService.ts'
-    );
-
     await db.insert(authAuditLogs).values({
       userUid: params.userUid,
       deviceId: params.deviceId,
       eventType: params.eventType,
-      ipHashSha256: scannerDetector.pseudonymizeIdentifierHmac(
-        params.clientIp || '0.0.0.0',
-        'ip'
-      ),
+      ipHashSha256: ipHash,
       metadataJson: JSON.stringify(safeMetadata),
     });
   } catch (error) {
     console.error('Audit log insert failed:', error);
   }
+}
+
+const ANON_AUDIT_DEDUP_MS = 10 * 60_000;
+const ANON_AUDIT_WINDOW_MS = 60_000;
+const ANON_AUDIT_MAX_PER_WINDOW = 30;
+const anonymousAuditSeen = new Map<string, number>();
+let anonymousAuditWindowStartMs = 0;
+let anonymousAuditWindowCount = 0;
+
+function shouldPersistAnonymousAuditEvent(eventType: string, ipHash: string): boolean {
+  const now = Date.now();
+  if (now - anonymousAuditWindowStartMs >= ANON_AUDIT_WINDOW_MS) {
+    anonymousAuditWindowStartMs = now;
+    anonymousAuditWindowCount = 0;
+    for (const [key, seenAt] of anonymousAuditSeen) {
+      if (now - seenAt >= ANON_AUDIT_DEDUP_MS) anonymousAuditSeen.delete(key);
+    }
+  }
+  const key = `${eventType}:${ipHash}`;
+  const lastSeen = anonymousAuditSeen.get(key);
+  if (lastSeen !== undefined && now - lastSeen < ANON_AUDIT_DEDUP_MS) return false;
+  if (anonymousAuditWindowCount >= ANON_AUDIT_MAX_PER_WINDOW) return false;
+  anonymousAuditSeen.set(key, now);
+  anonymousAuditWindowCount += 1;
+  return true;
+}
+
+export function resetAnonymousAuditSamplingForTests(): void {
+  anonymousAuditSeen.clear();
+  anonymousAuditWindowStartMs = 0;
+  anonymousAuditWindowCount = 0;
+}
+
+/**
+ * Renova a sessão de um aparelho que já está autorizado, no mesmo registro. O app chamava o
+ * cadastro a cada desbloqueio e cada chamada criava um aparelho novo com sessão de 30 dias, sem
+ * revogar a anterior. Agora o mesmo navegador troca os tokens e a sessão antiga deixa de valer.
+ */
+export async function rotateDeviceSessionInDb(params: {
+  userUid: string;
+  deviceId: string;
+  deviceName: string;
+  platform: 'desktop-web' | 'mobile-web' | 'ios' | 'android';
+  ttlMs?: number;
+}) {
+  checkSimulatedDbFailure();
+  const rawSessionToken = `dvlt_sess_${bytesToHex(CryptoEngine.getRandomBytes(24))}`;
+  const rawCsrfToken = `dvlt_csrf_${bytesToHex(CryptoEngine.getRandomBytes(24))}`;
+  const now = new Date();
+  const updated = await db
+    .update(authorizedDevices)
+    .set({
+      sessionTokenSha256: hashTokenSha256(rawSessionToken),
+      csrfTokenSha256: hashTokenSha256(rawCsrfToken),
+      deviceName: params.deviceName.slice(0, 120),
+      platform: params.platform,
+      lastSeenAt: now,
+      expiresAt: new Date(now.getTime() + (params.ttlMs ?? 30 * 24 * 60 * 60 * 1000)),
+    })
+    .where(
+      and(
+        eq(authorizedDevices.deviceId, params.deviceId),
+        eq(authorizedDevices.userUid, params.userUid),
+        isNull(authorizedDevices.revokedAt)
+      )
+    )
+    .returning();
+
+  if (!updated[0]) {
+    const err = new Error('Sessão do aparelho não encontrada ou revogada (401 Unauthorized).');
+    (err as Error & { statusCode?: number }).statusCode = 401;
+    throw err;
+  }
+  return { device: updated[0], rawSessionToken, rawCsrfToken };
 }
 
 /**
@@ -194,6 +273,8 @@ export async function provisionDeviceInDb(params: {
       })
       .returning();
 
+    await revokeDevicesBeyondLimit(params.userUid, deviceId);
+
     return {
       device: inserted[0],
       rawSessionToken,
@@ -208,6 +289,69 @@ export async function provisionDeviceInDb(params: {
       cause: error,
     });
   }
+}
+
+// Teto de sessões ativas por conta. Ao passar dele, as usadas há mais tempo são revogadas, então
+// nenhuma conta junta sessões de 30 dias sem limite, seja qual for o caminho que as criou.
+export const MAX_ACTIVE_DEVICES_PER_ACCOUNT = 20;
+
+async function revokeDevicesBeyondLimit(userUid: string, keepDeviceId: string) {
+  const now = new Date();
+  const active = await db
+    .select({ deviceId: authorizedDevices.deviceId })
+    .from(authorizedDevices)
+    .where(
+      and(
+        eq(authorizedDevices.userUid, userUid),
+        isNull(authorizedDevices.revokedAt),
+        gt(authorizedDevices.expiresAt, now)
+      )
+    )
+    .orderBy(desc(authorizedDevices.lastSeenAt), desc(authorizedDevices.authorizedAt));
+
+  const excess = active
+    .filter((device) => device.deviceId !== keepDeviceId)
+    .slice(MAX_ACTIVE_DEVICES_PER_ACCOUNT - 1)
+    .map((device) => device.deviceId);
+  if (excess.length === 0) return;
+
+  await db
+    .update(authorizedDevices)
+    .set({ revokedAt: now })
+    .where(
+      and(
+        eq(authorizedDevices.userUid, userUid),
+        inArray(authorizedDevices.deviceId, excess)
+      )
+    );
+}
+
+/**
+ * Diz se a sessão existe, não venceu e não foi revogada, sem gravar nada. Serve às defesas que
+ * rodam antes da autenticação; a autenticação completa continua em `verifyDeviceSessionInDb`.
+ */
+export async function isDeviceSessionActiveInDb(params: {
+  deviceId: string;
+  rawSessionToken: string;
+}): Promise<boolean> {
+  checkSimulatedDbFailure();
+  const rows = await db
+    .select({
+      sessionTokenSha256: authorizedDevices.sessionTokenSha256,
+      revokedAt: authorizedDevices.revokedAt,
+      expiresAt: authorizedDevices.expiresAt,
+    })
+    .from(authorizedDevices)
+    .where(eq(authorizedDevices.deviceId, params.deviceId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row || row.revokedAt !== null || row.expiresAt.getTime() <= Date.now()) {
+    return false;
+  }
+  const stored = Buffer.from(row.sessionTokenSha256, 'utf8');
+  const presented = Buffer.from(hashTokenSha256(params.rawSessionToken), 'utf8');
+  return stored.length === presented.length && timingSafeEqual(stored, presented);
 }
 
 /**
@@ -885,6 +1029,19 @@ export async function inspectRawDatabaseStateForTest(vaultId: string) {
 // FASE 5A — §1, §2, §3: WEBAUTHN PASSKEYS, SINGLE-USE CHALLENGES, CSRF & RECOVERY
 // ============================================================================
 
+// Desafios vencidos eram guardados para sempre. A limpeza roda no máximo a cada 10 minutos,
+// junto com a criação de um desafio novo, sem segurar a resposta.
+let lastChallengeCleanupMs = 0;
+function pruneExpiredChallenges(): void {
+  const now = Date.now();
+  if (now - lastChallengeCleanupMs < 10 * 60_000) return;
+  lastChallengeCleanupMs = now;
+  void db
+    .delete(webauthnChallenges)
+    .where(lt(webauthnChallenges.expiresAt, new Date(now - 60 * 60_000)))
+    .catch((error) => console.error('Challenge cleanup failed:', error));
+}
+
 /**
  * Cria um desafio criptográfico temporário e de uso único no PostgreSQL
  * (WebAuthn Registration, WebAuthn Authentication ou Ticket SSE efêmero).
@@ -898,6 +1055,7 @@ export async function createSingleUseChallengeInDb(params: {
   ttlMs?: number;
 }) {
   checkSimulatedDbFailure();
+  pruneExpiredChallenges();
   const challengeId = CryptoEngine.randomId('chal');
   const expiresAt = new Date(Date.now() + (params.ttlMs ?? 5 * 60 * 1000));
 
@@ -962,22 +1120,6 @@ export async function consumeSingleUseChallengeInDb(params: {
     throw err;
   }
 
-  if (row.consumedAt !== null) {
-    const err = new Error(
-      'Ataque de Replay bloqueado (401 Unauthorized): Este desafio criptográfico de uso único já foi consumido anteriormente!'
-    );
-    (err as Error & { statusCode?: number }).statusCode = 401;
-    throw err;
-  }
-
-  if (row.expiresAt.getTime() <= Date.now()) {
-    const err = new Error(
-      'Desafio criptográfico expirado (401 Unauthorized). Solicite um novo desafio.'
-    );
-    (err as Error & { statusCode?: number }).statusCode = 401;
-    throw err;
-  }
-
   if (params.expectedChallenge && row.challenge !== params.expectedChallenge) {
     const err = new Error(
       'Divergência de desafio criptográfico (401 Unauthorized).'
@@ -986,11 +1128,31 @@ export async function consumeSingleUseChallengeInDb(params: {
     throw err;
   }
 
+  // Consumo atômico: só marca se ainda não foi usado e não venceu. Antes era ler e depois gravar,
+  // e duas verificações simultâneas podiam usar o mesmo desafio.
+  const now = new Date();
   const updated = await db
     .update(webauthnChallenges)
-    .set({ consumedAt: new Date() })
-    .where(eq(webauthnChallenges.challengeId, row.challengeId))
+    .set({ consumedAt: now })
+    .where(
+      and(
+        eq(webauthnChallenges.challengeId, row.challengeId),
+        isNull(webauthnChallenges.consumedAt),
+        gt(webauthnChallenges.expiresAt, now)
+      )
+    )
     .returning();
+
+  if (!updated[0]) {
+    const expired = row.expiresAt.getTime() <= now.getTime();
+    const err = new Error(
+      expired
+        ? 'Desafio criptográfico expirado (401 Unauthorized). Solicite um novo desafio.'
+        : 'Ataque de Replay bloqueado (401 Unauthorized): Este desafio criptográfico de uso único já foi consumido anteriormente!'
+    );
+    (err as Error & { statusCode?: number }).statusCode = 401;
+    throw err;
+  }
 
   return updated[0];
 }
@@ -1101,16 +1263,27 @@ export async function verifyAndAdvanceWebAuthnCounterInDb(params: {
     throw err;
   }
 
+  const cloneError = (storedCounter: number) => {
+    const err = new Error(
+      `Alerta de Clonagem/Replay WebAuthn (401 Unauthorized): Contador de assinatura recebido (${params.newCounter}) não avançou em relação ao registrado (${storedCounter}).`
+    );
+    (err as Error & { statusCode?: number }).statusCode = 401;
+    return err;
+  };
+
   if (
     (cred.counter > 0 || params.newCounter > 0) &&
     params.newCounter <= cred.counter
   ) {
-    const err = new Error(
-      `Alerta de Clonagem/Replay WebAuthn (401 Unauthorized): Contador de assinatura recebido (${params.newCounter}) não avançou em relação ao registrado (${cred.counter}).`
-    );
-    (err as Error & { statusCode?: number }).statusCode = 401;
-    throw err;
+    throw cloneError(cred.counter);
   }
+
+  // A condição vai junto da gravação: duas assinaturas simultâneas com o mesmo contador não
+  // passam as duas. Autenticadores que sempre mandam 0 (passkeys sincronizadas) seguem aceitos.
+  const counterCondition =
+    params.newCounter === 0
+      ? eq(webauthnCredentials.counter, 0)
+      : lt(webauthnCredentials.counter, params.newCounter);
 
   const updated = await db
     .update(webauthnCredentials)
@@ -1118,8 +1291,18 @@ export async function verifyAndAdvanceWebAuthnCounterInDb(params: {
       counter: params.newCounter,
       lastUsedAt: new Date(),
     })
-    .where(eq(webauthnCredentials.credentialId, params.credentialId))
+    .where(
+      and(
+        eq(webauthnCredentials.credentialId, params.credentialId),
+        eq(webauthnCredentials.userUid, params.expectedUserUid),
+        counterCondition
+      )
+    )
     .returning();
+
+  if (!updated[0]) {
+    throw cloneError(cred.counter);
+  }
 
   return updated[0];
 }
@@ -1136,6 +1319,7 @@ export async function saveVaultRecoveryWrapInDb(params: {
   recoveryWrappedDekHex: string;
   recoveryDekNonceHex: string;
   recoveryKeyCommitmentSha256: string;
+  recoveryAuthVerifierSha256: string;
 }) {
   checkSimulatedDbFailure();
   const rows = await db
@@ -1175,6 +1359,7 @@ export async function saveVaultRecoveryWrapInDb(params: {
       recoveryDekNonceHex: params.recoveryDekNonceHex,
       recoveryKeyVersion: params.recoveryKeyVersion,
       recoveryKeyCommitmentSha256: params.recoveryKeyCommitmentSha256,
+      recoveryAuthVerifierSha256: params.recoveryAuthVerifierSha256,
       recoveryUpdatedAt: now,
       updatedAt: now,
     })
@@ -1221,6 +1406,7 @@ export async function revokeVaultRecoveryKeyInDb(params: {
       recoveryDekNonceHex: null,
       recoveryKeyVersion: nextVersion,
       recoveryKeyCommitmentSha256: null,
+      recoveryAuthVerifierSha256: null,
       recoveryUpdatedAt: now,
       updatedAt: now,
     })
@@ -1232,13 +1418,23 @@ export async function revokeVaultRecoveryKeyInDb(params: {
 
 /**
  * Obtém o pacote criptografado de recuperação para um dispositivo totalmente novo
- * mediante apresentação do `recoveryKeyCommitmentSha256` (prova Zero-Knowledge de posse do Kit de Emergência).
+ * mediante o `recoveryAuthToken`, derivado da Chave de Recuperação do Kit de Emergência.
+ * O servidor guarda só o hash desse token, então ler o banco não basta para pedir o pacote.
  */
 export async function fetchEmergencyRecoveryBundleFromDb(params: {
   vaultId: string;
-  recoveryKeyCommitmentSha256: string;
+  recoveryAuthToken: string;
 }) {
   checkSimulatedDbFailure();
+  const invalidProof = () => {
+    const err = new Error(
+      'Prova do Kit de Emergência inválida ou substituída por versão mais recente (401 Unauthorized).'
+    );
+    (err as Error & { statusCode?: number }).statusCode = 401;
+    return err;
+  };
+  const presentedVerifier = CryptoEngine.computeRecoveryAuthVerifier(params.recoveryAuthToken);
+
   const rows = await db
     .select()
     .from(vaults)
@@ -1246,14 +1442,8 @@ export async function fetchEmergencyRecoveryBundleFromDb(params: {
 
   const vault = rows[0];
   if (!vault) {
-    // Anti-Enumeração (Fase 5B — §3): Executa hash dummy e retorna exatamente o mesmo 401
-    // que um compromisso inválido para impedir enumeração de vaultId por status HTTP ou timing!
-    hashTokenSha256(`decoy-commitment:${params.vaultId}:${params.recoveryKeyCommitmentSha256}`);
-    const err = new Error(
-      'Compromisso criptográfico do Kit de Emergência inválido ou substituído por versão mais recente (401 Unauthorized).'
-    );
-    (err as Error & { statusCode?: number }).statusCode = 401;
-    throw err;
+    // Anti-enumeração: mesmo 401 de uma prova inválida (o hash acima já foi calculado).
+    throw invalidProof();
   }
 
   if (
@@ -1269,14 +1459,19 @@ export async function fetchEmergencyRecoveryBundleFromDb(params: {
     throw err;
   }
 
-  if (
-    vault.recoveryKeyCommitmentSha256 !== params.recoveryKeyCommitmentSha256
-  ) {
+  if (!vault.recoveryAuthVerifierSha256) {
+    // Kits gerados antes desta versão não têm verificador e precisam ser gerados de novo.
     const err = new Error(
-      'Compromisso criptográfico do Kit de Emergência inválido ou substituído por versão mais recente (401 Unauthorized).'
+      'Este Kit de Emergência é de uma versão antiga e precisa ser gerado de novo (403 Forbidden).'
     );
-    (err as Error & { statusCode?: number }).statusCode = 401;
+    (err as Error & { statusCode?: number }).statusCode = 403;
     throw err;
+  }
+
+  const stored = Buffer.from(vault.recoveryAuthVerifierSha256, 'utf8');
+  const presented = Buffer.from(presentedVerifier, 'utf8');
+  if (stored.length !== presented.length || !timingSafeEqual(stored, presented)) {
+    throw invalidProof();
   }
 
   const allVaultRecords = await db
