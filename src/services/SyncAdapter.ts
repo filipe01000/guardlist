@@ -191,6 +191,14 @@ export class SyncAdapter {
     this.offlineQueue.delete(operationId);
   }
 
+  /**
+   * Esvazia a fila offline. Usado antes do primeiro envio de um cofre, que é substituído
+   * por um retrato completo dos registros.
+   */
+  clearPendingQueue(): void {
+    this.offlineQueue.clear();
+  }
+
   getPendingQueue(): OfflineQueueEntry[] {
     return Array.from(this.offlineQueue.values()).map((e) =>
       structuredClone(e)

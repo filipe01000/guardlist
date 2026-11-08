@@ -20,7 +20,8 @@ import type {
   SecretNote,
   VaultPayload,
 } from './types/vault';
-import { CryptoEngine } from './services/CryptoEngine';
+import { CryptoEngine, NEW_VAULT_ARGON2_PARAMS } from './services/CryptoEngine';
+import { checkMasterPasswordPolicy } from './utils/generator';
 import {
   DeviceSecurityModel,
   type EmergencyKitDocument,
@@ -117,6 +118,8 @@ export default function App() {
     useState<EmergencyKitDocument | null>(null);
   const serverCursorRef = useRef<number>(0);
   const effectiveOnline = isOnline && !simulatedOffline;
+  // Cofres sem a configuração (criados antes dela) seguem sincronizando como antes.
+  const syncEnabled = unlockedPayload?.settings?.syncEnabled !== false;
 
   const triggerComicToast = useCallback(
     (
@@ -163,7 +166,7 @@ export default function App() {
     setMobileMenuOpen(false);
   }, []);
 
-  // Carrega envelope criptografado do IndexedDB ao iniciar (e suporta ?autostart=1)
+  // Carrega envelope criptografado do IndexedDB ao iniciar
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -172,27 +175,14 @@ export default function App() {
         if (!mounted) return;
         setStoredEnvelope(existing);
 
+        // Atalho de demonstração (?autostart=1): existe só no modo de desenvolvimento e só cria
+        // um cofre quando este navegador ainda não tem nenhum. Antes valia em qualquer build e,
+        // se a senha de demonstração não abrisse o cofre salvo, gravava um cofre novo por cima:
+        // um link externo apagava o cofre de quem o abrisse.
         const params = new URLSearchParams(window.location.search);
-        if (params.get('autostart') === '1') {
-          if (
-            existing &&
-            existing.vaultId &&
-            existing.vaultId !== 'vault-springfield-7g'
-          ) {
-            try {
-              const { payload, sessionDek } =
-                await unlockEncryptedVaultEnvelope(existing, 'Rosquinha2026!');
-              if (!mounted) return;
-              sessionDekRef.current = sessionDek;
-              setStoredEnvelope(existing);
-              setUnlockedPayload(payload);
-              setTheme(payload.settings?.theme || 'light');
-              return;
-            } catch {
-              // Se a senha mestra do cofre salvo divergir, recria cofre de demonstração
-            }
-          }
+        if (import.meta.env.DEV && !existing && params.get('autostart') === '1') {
           const sample = createSampleSpringFieldPayload();
+          sample.settings = { ...sample.settings, syncEnabled: false };
           const { envelope, sessionDek } = await createEncryptedVaultEnvelope(
             'Rosquinha2026!',
             sample
@@ -423,9 +413,17 @@ export default function App() {
     ]
   );
 
-  // Provisiona dispositivo automaticamente ao desbloquear o cofre e conecta ao stream SSE
+  // Com a sincronização ligada, provisiona o dispositivo ao desbloquear o cofre e conecta ao SSE.
+  // Desligada, nada sai do navegador: as alterações ficam na fila local, como no modo offline.
   useEffect(() => {
-    if (!unlockedPayload || !storedEnvelope || !sessionDekRef.current) return;
+    if (
+      !unlockedPayload ||
+      !storedEnvelope ||
+      !sessionDekRef.current ||
+      !syncEnabled
+    ) {
+      return;
+    }
     let cancelled = false;
     let eventSource: EventSource | null = null;
 
@@ -467,12 +465,11 @@ export default function App() {
           setSyncAuthSession(currentAuth);
           setAuthorizedDevices([registered.device]);
 
-          // Enfileira os registros iniciais se o servidor ainda estiver no cursor 0
-          if (
-            serverCursorRef.current === 0 &&
-            syncAdapterRef.current.getPendingQueue().length === 0 &&
-            sessionDekRef.current
-          ) {
+          // Primeira sincronização (cursor 0): envia o cofre inteiro. A fila local pode já ter
+          // alterações feitas com a sincronização desligada; ela é trocada por um retrato
+          // completo do cofre para o servidor não ficar só com os itens alterados.
+          if (serverCursorRef.current === 0 && sessionDekRef.current) {
+            syncAdapterRef.current.clearPendingQueue();
             const vaultId = storedEnvelope.vaultId || unlockedPayload.vaultId;
             const keyEpoch = storedEnvelope.keyEpoch || 1;
             for (const cred of unlockedPayload.credentials) {
@@ -540,7 +537,7 @@ export default function App() {
       cancelled = true;
       eventSource?.close();
     };
-  }, [Boolean(unlockedPayload), storedEnvelope?.vaultId]);
+  }, [Boolean(unlockedPayload), storedEnvelope?.vaultId, syncEnabled]);
 
   // Enfileira um registro modificado (criptografado localmente em V2) e sincroniza
   const enqueueRecordChangeForSync = async (
@@ -604,8 +601,13 @@ export default function App() {
   const handleCreateVault = async (
     masterPassword: string,
     vaultName: string,
-    includeSampleData: boolean
+    includeSampleData: boolean,
+    enableSync: boolean
   ) => {
+    const policy = checkMasterPasswordPolicy(masterPassword);
+    if (!policy.ok) {
+      throw new Error(policy.reason);
+    }
     const basePayload: VaultPayload = includeSampleData
       ? createSampleSpringFieldPayload()
       : {
@@ -624,9 +626,11 @@ export default function App() {
         };
 
     basePayload.vaultName = vaultName;
+    basePayload.settings = { ...basePayload.settings, syncEnabled: enableSync };
     const { envelope, sessionDek } = await createEncryptedVaultEnvelope(
       masterPassword,
-      basePayload
+      basePayload,
+      NEW_VAULT_ARGON2_PARAMS
     );
     await saveEncryptedEnvelopeToIdb(envelope);
     sessionDekRef.current = sessionDek;
@@ -653,6 +657,17 @@ export default function App() {
     setUnlockedPayload(payload);
     setTheme(payload.settings?.theme || 'light');
     setActiveTab('dashboard');
+    const policy = checkMasterPasswordPolicy(masterPassword);
+    if (!policy.ok) {
+      // Cofres criados antes da regra atual continuam abrindo, mas o usuário é avisado.
+      triggerComicToast(
+        'ATENÇÃO!',
+        'Sua Senha Mestra está abaixo da regra atual.',
+        'warning',
+        `${policy.reason} Troque em Configurações.`
+      );
+      return;
+    }
     triggerComicToast(
       'ABERTO!',
       'Cofre de Springfield desbloqueado com sucesso!',
@@ -1083,7 +1098,32 @@ export default function App() {
     }
   };
 
+  // Liga ou desliga a sincronização deste cofre. A escolha fica salva, cifrada, no próprio cofre.
+  // Ao desligar, a sessão continua válida no servidor (o cookie prova a posse da conta ao religar),
+  // mas nada mais é enviado. A cópia já enviada permanece no servidor.
+  const handleToggleSync = async (enabled: boolean) => {
+    if (!unlockedPayload) return;
+    await persistUpdatedPayload({
+      ...unlockedPayload,
+      settings: { ...unlockedPayload.settings, syncEnabled: enabled },
+    });
+    if (!enabled) {
+      setSyncAuthSession(null);
+      setSyncHeadline('Sincronização desligada: o cofre está só neste navegador.');
+    }
+    triggerComicToast(
+      enabled ? 'LIGADA!' : 'DESLIGADA!',
+      enabled ? 'Sincronização ativada.' : 'Sincronização desativada.',
+      'info',
+      enabled
+        ? 'O cofre, cifrado neste navegador, será enviado ao servidor.'
+        : 'Nada mais sai deste navegador. O que já foi enviado continua no servidor.'
+    );
+  };
+
   const syncDashboardProps: SyncDashboardProps = {
+    syncEnabled,
+    onToggleSync: handleToggleSync,
     isOnline: effectiveOnline,
     isSyncing,
     syncHeadline,
@@ -1468,12 +1508,18 @@ export default function App() {
                 });
               }}
               onChangeMasterPassword={async (currentPwd, newPwd) => {
+                const policy = checkMasterPasswordPolicy(newPwd);
+                if (!policy.ok) {
+                  throw new Error(policy.reason);
+                }
+                // A troca de senha também leva o cofre para os parâmetros Argon2id atuais.
                 const { envelope: rotatedEnvelope, sessionDek: newDek } =
                   await rotateMasterPassword(
                     storedEnvelope,
                     currentPwd,
                     newPwd,
-                    unlockedPayload
+                    unlockedPayload,
+                    NEW_VAULT_ARGON2_PARAMS
                   );
                 await saveEncryptedEnvelopeToIdb(rotatedEnvelope);
                 if (sessionDekRef.current) {

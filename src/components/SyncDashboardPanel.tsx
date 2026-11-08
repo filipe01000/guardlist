@@ -42,6 +42,8 @@ export interface SyncDeviceViewItem {
 }
 
 export interface SyncDashboardProps {
+  syncEnabled: boolean;
+  onToggleSync: (enabled: boolean) => Promise<void>;
   isOnline: boolean;
   isSyncing: boolean;
   syncHeadline: string;
@@ -67,6 +69,8 @@ export interface SyncDashboardProps {
 }
 
 export function SyncDashboardPanel({
+  syncEnabled,
+  onToggleSync,
   isOnline,
   isSyncing,
   syncHeadline,
@@ -139,6 +143,40 @@ export function SyncDashboardPanel({
     }
   };
 
+  if (!syncEnabled) {
+    return (
+      <Card
+        data-testid="sync-dashboard-panel"
+        className="bg-[#E0F2FE]/85 dark:bg-slate-900 border-4 border-border shadow-[6px_6px_0px_0px_var(--border)]"
+      >
+        <CardHeader className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Cloud className="w-5 h-5 text-[#0284C7] dark:text-sky" />
+            <CardTitle className="text-lg sm:text-xl">Sincronização desligada</CardTitle>
+            <ComicActionCallout text="SÓ NESTE NAVEGADOR" tone="yellow" />
+          </div>
+          <CardDescription className="text-xs font-bold text-stone-700 dark:text-slate-300">
+            Seu cofre está guardado só neste navegador. Ao ativar, o servidor passa a guardar
+            uma cópia cifrada: os registros e a chave do cofre, protegida pela sua Senha Mestra.
+            Ele não lê nada sem ela, mas uma senha fraca pode ser quebrada por quem tiver acesso
+            ao banco de dados.
+          </CardDescription>
+        </CardHeader>
+        <CardFooter>
+          <Button
+            type="button"
+            variant="default"
+            size="sm"
+            onClick={() => void onToggleSync(true)}
+          >
+            <Cloud className="w-4 h-4" />
+            <span>Ativar sincronização</span>
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+
   return (
     <Card
       data-testid="sync-dashboard-panel"
@@ -187,6 +225,16 @@ export function SyncDashboardPanel({
                   <span>Offline</span>
                 </>
               )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="neutral"
+              size="xs"
+              onClick={() => void onToggleSync(false)}
+              aria-label="Desativar a sincronização com o servidor"
+            >
+              <span>Desativar</span>
             </Button>
 
             <Button

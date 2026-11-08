@@ -16,7 +16,11 @@ import {
   BarnabyMascot,
   CartoonVaultDoor,
 } from './CartoonIllustrations';
-import { evaluatePasswordStrength } from '../utils/generator';
+import {
+  checkMasterPasswordPolicy,
+  evaluatePasswordStrength,
+  MASTER_PASSWORD_MIN_LENGTH,
+} from '../utils/generator';
 import { Button } from './ui/button';
 import {
   Card,
@@ -34,7 +38,8 @@ interface WelcomeScreenProps {
   onCreateVault: (
     masterPassword: string,
     vaultName: string,
-    includeSampleData: boolean
+    includeSampleData: boolean,
+    enableSync: boolean
   ) => Promise<void>;
   onUnlockVault: (masterPassword: string) => Promise<void>;
   onImportBackupFile: (fileContent: string, masterPassword: string) => Promise<void>;
@@ -54,6 +59,7 @@ export function WelcomeScreen({
   const [masterPassword, setMasterPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [includeSampleData, setIncludeSampleData] = useState(true);
+  const [enableSync, setEnableSync] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [importedJson, setImportedJson] = useState<string>('');
   const [importedFileName, setImportedFileName] = useState<string>('');
@@ -78,8 +84,9 @@ export function WelcomeScreen({
     e.preventDefault();
     setErrorMsg(null);
 
-    if (masterPassword.length < 6) {
-      setErrorMsg('A Senha Mestra precisa ter pelo menos 6 caracteres para proteger suas rosquinhas!');
+    const policy = checkMasterPasswordPolicy(masterPassword);
+    if (!policy.ok) {
+      setErrorMsg(policy.reason);
       return;
     }
     if (masterPassword !== confirmPassword) {
@@ -94,7 +101,8 @@ export function WelcomeScreen({
       await onCreateVault(
         masterPassword,
         vaultName.trim() || 'Cofre de Springfield',
-        includeSampleData
+        includeSampleData,
+        enableSync
       );
     } catch (err) {
       setVaultDoorOpen(false);
@@ -420,6 +428,10 @@ export function WelcomeScreen({
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
+                      <p className="mt-1 text-[11px] font-semibold text-stone-600 dark:text-slate-300">
+                        Mínimo de {MASTER_PASSWORD_MIN_LENGTH} caracteres e força "Forte". Uma frase
+                        com várias palavras funciona bem.
+                      </p>
                       {masterPassword.length > 0 && (
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center justify-between text-xs font-extrabold">
@@ -470,6 +482,20 @@ export function WelcomeScreen({
                       />
                       <span className="font-semibold text-foreground">
                         <strong>Incluir credenciais divertidas de Springfield</strong> (ótimo para testar a Auditoria, Favoritos e Categorias na hora!)
+                      </span>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#E0F2FE]/70 dark:bg-slate-800 border-2 border-border cursor-pointer text-xs">
+                      <input
+                        type="checkbox"
+                        checked={enableSync}
+                        onChange={(e) => setEnableSync(e.target.checked)}
+                        className="mt-0.5 accent-pink w-4 h-4"
+                      />
+                      <span className="font-semibold text-foreground">
+                        <strong>Sincronizar com o servidor</strong> (opcional). O servidor guarda uma
+                        cópia cifrada do cofre para outros aparelhos. Dá para ativar depois em
+                        Configurações.
                       </span>
                     </label>
 

@@ -60,12 +60,14 @@ export async function rotateMasterPassword(
   existingEnvelope: EncryptedVaultEnvelope,
   currentMasterPassword: string,
   newMasterPassword: string,
-  currentPayload: VaultPayload
+  currentPayload: VaultPayload,
+  newKdfParams?: Argon2Params
 ): Promise<{ envelope: EncryptedVaultEnvelope; sessionDek: Uint8Array }> {
   return CryptoEngine.rotateMasterPassword(
     existingEnvelope,
     currentMasterPassword,
     newMasterPassword,
-    currentPayload
+    currentPayload,
+    newKdfParams
   );
 }

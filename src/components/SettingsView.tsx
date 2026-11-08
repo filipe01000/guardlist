@@ -27,6 +27,7 @@ import {
 } from './ui/card';
 import { Input } from './ui/input';
 import { ComicSpeechBubble, ComicActionCallout } from './ui/comic';
+import { checkMasterPasswordPolicy } from '../utils/generator';
 import {
   SyncDashboardPanel,
   type SyncDashboardProps,
@@ -91,11 +92,9 @@ export function SettingsView({
     e.preventDefault();
     setPwdStatus(null);
 
-    if (newPwd.length < 6) {
-      setPwdStatus({
-        type: 'error',
-        text: 'A nova Senha Mestra deve ter pelo menos 6 caracteres.',
-      });
+    const policy = checkMasterPasswordPolicy(newPwd);
+    if (!policy.ok) {
+      setPwdStatus({ type: 'error', text: policy.reason });
       return;
     }
     if (newPwd !== confirmNewPwd) {

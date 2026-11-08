@@ -456,10 +456,15 @@ export async function pushEncryptedOperationsToDb(params: {
   try {
     checkSimulatedDbFailure();
     return await db.transaction(async (tx) => {
+      // Trava a linha do cofre até o fim da transação. Sem isso, dois envios simultâneos
+      // liam o mesmo estado: recebiam o mesmo serverCursor (e um aparelho podia nunca baixar
+      // um dos registros), as duas edições do mesmo item eram aceitas (uma sumia) e o mesmo
+      // registro novo era gravado duas vezes. Com a trava, os envios de um cofre são em fila.
       const vaultRows = await tx
         .select()
         .from(vaults)
-        .where(eq(vaults.vaultId, params.vaultId));
+        .where(eq(vaults.vaultId, params.vaultId))
+        .for('update');
 
       const vault = vaultRows[0];
       if (!vault) {

@@ -69,6 +69,9 @@ export interface VaultPayload {
   settings: {
     autoLockMinutes: number;
     theme: 'light' | 'dark';
+    // Sincronização com o servidor. Cofres novos começam com `false` e o usuário ativa.
+    // Ausente (cofres antigos) equivale a `true`, para não cortar quem já sincroniza.
+    syncEnabled?: boolean;
   };
 }
 

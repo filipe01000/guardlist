@@ -55,6 +55,11 @@ export const ARGON2_PROFILES: Record<Argon2ProfileId, Argon2Params> = {
 
 export const DEFAULT_ARGON2_PARAMS: Argon2Params = ARGON2_PROFILES['legacy-v1'];
 
+// Parâmetros para cofres novos e para cada troca de Senha Mestra. O padrão acima continua
+// existindo por compatibilidade: cada envelope guarda os próprios parâmetros, então cofres
+// antigos seguem abrindo com os valores com que foram criados.
+export const NEW_VAULT_ARGON2_PARAMS: Argon2Params = ARGON2_PROFILES['owasp-high-v2'];
+
 /**
  * CryptoEngine (Fase 4A):
  * Motor criptográfico Zero-Knowledge responsável por:

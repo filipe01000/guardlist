@@ -216,3 +216,29 @@ export function evaluatePasswordStrength(
     suggestions: [],
   };
 }
+
+export const MASTER_PASSWORD_MIN_LENGTH = 12;
+
+/**
+ * Regra mínima para a Senha Mestra. Ela protege a chave do cofre, que fica no servidor
+ * quando a sincronização está ligada: uma senha fraca pode ser quebrada fora do ar por quem
+ * tiver acesso ao banco, então exigimos comprimento e força (zxcvbn >= 3).
+ */
+export function checkMasterPasswordPolicy(
+  password: string
+): { ok: true } | { ok: false; reason: string } {
+  if (password.length < MASTER_PASSWORD_MIN_LENGTH) {
+    return {
+      ok: false,
+      reason: `A Senha Mestra precisa ter pelo menos ${MASTER_PASSWORD_MIN_LENGTH} caracteres.`,
+    };
+  }
+  if (evaluatePasswordStrength(password).level !== 'strong') {
+    return {
+      ok: false,
+      reason:
+        'A Senha Mestra ainda é fácil de adivinhar. Use uma frase com várias palavras ou misture letras, números e símbolos.',
+    };
+  }
+  return { ok: true };
+}
