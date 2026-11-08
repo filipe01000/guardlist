@@ -303,6 +303,90 @@ test('Conta criada antes da prova a recebe pela sessão válida', async () => {
   });
 });
 
+const VAULT_META = {
+  activeKeyEpoch: 1,
+  kdfParams: { t: 1, m: 4096, p: 1, dkLen: 32 },
+  saltHex: 'aa'.repeat(16),
+  wrappedDekHex: 'bb'.repeat(32),
+  dekNonceHex: 'cc'.repeat(12),
+};
+
+async function postVaultMeta(
+  baseUrl: string,
+  session: { sessionToken: string; device: { deviceId: string } },
+  body: Record<string, unknown>
+) {
+  return fetch(`${baseUrl}/api/v1/sync/vault`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.sessionToken}`,
+      'X-Device-Id': session.device.deviceId,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+test('Trocar a chave do cofre exige a prova de posse quando a conta tem uma', async () => {
+  await withServer(async (baseUrl) => {
+    const vaultId = CryptoEngine.randomId('vault');
+    const userUid = `usr-${vaultId.slice(0, 24)}`;
+    const token = CryptoEngine.deriveVaultReauthToken(
+      CryptoEngine.generateVaultReauthSecret(),
+      vaultId
+    );
+    const reg = await registerDevice(baseUrl, {
+      ...deviceBody(userUid),
+      vaultReauthToken: token,
+    });
+    assert.equal(reg.res.status, 201);
+    const meta = { vaultId, ...VAULT_META };
+
+    assert.equal((await postVaultMeta(baseUrl, reg.data, meta)).status, 403);
+    assert.equal(
+      (await postVaultMeta(baseUrl, reg.data, { ...meta, vaultReauthToken: token })).status,
+      200
+    );
+    // Sincronização normal: mesmos metadados, sem prova.
+    assert.equal((await postVaultMeta(baseUrl, reg.data, meta)).status, 200);
+
+    // Sessão sem a prova não troca a chave (o ataque que travava o dono com 409).
+    const bumped = { ...meta, activeKeyEpoch: 2, wrappedDekHex: 'dd'.repeat(32) };
+    assert.equal((await postVaultMeta(baseUrl, reg.data, bumped)).status, 403);
+    const wrongToken = CryptoEngine.deriveVaultReauthToken(
+      CryptoEngine.generateVaultReauthSecret(),
+      vaultId
+    );
+    assert.equal(
+      (await postVaultMeta(baseUrl, reg.data, { ...bumped, vaultReauthToken: wrongToken }))
+        .status,
+      403
+    );
+
+    // Troca de Senha Mestra do dono (DEK nova, época + 1) continua passando.
+    assert.equal(
+      (await postVaultMeta(baseUrl, reg.data, { ...bumped, vaultReauthToken: token })).status,
+      200
+    );
+    assert.equal((await postVaultMeta(baseUrl, reg.data, bumped)).status, 200);
+  });
+});
+
+test('Conta criada antes da prova segue podendo trocar a chave até gravar a sua', async () => {
+  await withServer(async (baseUrl) => {
+    const vaultId = CryptoEngine.randomId('vault');
+    const userUid = `usr-${vaultId.slice(0, 24)}`;
+    const reg = await registerDevice(baseUrl, deviceBody(userUid));
+    assert.equal(reg.res.status, 201);
+    const meta = { vaultId, ...VAULT_META };
+    assert.equal((await postVaultMeta(baseUrl, reg.data, meta)).status, 200);
+    assert.equal(
+      (await postVaultMeta(baseUrl, reg.data, { ...meta, activeKeyEpoch: 2 })).status,
+      200
+    );
+  });
+});
+
 test('Eventos anônimos repetidos da mesma origem gravam uma linha só', async () => {
   resetRateLimitsForTests();
   const eventType = `TEST_ANON_SAMPLING_${CryptoEngine.randomId('evt')}`;

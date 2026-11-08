@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { checkMasterPasswordPolicy, MASTER_PASSWORD_MIN_LENGTH } from './generator.ts';
+import { loadStrengthEngine } from './strengthEngine.ts';
 import {
   ARGON2_PROFILES,
   DEFAULT_ARGON2_PARAMS,
   NEW_VAULT_ARGON2_PARAMS,
 } from '../services/CryptoEngine.ts';
+
+await loadStrengthEngine();
 
 test('Senha Mestra curta é recusada', () => {
   const result = checkMasterPasswordPolicy('Ab1!xyz');

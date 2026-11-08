@@ -21,6 +21,9 @@ Node.js 24.22.1. Código identificado como DonutVault 0.9.3 pelo proprietário.
 - Reconexão: com a sessão vencida (30 dias sem abrir o app), o navegador volta a sincronizar provando a
   posse do cofre com um token que sai de um segredo guardado dentro do cofre cifrado. O servidor guarda
   só o hash, gravado uma vez por conta (no primeiro aparelho ou por um aparelho com sessão válida).
+  Trocar a chave do cofre (troca de Senha Mestra) também exige esse token quando a conta já tem um.
+- CSP: definida pelo servidor, por cabeçalho. Em produção não há script inline; no desenvolvimento o
+  Vite precisa de script e estilo inline e de WebSocket, e a política se ajusta pelo `NODE_ENV`.
 - IP do cliente: no Render vale o `CF-Connecting-IP`, posto pela Cloudflare, que recusa esse cabeçalho
   quando vem do cliente. O `X-Forwarded-For` só conta quando vem de proxy confiável (`TRUST_PROXY`,
   padrão `loopback`). Fora do Render, atrás da Cloudflare, defina `CLIENT_IP_HEADER=cf-connecting-ip`;

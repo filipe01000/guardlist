@@ -24,6 +24,7 @@ import {
   evaluatePasswordStrength,
   generateSecurePassword,
 } from '../utils/generator';
+import { useStrengthEngineReady } from '../utils/strengthEngine';
 import {
   copySecretToClipboardWithAutoClear,
   normalizeCredentialUrlForStorage,
@@ -270,6 +271,7 @@ export function PasswordsView({
     closeModal();
   };
 
+  useStrengthEngineReady();
   const strength = evaluatePasswordStrength(password, [serviceName, username, email]);
 
   const getCategoryMeta = (catId: CategoryId) =>

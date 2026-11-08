@@ -309,6 +309,37 @@ export async function bindUserReauthVerifierInDb(params: {
 }
 
 /**
+ * Libera a troca da chave do cofre só com a prova de posse, quando a conta já tem uma gravada.
+ * Contas criadas antes da prova seguem livres até gravarem a sua (no próximo desbloqueio com
+ * sessão válida).
+ */
+async function assertVaultKeyChangeAllowed(userUid: string, reauthToken?: string) {
+  const rows = await db
+    .select({ verifier: users.reauthVerifierSha256 })
+    .from(users)
+    .where(eq(users.uid, userUid))
+    .limit(1);
+  const verifier = rows[0]?.verifier;
+  if (!verifier) return;
+
+  const presented = reauthToken
+    ? Buffer.from(CryptoEngine.computeVaultReauthVerifier(reauthToken), 'utf8')
+    : null;
+  const stored = Buffer.from(verifier, 'utf8');
+  if (
+    !presented ||
+    presented.length !== stored.length ||
+    !timingSafeEqual(presented, stored)
+  ) {
+    const err = new Error(
+      'Para trocar a chave do cofre é preciso provar a posse do cofre (403 Forbidden).'
+    );
+    (err as Error & { statusCode?: number }).statusCode = 403;
+    throw err;
+  }
+}
+
+/**
  * Confere o token de reconexão de um navegador cuja sessão venceu. O token sai de um segredo
  * guardado dentro do cofre cifrado, então só quem abre o cofre consegue apresentá-lo.
  */
@@ -556,6 +587,8 @@ export async function registerOrUpdateVaultMetadataInDb(params: {
   saltHex: string;
   wrappedDekHex: string;
   dekNonceHex: string;
+  // Token de reconexão (CryptoEngine.deriveVaultReauthToken); exigido para trocar a chave do cofre.
+  reauthToken?: string;
 }) {
   try {
     checkSimulatedDbFailure();
@@ -565,6 +598,15 @@ export async function registerOrUpdateVaultMetadataInDb(params: {
       .where(eq(vaults.vaultId, params.vaultId));
 
     const existing = existingRows[0];
+    const kdfParamsJson = JSON.stringify(params.kdfParams);
+    const changesVaultKey =
+      !existing ||
+      existing.activeKeyEpoch !== params.activeKeyEpoch ||
+      existing.kdfParamsJson !== kdfParamsJson ||
+      existing.saltHex !== params.saltHex ||
+      existing.wrappedDekHex !== params.wrappedDekHex ||
+      existing.dekNonceHex !== params.dekNonceHex;
+
     if (existing) {
       if (existing.userUid !== params.userUid) {
         const err = new Error(
@@ -580,12 +622,21 @@ export async function registerOrUpdateVaultMetadataInDb(params: {
         (err as Error & { statusCode?: number }).statusCode = 409;
         throw err;
       }
+    }
 
+    // Trocar a chave do cofre (época, DEK cifrada, sal, nonce ou parâmetros do Argon2) exige a prova
+    // de posse do cofre quando a conta já tem uma. Antes, qualquer sessão da conta gravava uma época
+    // maior e outra DEK, e dali em diante o aparelho do dono recebia 409 em toda sincronização.
+    if (changesVaultKey) {
+      await assertVaultKeyChangeAllowed(params.userUid, params.reauthToken);
+    }
+
+    if (existing) {
       const updated = await db
         .update(vaults)
         .set({
           activeKeyEpoch: params.activeKeyEpoch,
-          kdfParamsJson: JSON.stringify(params.kdfParams),
+          kdfParamsJson,
           saltHex: params.saltHex,
           wrappedDekHex: params.wrappedDekHex,
           dekNonceHex: params.dekNonceHex,
@@ -602,7 +653,7 @@ export async function registerOrUpdateVaultMetadataInDb(params: {
         vaultId: params.vaultId,
         userUid: params.userUid,
         activeKeyEpoch: params.activeKeyEpoch,
-        kdfParamsJson: JSON.stringify(params.kdfParams),
+        kdfParamsJson,
         saltHex: params.saltHex,
         wrappedDekHex: params.wrappedDekHex,
         dekNonceHex: params.dekNonceHex,

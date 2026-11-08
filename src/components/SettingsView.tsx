@@ -28,6 +28,7 @@ import {
 import { Input } from './ui/input';
 import { ComicSpeechBubble, ComicActionCallout } from './ui/comic';
 import { checkMasterPasswordPolicy } from '../utils/generator';
+import { loadStrengthEngine } from '../utils/strengthEngine';
 import {
   SyncDashboardPanel,
   type SyncDashboardProps,
@@ -92,6 +93,7 @@ export function SettingsView({
     e.preventDefault();
     setPwdStatus(null);
 
+    await loadStrengthEngine().catch(() => undefined);
     const policy = checkMasterPasswordPolicy(newPwd);
     if (!policy.ok) {
       setPwdStatus({ type: 'error', text: policy.reason });

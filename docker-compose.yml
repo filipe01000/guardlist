@@ -1,48 +1,44 @@
-version: '3.9'
-
-# Ambiente de Homologação e Testes Locais Isolados (Zero-Knowledge Sync)
-# Nenhum segredo fixo no repositório: todas as credenciais são injetadas via variáveis de ambiente.
+# Bancos Postgres para desenvolvimento e testes locais. O app roda fora do Docker (npm run dev).
+# Uso: docker compose up -d
+# As portas ficam presas a 127.0.0.1; nada fica exposto na rede.
 services:
-  postgres-homolog:
+  # Banco do servidor local (npm run dev). Os dados ficam no volume donutvault_pgdata.
+  postgres-dev:
     image: postgres:16-alpine
-    container_name: donutvault-postgres-homolog
+    container_name: donutvault-postgres-dev
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${SQL_DB_NAME:-donutvault_homolog}
-      POSTGRES_USER: ${SQL_ADMIN_USER:-donutvault_admin}
-      POSTGRES_PASSWORD: ${SQL_ADMIN_PASSWORD:?Defina SQL_ADMIN_PASSWORD no ambiente}
+      POSTGRES_DB: donutvault_local
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_DEV_PASSWORD:-donutvault}
     ports:
-      - '5432:5432'
+      - '127.0.0.1:55433:5432'
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d donutvault_local']
       interval: 5s
       timeout: 5s
       retries: 5
     volumes:
       - donutvault_pgdata:/var/lib/postgresql/data
 
-  donutvault-app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: donutvault-homolog-server
-    depends_on:
-      postgres-homolog:
-        condition: service_healthy
+  # Banco só para npm test. Fica em memória: some quando o contêiner para.
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: donutvault-postgres-test
+    restart: unless-stopped
     environment:
-      NODE_ENV: staging
-      PORT: 3000
-      SQL_HOST: postgres-homolog
-      SQL_DB_NAME: ${SQL_DB_NAME:-donutvault_homolog}
-      SQL_USER: ${SQL_USER:-donutvault_app}
-      SQL_PASSWORD: ${SQL_PASSWORD:?Defina SQL_PASSWORD no ambiente}
+      POSTGRES_DB: dvtest
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dvtest
     ports:
-      - '3000:3000'
+      - '127.0.0.1:55432:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://localhost:3000/api/v1/health || exit 1']
-      interval: 10s
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d dvtest']
+      interval: 5s
       timeout: 5s
-      retries: 3
+      retries: 5
 
 volumes:
   donutvault_pgdata:

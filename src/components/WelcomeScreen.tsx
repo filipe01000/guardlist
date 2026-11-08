@@ -22,6 +22,10 @@ import {
   evaluatePasswordStrength,
   MASTER_PASSWORD_MIN_LENGTH,
 } from '../utils/generator';
+import {
+  loadStrengthEngine,
+  useStrengthEngineReady,
+} from '../utils/strengthEngine';
 import { Button } from './ui/button';
 import {
   Card,
@@ -85,6 +89,7 @@ export function WelcomeScreen({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useStrengthEngineReady();
   const strength = evaluatePasswordStrength(masterPassword);
 
   const resetForm = (nextModal: WelcomePanel) => {
@@ -144,6 +149,7 @@ export function WelcomeScreen({
       return;
     }
 
+    await loadStrengthEngine().catch(() => undefined);
     const policy = checkMasterPasswordPolicy(masterPassword);
     if (!policy.ok) {
       setErrorMsg(policy.reason);

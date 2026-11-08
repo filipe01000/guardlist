@@ -8,14 +8,19 @@ export default defineConfig(() => {
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(import.meta.dirname, '.'),
       },
     },
+    build: {
+      // O único arquivo acima de 500 kB é o do medidor de força (zxcvbn), que é quase todo
+      // dicionário e carrega em segundo plano (src/utils/strengthEngine.ts). O pacote principal
+      // fica abaixo de 500 kB.
+      chunkSizeWarningLimit: 900,
+    },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modify—file watching is disabled to prevent flickering during agent edits.
+      // DISABLE_HMR=true desliga o recarregamento automático e a observação de arquivos, o que
+      // poupa CPU quando muitos arquivos mudam de uma vez.
       hmr: process.env.DISABLE_HMR !== 'true',
-      // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
   };

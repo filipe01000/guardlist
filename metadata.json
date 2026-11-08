@@ -1,6 +1,0 @@
-{
-  "name": "DonutVault — Gerenciador de Senhas",
-  "description": "Suas senhas estão mais protegidas que a última rosquinha! Gerenciador de senhas criptografado com AES-256-GCM e Argon2id em estilo cartoon anos 90.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

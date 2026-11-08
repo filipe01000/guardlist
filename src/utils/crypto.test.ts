@@ -26,6 +26,10 @@ import {
 } from './security';
 import { runVaultSecurityAudit } from './audit';
 import { createSampleSpringFieldPayload } from './seedData';
+import { loadStrengthEngine } from './strengthEngine';
+
+// O medidor de força (zxcvbn) carrega sob demanda; os testes de força precisam dele pronto.
+await loadStrengthEngine();
 
 const FAST_KDF_PARAMS = { t: 1, m: 4096, p: 1, dkLen: 32 };
 

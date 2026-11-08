@@ -1,5 +1,5 @@
-import zxcvbn from 'zxcvbn';
 import type { PasswordGeneratorConfig } from '../types/vault';
+import { getStrengthEngine, loadStrengthEngine } from './strengthEngine';
 
 const UPPERCASE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const LOWERCASE_CHARS = 'abcdefghijklmnopqrstuvwxyz';
@@ -158,6 +158,22 @@ export function evaluatePasswordStrength(
     };
   }
 
+  const zxcvbn = getStrengthEngine();
+  if (!zxcvbn) {
+    // Medidor ainda carregando: nada é dado como forte até ele chegar.
+    void loadStrengthEngine().catch(() => undefined);
+    return {
+      score: 0,
+      level: 'weak',
+      label: 'Calculando…',
+      funnyMessage: 'Só um instante: estou medindo a força da senha.',
+      mascotMood: 'thinking',
+      crackTimeDisplay: '—',
+      entropyGuessesLog10: 0,
+      suggestions: [],
+    };
+  }
+
   const ptBrCommonInputs = [
     'rosquinha',
     'senha',
@@ -229,6 +245,13 @@ export function checkMasterPasswordPolicy(
     return {
       ok: false,
       reason: `A Senha Mestra precisa ter pelo menos ${MASTER_PASSWORD_MIN_LENGTH} caracteres.`,
+    };
+  }
+  if (!getStrengthEngine()) {
+    return {
+      ok: false,
+      reason:
+        'O verificador de força da senha ainda está carregando. Tente de novo em instantes.',
     };
   }
   if (evaluatePasswordStrength(password).level !== 'strong') {

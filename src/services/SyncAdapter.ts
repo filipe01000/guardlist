@@ -570,6 +570,8 @@ export class SyncAdapter {
       saltHex: string;
       wrappedDekHex: string;
       dekNonceHex: string;
+      // Prova de posse do cofre; o servidor a exige quando estes metadados mudam.
+      vaultReauthToken?: string;
     }
   ): Promise<{ vaultId: string; activeKeyEpoch: number; updatedAt: string }> {
     const res = await fetch(`${baseUrl}/api/v1/sync/vault`, {

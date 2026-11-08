@@ -48,6 +48,11 @@ import {
   parseAndValidateBackupJson,
 } from './utils/storage';
 import { runVaultSecurityAudit } from './utils/audit';
+import { mergeRemoteRecords } from './utils/syncMerge';
+import {
+  loadStrengthEngine,
+  useStrengthEngineReady,
+} from './utils/strengthEngine';
 import { DonutVaultLogo } from './components/CartoonIllustrations';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { DashboardView } from './components/DashboardView';
@@ -120,6 +125,21 @@ const SYNC_HEADLINE_OFFLINE =
 const SYNC_HEADLINE_FAILED =
   'Não foi possível sincronizar agora. Suas alterações continuam na fila.';
 
+// Token de reconexão do cofre (CryptoEngine.deriveVaultReauthToken). Sem segredo, ou com um
+// segredo ilegível, segue sem a prova.
+function deriveReauthTokenFor(
+  payload: VaultPayload,
+  vaultId: string
+): string | undefined {
+  const secret = payload.settings?.syncReauthSecretHex;
+  if (!secret) return undefined;
+  try {
+    return CryptoEngine.deriveVaultReauthToken(secret, vaultId);
+  } catch {
+    return undefined;
+  }
+}
+
 export default function App() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [storedEnvelope, setStoredEnvelope] =
@@ -128,6 +148,19 @@ export default function App() {
     null
   );
   const sessionDekRef = useRef<Uint8Array | null>(null);
+  // Cópias sempre atuais do cofre aberto. O aviso do SSE chama a versão da sincronização guardada
+  // no desbloqueio; lendo daqui, ela não grava por cima de alterações feitas depois.
+  const unlockedPayloadRef = useRef<VaultPayload | null>(unlockedPayload);
+  const storedEnvelopeRef = useRef<EncryptedVaultEnvelope | null>(storedEnvelope);
+  unlockedPayloadRef.current = unlockedPayload;
+  storedEnvelopeRef.current = storedEnvelope;
+
+  // O medidor de força de senha (zxcvbn) vem num arquivo à parte. Ele começa a carregar assim que
+  // o app abre; abrir, criar ou importar um cofre espera por ele antes de mostrar o painel.
+  const strengthReady = useStrengthEngineReady();
+  useEffect(() => {
+    void loadStrengthEngine().catch(() => undefined);
+  }, []);
 
   const [activeTab, setActiveTab] = useState<NavigationTab>('dashboard');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
@@ -285,8 +318,8 @@ export default function App() {
       customPayload?: VaultPayload
     ) => {
       const activeAuth = customAuth || syncAuthSession;
-      const activeEnvelope = customEnvelope || storedEnvelope;
-      const activePayload = customPayload || unlockedPayload;
+      const activeEnvelope = customEnvelope || storedEnvelopeRef.current;
+      const activePayload = customPayload || unlockedPayloadRef.current;
       const activeDek = sessionDekRef.current;
 
       if (!activeAuth || !activeEnvelope || !activePayload || !activeDek) {
@@ -313,6 +346,7 @@ export default function App() {
           saltHex: activeEnvelope.saltHex,
           wrappedDekHex: activeEnvelope.wrappedDekHex,
           dekNonceHex: activeEnvelope.dekNonceHex,
+          vaultReauthToken: deriveReauthTokenFor(activePayload, vaultId),
         });
 
         // 1. Push da fila offline pendente
@@ -343,55 +377,39 @@ export default function App() {
         serverCursorRef.current = nextCursor;
         setServerCursor(nextCursor);
 
-        // Se chegaram registros novos de outros dispositivos (ex: Celular), mescla localmente sem perda
+        // Registros novos de outros aparelhos (ex.: celular) entram no cofre local sem perda. A base
+        // é o cofre mais recente, não o do início desta função: ele pode ter mudado enquanto os
+        // pedidos iam e voltavam do servidor (e, no aviso do SSE, esta função é a do desbloqueio).
         if (
           pullOutcome.decryptedCredentials.length > 0 ||
           pullOutcome.decryptedNotes.length > 0
         ) {
-          let hasRemoteUpdates = false;
-          const credMap = new Map<string, CredentialItem>(
-            activePayload.credentials.map((c) => [c.id, c])
-          );
-          for (const remoteCred of pullOutcome.decryptedCredentials) {
-            const localCred = credMap.get(remoteCred.id);
-            if (
-              !localCred ||
-              (remoteCred.revision || 1) > (localCred.revision || 1)
-            ) {
-              credMap.set(remoteCred.id, remoteCred);
-              hasRemoteUpdates = true;
-            }
-          }
-
-          const noteMap = new Map<string, SecretNote>(
-            activePayload.notes.map((n) => [n.id, n])
-          );
-          for (const remoteNote of pullOutcome.decryptedNotes) {
-            const localNote = noteMap.get(remoteNote.id);
-            if (
-              !localNote ||
-              (remoteNote.revision || 1) > (localNote.revision || 1)
-            ) {
-              noteMap.set(remoteNote.id, remoteNote);
-              hasRemoteUpdates = true;
-            }
-          }
-
-          if (hasRemoteUpdates) {
-            const mergedPayload: VaultPayload = {
-              ...activePayload,
-              credentials: Array.from(credMap.values()),
-              notes: Array.from(noteMap.values()),
-              updatedAt: new Date().toISOString(),
-            };
-            const reencryptedEnvelope = await updateEncryptedVaultPayload(
-              activeEnvelope,
-              activeDek,
-              mergedPayload
+          const basePayload = unlockedPayloadRef.current;
+          const baseEnvelope = storedEnvelopeRef.current;
+          const currentDek = sessionDekRef.current;
+          if (
+            basePayload &&
+            baseEnvelope &&
+            currentDek &&
+            (baseEnvelope.vaultId || basePayload.vaultId) === vaultId
+          ) {
+            const mergedPayload = mergeRemoteRecords(
+              basePayload,
+              pullOutcome.decryptedCredentials,
+              pullOutcome.decryptedNotes
             );
-            await saveEncryptedEnvelopeToIdb(reencryptedEnvelope);
-            setStoredEnvelope(reencryptedEnvelope);
-            setUnlockedPayload(mergedPayload);
+            if (mergedPayload) {
+              const reencryptedEnvelope = await updateEncryptedVaultPayload(
+                baseEnvelope,
+                currentDek,
+                mergedPayload
+              );
+              await saveEncryptedEnvelopeToIdb(reencryptedEnvelope);
+              storedEnvelopeRef.current = reencryptedEnvelope;
+              unlockedPayloadRef.current = mergedPayload;
+              setStoredEnvelope(reencryptedEnvelope);
+              setUnlockedPayload(mergedPayload);
+            }
           }
         }
 
@@ -480,18 +498,10 @@ export default function App() {
           const thisDevice = describeThisDevice();
           // Prova de posse do cofre: deixa este navegador voltar a sincronizar quando a sessão
           // no servidor vencer (o cookie dura 30 dias desde o último desbloqueio).
-          const reauthSecret = unlockedPayload.settings?.syncReauthSecretHex;
-          let vaultReauthToken: string | undefined;
-          try {
-            vaultReauthToken = reauthSecret
-              ? CryptoEngine.deriveVaultReauthToken(
-                  reauthSecret,
-                  storedEnvelope.vaultId || unlockedPayload.vaultId
-                )
-              : undefined;
-          } catch {
-            // Segredo ilegível: segue sem a prova, como antes.
-          }
+          const vaultReauthToken = deriveReauthTokenFor(
+            unlockedPayload,
+            storedEnvelope.vaultId || unlockedPayload.vaultId
+          );
           const registered =
             await syncAdapterRef.current.registerDeviceOnBackend('', {
               userUid: vaultBasedUid,
@@ -547,11 +557,8 @@ export default function App() {
           }
         }
 
-        await executeIncrementalSync(
-          currentAuth,
-          storedEnvelope,
-          unlockedPayload
-        );
+        // Sem cofre explícito: a função lê o cofre mais recente.
+        await executeIncrementalSync(currentAuth);
 
         // Conecta ao SSE para notificações em tempo real usando Cookie HttpOnly (jamais envia token na URL!)
         if (typeof EventSource !== 'undefined' && currentAuth) {
@@ -626,7 +633,8 @@ export default function App() {
 
   // Persiste qualquer alteração re-criptografando com novo nonce único
   const persistUpdatedPayload = async (nextPayload: VaultPayload) => {
-    if (!storedEnvelope || !sessionDekRef.current) {
+    const baseEnvelope = storedEnvelopeRef.current || storedEnvelope;
+    if (!baseEnvelope || !sessionDekRef.current) {
       throw new Error('Sessão do cofre bloqueada.');
     }
     const updatedPayload: VaultPayload = {
@@ -634,11 +642,13 @@ export default function App() {
       updatedAt: new Date().toISOString(),
     };
     const nextEnvelope = await updateEncryptedVaultPayload(
-      storedEnvelope,
+      baseEnvelope,
       sessionDekRef.current,
       updatedPayload
     );
     await saveEncryptedEnvelopeToIdb(nextEnvelope);
+    storedEnvelopeRef.current = nextEnvelope;
+    unlockedPayloadRef.current = updatedPayload;
     setStoredEnvelope(nextEnvelope);
     setUnlockedPayload(updatedPayload);
   };
@@ -670,6 +680,7 @@ export default function App() {
         'Já existe um cofre neste navegador. Confirme a substituição antes de criar outro.'
       );
     }
+    await loadStrengthEngine().catch(() => undefined);
     const policy = checkMasterPasswordPolicy(masterPassword);
     if (!policy.ok) {
       throw new Error(policy.reason);
@@ -752,6 +763,7 @@ export default function App() {
     }
     const { payload: openedPayload, sessionDek } =
       await unlockEncryptedVaultEnvelope(storedEnvelope, masterPassword);
+    await loadStrengthEngine().catch(() => undefined);
     let payload = openedPayload;
     const ensured = await ensureSyncReauthSecret(
       storedEnvelope,
@@ -797,6 +809,7 @@ export default function App() {
     const validatedEnvelope = parseAndValidateBackupJson(fileContent);
     const { payload: importedPayload, sessionDek: importedDek } =
       await unlockEncryptedVaultEnvelope(validatedEnvelope, masterPassword);
+    await loadStrengthEngine().catch(() => undefined);
 
     if (
       strategy === 'merge' &&
@@ -1090,7 +1103,8 @@ export default function App() {
   // Relatório de auditoria calculado em tempo real
   const auditReport = useMemo(
     () => runVaultSecurityAudit(unlockedPayload?.credentials || []),
-    [unlockedPayload?.credentials]
+    // strengthReady: refaz a conta quando o medidor de força termina de carregar.
+    [unlockedPayload?.credentials, strengthReady]
   );
 
   // Aparelhos conectados à sincronização
@@ -1521,6 +1535,7 @@ export default function App() {
                 });
               }}
               onChangeMasterPassword={async (currentPwd, newPwd) => {
+                await loadStrengthEngine().catch(() => undefined);
                 const policy = checkMasterPasswordPolicy(newPwd);
                 if (!policy.ok) {
                   throw new Error(policy.reason);

@@ -18,6 +18,30 @@ export interface ZeroTrustVerifiedRequest extends Request {
 // Métodos que o anti-scanner aceita de qualquer origem (os demais só de sessão conferida).
 const COMMON_HTTP_METHODS = new Set(['GET', 'POST', 'OPTIONS', 'HEAD']);
 
+// CSP da página do app. Em produção nada roda inline: o build do Vite só gera arquivos, e o React
+// aplica estilos pelo DOM (o que a CSP não bloqueia). No desenvolvimento o Vite injeta script e
+// estilo inline e usa WebSocket para recarregar a página.
+const APP_CSP_PRODUCTION = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob:",
+  "connect-src 'self'",
+  // O canvas-confetti desenha num worker criado a partir de um blob.
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join('; ');
+const APP_CSP_DEVELOPMENT = APP_CSP_PRODUCTION.replace(
+  "script-src 'self'",
+  "script-src 'self' 'unsafe-inline'"
+)
+  .replace("style-src 'self'", "style-src 'self' 'unsafe-inline'")
+  .replace("connect-src 'self'", "connect-src 'self' ws: wss:");
+
 /**
  * Domínios oficiais planejados para produção (Fase 5B):
  * - Frontend Web Vault: https://vault.filipeti.com.br
@@ -101,7 +125,12 @@ export function securityHeadersAndAntiFingerprintMiddleware(
     );
     res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
   } else {
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    // Antes a CSP ia numa tag do index.html e liberava script inline também em produção.
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader(
+      'Content-Security-Policy',
+      process.env.NODE_ENV === 'production' ? APP_CSP_PRODUCTION : APP_CSP_DEVELOPMENT
+    );
   }
 
   next();

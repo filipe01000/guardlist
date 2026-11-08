@@ -1117,6 +1117,12 @@ export function createSyncApiRouter(): express.Router {
         const saltHex = String(req.body?.saltHex || '').trim();
         const wrappedDekHex = String(req.body?.wrappedDekHex || '').trim();
         const dekNonceHex = String(req.body?.dekNonceHex || '').trim();
+        // Prova de posse do cofre, exigida só quando o pedido troca a chave do cofre.
+        const vaultReauthToken =
+          typeof req.body?.vaultReauthToken === 'string' &&
+          /^[0-9a-f]{64}$/.test(req.body.vaultReauthToken)
+            ? (req.body.vaultReauthToken as string)
+            : undefined;
 
         if (
           !vaultId ||
@@ -1144,6 +1150,7 @@ export function createSyncApiRouter(): express.Router {
           saltHex,
           wrappedDekHex,
           dekNonceHex,
+          reauthToken: vaultReauthToken,
         });
 
         res.status(200).json({

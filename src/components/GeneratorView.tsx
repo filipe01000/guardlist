@@ -13,6 +13,7 @@ import {
   generateSecurePassword,
   evaluatePasswordStrength,
 } from '../utils/generator';
+import { useStrengthEngineReady } from '../utils/strengthEngine';
 import { BarnabyMascot } from './CartoonIllustrations';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
@@ -81,6 +82,7 @@ export function GeneratorView({
     config.includeNumberInPassphrase,
   ]);
 
+  useStrengthEngineReady();
   const strength = evaluatePasswordStrength(generatedPassword);
 
   const handleCopy = async () => {

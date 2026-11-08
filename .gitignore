@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Ferramentas locais (agentes e editores)
+.claude/
+.impeccable/
+.omc/
