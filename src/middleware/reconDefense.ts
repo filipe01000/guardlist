@@ -18,14 +18,14 @@ export interface ZeroTrustVerifiedRequest extends Request {
 // Métodos que o anti-scanner aceita de qualquer origem (os demais só de sessão conferida).
 const COMMON_HTTP_METHODS = new Set(['GET', 'POST', 'OPTIONS', 'HEAD']);
 
-// CSP da página do app. Em produção nada roda inline: o build do Vite só gera arquivos, e o React
+// CSP da página do app. As fontes são servidas pelo próprio app. Em produção nada roda inline: o build do Vite só gera arquivos, e o React
 // aplica estilos pelo DOM (o que a CSP não bloqueia). No desenvolvimento o Vite injeta script e
 // estilo inline e usa WebSocket para recarregar a página.
-const APP_CSP_PRODUCTION = [
+export const APP_CSP_PRODUCTION = [
   "default-src 'self'",
   "script-src 'self'",
-  "style-src 'self' https://fonts.googleapis.com",
-  "font-src 'self' https://fonts.gstatic.com data:",
+  "style-src 'self'",
+  "font-src 'self' data:",
   "img-src 'self' data: blob:",
   "connect-src 'self'",
   // O canvas-confetti desenha num worker criado a partir de um blob.
