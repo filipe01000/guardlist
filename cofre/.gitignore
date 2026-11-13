@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Ferramentas locais (agentes e editores)
+.claude/
+.impeccable/
+.omc/

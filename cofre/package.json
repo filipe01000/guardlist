@@ -1,0 +1,68 @@
+{
+  "name": "donutvault",
+  "private": true,
+  "version": "0.9.3",
+  "type": "module",
+  "engines": {
+    "node": "24.22.1"
+  },
+  "scripts": {
+    "dev": "tsx server.ts",
+    "start": "npm run db:migrate && tsx server.ts",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist server.js",
+    "lint": "tsc --noEmit",
+    "test": "tsx --test src/utils/*.test.ts",
+    "db:generate": "drizzle-kit generate --config src/db/drizzle.config.ts",
+    "db:migrate": "tsx scripts/migrate.ts"
+  },
+  "dependencies": {
+    "@base-ui/react": "^1.9.0",
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@noble/hashes": "^2.4.0",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.1.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/canvas-confetti": "^1.9.0",
+    "@types/pg": "^8.23.1",
+    "@types/zxcvbn": "^4.4.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "canvas-confetti": "^1.9.4",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.4",
+    "express": "^4.21.2",
+    "firebase": "^13.2.0",
+    "firebase-admin": "^14.5.0",
+    "jose": "^6.2.15",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "pg": "^8.23.1",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "tailwind-merge": "^3.7.0",
+    "tsx": "^4.21.0",
+    "vite": "^8.3.0",
+    "zxcvbn": "^4.4.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.4.21",
+    "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.28.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "^1.14.5"
+    }
+  }
+}

@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DonutVault · esboço meio a meio</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --app-bg: #0E0D15; --surface-subtle: #131A35; --line: #2C3C68; --line-strong: #3D5387;
+    --text: #F3F0F6; --text-soft: #D5CCD8; --muted: #9EA4C8;
+    --action: #FFD90F; --action-hover: #FFE553; --action-text: #0E0D15;
+    --accent-soft: rgba(255, 217, 15, 0.12); --pink: #FF5CA8; --sky: #38BDF8;
+    --danger: #ff6b7a; --warning: #f2b04f; --success: #3fd69b;
+    --glass: rgba(24, 35, 70, 0.52); --glass-line: rgba(191, 169, 186, 0.16); --glass-hi: rgba(255,255,255,0.055);
+    --display: 'Bricolage Grotesque', system-ui, sans-serif;
+    --sans: 'IBM Plex Sans', system-ui, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #07070b; color: var(--text); font: 400 14px/1.5 var(--sans); padding: 28px clamp(16px, 3vw, 40px) 60px; }
+  .note { max-width: 1180px; margin: 0 auto 14px; color: var(--muted); }
+  .note h1 { font: 800 22px/1.2 var(--display); color: var(--text); margin: 0 0 4px; }
+  .note h2 { font: 700 15px/1.3 var(--sans); color: var(--text); margin: 34px 0 2px; }
+  .note p { margin: 0; max-width: 78ch; }
+
+  .screen { position: relative; max-width: 1180px; margin: 0 auto; border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--line); background: var(--app-bg); isolation: isolate; }
+  /* fundo: faixas de luz do GuardList + pontinhos de gibi bem fracos */
+  .screen::before { content: ""; position: absolute; inset: 0; z-index: -1;
+    background-image: radial-gradient(rgba(255,255,255,0.05) 1.4px, transparent 1.5px); background-size: 14px 14px; }
+  .streak { position: absolute; z-index: -1; left: -30%; width: 160%; height: 150px; border-radius: 50%;
+    background: linear-gradient(90deg, transparent 10%, rgba(61,83,135,.34) 40%, rgba(217,204,214,.36) 50%, rgba(61,83,135,.26) 60%, transparent 85%);
+    filter: blur(28px); transform: rotate(-17deg); }
+  .glass { background: var(--glass); border: 1px solid var(--glass-line); backdrop-filter: blur(18px) saturate(135%);
+    box-shadow: inset 0 1px 0 var(--glass-hi), 0 18px 40px -28px rgba(0,0,0,.6); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; cursor: pointer;
+    background: var(--action); color: var(--action-text); font: 700 14px/1 var(--sans); border-radius: 8px; padding: 9px 13px; }
+  .btn:hover { background: var(--action-hover); }
+  .btn.ghost { background: transparent; color: var(--text-soft); border: 1px solid var(--line-strong); font-weight: 600; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---- desbloqueio ---- */
+  .unlock { display: grid; grid-template-columns: 1.05fr 0.95fr; min-height: 560px; }
+  .stage { position: relative; display: grid; place-items: center; padding: 40px; text-align: center; }
+  .stage h3 { font: 800 34px/1.1 var(--display); letter-spacing: -0.02em; margin: 18px 0 6px; }
+  .stage h3 span { color: var(--action); }
+  .stage p { color: var(--muted); max-width: 34ch; margin: 0 auto; }
+  .burst { position: absolute; width: 330px; height: 330px; border-radius: 50%; z-index: -1;
+    background: radial-gradient(circle, rgba(255,217,15,.16), transparent 68%); }
+  .panel { margin: 28px; border-radius: 24px; padding: 36px 34px; align-self: center; }
+  .panel h4 { font: 800 24px/1.2 var(--display); margin: 0 0 4px; }
+  .panel .sub { color: var(--muted); margin: 0 0 24px; }
+  label { display: block; font: 600 12.8px/1.3 var(--sans); color: var(--text-soft); margin: 0 0 6px; }
+  .field { width: 100%; background: var(--surface-subtle); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px; font: 500 14px var(--mono); letter-spacing: .18em; }
+  .field:focus { outline: 2px solid var(--action); outline-offset: 2px; }
+  .panel .btn { width: 100%; height: 50px; border-radius: 10px; font-size: 15px; margin-top: 18px; }
+  .links { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; font-size: 13px; }
+  .links a { color: var(--text-soft); text-decoration: underline; text-underline-offset: 3px; }
+  .seal { display: inline-flex; align-items: center; gap: 8px; margin-top: 22px; padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--glass-line); color: var(--muted); font-size: 12.5px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+
+  /* ---- app ---- */
+  .app { display: grid; grid-template-columns: 280px 1fr; gap: 24px; padding: 24px; min-height: 640px; }
+  .side { border-radius: 24px; padding: 20px 0; align-self: start; }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 0 24px 16px; border-bottom: 1px solid var(--glass-line); margin-bottom: 10px; }
+  .brand b { font: 800 18px/1 var(--display); }
+  .brand small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .nav { display: flex; align-items: center; gap: 14px; height: 44px; padding: 0 24px; color: var(--muted); font-weight: 500; }
+  .nav i { width: 20px; height: 20px; border-radius: 6px; border: 2px solid currentColor; opacity: .8; flex: none; }
+  .nav.on { background: var(--accent-soft); color: var(--action); font-weight: 600; box-shadow: inset 3px 0 0 var(--action); }
+  .who { display: flex; align-items: center; gap: 12px; margin: 12px 16px 0; padding: 12px; border-radius: 14px; background: rgba(14,13,21,.35); }
+  .who .av { width: 40px; height: 40px; border-radius: 50%; background: var(--pink); display: grid; place-items: center; font: 800 15px var(--display); color: #0E0D15; }
+  .avimg { flex: none; }
+  .who small { color: var(--muted); display: block; font-size: 12px; }
+  .top { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; }
+  .search { flex: 1; border-radius: 12px; padding: 11px 14px; color: var(--muted); }
+  .head { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .head h3 { font: 800 27px/1.15 var(--display); letter-spacing: -0.02em; margin: 0; }
+  .head p { margin: 2px 0 0; color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+  .stat { border-radius: 11px; padding: 16px 18px; }
+  .stat small { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+  .stat b { display: block; font: 600 26px/1.2 var(--mono); letter-spacing: -0.03em; margin-top: 2px; }
+  main { min-width: 0; }
+  .tablewrap { border-radius: 12px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font: 600 12.5px var(--sans); color: var(--muted); padding: 11px 16px; background: rgba(14,13,21,.35); }
+  td { padding: 12px 16px; border-top: 1px solid var(--glass-line); vertical-align: middle; }
+  .svc { display: flex; align-items: center; gap: 11px; font-weight: 600; }
+  .svc span { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font: 800 13px var(--display); color: #0E0D15; }
+  .tag { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid; }
+  .ok { color: var(--success); } .mid { color: var(--warning); } .bad { color: var(--danger); }
+  .tip { display: flex; align-items: center; gap: 16px; border-radius: 12px; padding: 14px 18px; margin-top: 16px; }
+  .tip p { margin: 0; color: var(--text-soft); } .tip b { color: var(--text); }
+  @media (max-width: 900px) { .unlock, .app { grid-template-columns: 1fr; } .stats { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="logo" viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="92" fill="#1C1917"/>
+      <circle cx="100" cy="100" r="84" fill="#E3A857"/>
+      <circle cx="100" cy="100" r="71" fill="#1C1917"/>
+      <circle cx="100" cy="100" r="64" fill="#FF5CA8"/>
+      <g stroke="#1C1917" stroke-width="2.5">
+        <rect x="92" y="44" width="16" height="7" rx="3.5" fill="#38BDF8" transform="rotate(12 100 47)"/>
+        <rect x="134" y="62" width="16" height="7" rx="3.5" fill="#FFD90F" transform="rotate(40 142 65)"/>
+        <rect x="146" y="104" width="16" height="7" rx="3.5" fill="#38BDF8" transform="rotate(-62 154 107)"/>
+        <rect x="134" y="142" width="16" height="7" rx="3.5" fill="#4ADE80" transform="rotate(-20 142 145)"/>
+        <rect x="94" y="158" width="16" height="7" rx="3.5" fill="#fff" transform="rotate(-8 102 161)"/>
+        <rect x="54" y="142" width="16" height="7" rx="3.5" fill="#FFD90F" transform="rotate(22 62 145)"/>
+        <rect x="40" y="104" width="16" height="7" rx="3.5" fill="#fff" transform="rotate(62 48 107)"/>
+        <rect x="54" y="62" width="16" height="7" rx="3.5" fill="#4ADE80" transform="rotate(-32 62 65)"/>
+      </g>
+      <circle cx="100" cy="88" r="20" fill="#0F1220"/>
+      <path d="M90 96L80 142H120L110 96Z" fill="#0F1220"/>
+    </symbol>
+    <symbol id="mascot" viewBox="0 0 200 200">
+      <circle cx="100" cy="100" r="92" fill="#1C1917"/>
+      <circle cx="100" cy="100" r="84" fill="#E3A857"/>
+      <circle cx="100" cy="100" r="71" fill="#1C1917"/>
+      <circle cx="100" cy="100" r="64" fill="#FF5CA8"/>
+      <g stroke="#1C1917" stroke-width="2.5">
+        <rect x="92" y="44" width="16" height="7" rx="3.5" fill="#38BDF8" transform="rotate(12 100 47)"/>
+        <rect x="134" y="62" width="16" height="7" rx="3.5" fill="#FFD90F" transform="rotate(40 142 65)"/>
+        <rect x="146" y="104" width="16" height="7" rx="3.5" fill="#38BDF8" transform="rotate(-62 154 107)"/>
+        <rect x="134" y="142" width="16" height="7" rx="3.5" fill="#4ADE80" transform="rotate(-20 142 145)"/>
+        <rect x="94" y="158" width="16" height="7" rx="3.5" fill="#fff" transform="rotate(-8 102 161)"/>
+        <rect x="54" y="142" width="16" height="7" rx="3.5" fill="#FFD90F" transform="rotate(22 62 145)"/>
+        <rect x="40" y="104" width="16" height="7" rx="3.5" fill="#fff" transform="rotate(62 48 107)"/>
+        <rect x="54" y="62" width="16" height="7" rx="3.5" fill="#4ADE80" transform="rotate(-32 62 65)"/>
+      </g>
+      <circle cx="100" cy="88" r="20" fill="#0F1220"/>
+      <path d="M90 96L80 142H120L110 96Z" fill="#0F1220"/>
+    </symbol>
+  </defs>
+</svg>
+
+<div class="note">
+  <h1>DonutVault com a cara do GuardList, no "meio a meio"</h1>
+  <p>Do GuardList: fundo azul-noite com faixas de luz, painéis de vidro fosco, menu lateral arredondado, texto em IBM Plex e números em monoespaçado. Do DonutVault: amarelo nos botões, pontinhos de gibi no fundo, títulos na fonte arredondada, e a rosquinha com fechadura como marca.</p>
+  <h2>1. Tela de desbloqueio</h2>
+  <p>É o palco da marca, como o login é no GuardList. A rosquinha com fechadura fica no centro.</p>
+</div>
+
+<div class="screen">
+  <div class="streak" style="top:4%"></div><div class="streak" style="top:62%; opacity:.6"></div>
+  <div class="unlock">
+    <div class="stage">
+      <div class="burst"></div>
+      <div>
+        <svg width="210" height="210"><use href="#mascot"/></svg>
+        <h3>Donut<span>Vault</span></h3>
+        <p>Seu cofre é aberto aqui, no seu navegador. A Senha Mestra nunca sai deste aparelho.</p>
+        <div class="seal"><span class="dot"></span> Cofre trancado neste aparelho</div>
+      </div>
+    </div>
+    <div class="panel glass">
+      <h4>Abrir o cofre</h4>
+      <p class="sub">Cofre "Pessoal" · último acesso hoje, 09:14</p>
+      <label for="mp">Senha Mestra</label>
+      <input id="mp" class="field" type="password" value="••••••••••••••">
+      <button class="btn">Abrir cofre</button>
+      <div class="links"><a href="#">Entrar com passkey</a><a href="#">Restaurar um backup</a></div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <h2>2. Tela de senhas</h2>
+  <p>Mesma estrutura do GuardList: menu lateral em vidro, busca no topo, números em destaque e tabela densa. O amarelo aparece só no que se aciona e no item ativo do menu.</p>
+</div>
+
+<div class="screen">
+  <div class="streak" style="top:-4%"></div><div class="streak" style="top:48%; opacity:.55"></div>
+  <div class="app">
+    <aside class="side glass">
+      <div class="brand"><svg width="40" height="40"><use href="#logo"/></svg><div><b>DonutVault</b><small>Cofre Pessoal</small></div></div>
+      <div class="nav"><i></i>Início</div>
+      <div class="nav on"><i></i>Senhas</div>
+      <div class="nav"><i></i>Favoritos</div>
+      <div class="nav"><i></i>Gerador de senhas</div>
+      <div class="nav"><i></i>Saúde das senhas</div>
+      <div class="nav"><i></i>Notas seguras</div>
+      <div class="nav"><i></i>Categorias</div>
+      <div class="nav"><i></i>Lixeira</div>
+      <div class="nav"><i></i>Configurações</div>
+      <div class="who"><svg class="avimg" width="40" height="40"><use href="#logo"/></svg><div><b>Pessoal</b><small>Sincronizado há 2 min</small></div></div>
+    </aside>
+
+    <main>
+      <div class="top">
+        <div class="search glass">Pesquisar por serviço, site, usuário ou tag…</div>
+        <button class="btn ghost">Trancar</button>
+      </div>
+      <div class="head">
+        <div><h3>Senhas</h3><p>42 itens no cofre</p></div>
+        <button class="btn">+ Nova senha</button>
+      </div>
+      <div class="stats">
+        <div class="stat glass"><small>Fortes</small><b class="ok">31</b></div>
+        <div class="stat glass"><small>Repetidas</small><b class="mid">8</b></div>
+        <div class="stat glass"><small>Fracas</small><b class="bad">3</b></div>
+      </div>
+      <div class="tablewrap glass">
+        <table>
+          <thead><tr><th>Serviço</th><th>Usuário</th><th>Senha</th><th>Força</th><th>Alterada</th></tr></thead>
+          <tbody>
+            <tr><td><div class="svc"><span style="background:#38BDF8">E</span>E-mail</div></td><td class="mono">barnaby@exemplo.com</td><td class="mono">••••••••••••</td><td><span class="tag ok">Forte</span></td><td class="mono">02/11/2026</td></tr>
+            <tr><td><div class="svc"><span style="background:#FFD90F">B</span>Banco</div></td><td class="mono">inspetor_barnaby</td><td class="mono">••••••••••••••••</td><td><span class="tag ok">Forte</span></td><td class="mono">28/10/2026</td></tr>
+            <tr><td><div class="svc"><span style="background:#FF5CA8">S</span>Streaming</div></td><td class="mono">barnaby@exemplo.com</td><td class="mono">••••••••</td><td><span class="tag mid">Repetida</span></td><td class="mono">14/06/2026</td></tr>
+            <tr><td><div class="svc"><span style="background:#3fd69b">L</span>Loja</div></td><td class="mono">barnaby</td><td class="mono">••••••</td><td><span class="tag bad">Fraca</span></td><td class="mono">03/01/2025</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tip glass">
+        <svg width="56" height="56" style="flex:none"><use href="#mascot"/></svg>
+        <p><b>3 senhas pedem atenção.</b> A rosquinha aparece em avisos como este e nas telas vazias.</p>
+      </div>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>
