@@ -1,0 +1,380 @@
+/* Página principal (Início): avisos, um cartão por serviço, atividade e atalhos. Cores pelos tokens do tema. */
+
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-bottom: 24px;
+}
+
+.home__hello h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.75rem;
+  font-weight: 720;
+  letter-spacing: -0.025em;
+}
+
+.home__hello p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.home__alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.home-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  text-align: left;
+}
+
+button.home-alert {
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+button.home-alert:hover {
+  border-color: var(--glass-line-hover);
+}
+
+button.home-alert:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.home-alert b {
+  color: var(--text);
+}
+
+.home-alert__go {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+
+.home-alert__pip {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.home-alert__pip--danger { background: var(--danger); }
+.home-alert__pip--warn { background: var(--warning); }
+.home-alert__pip--ok { background: var(--success); }
+
+.home__label {
+  margin: 6px 0 -6px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.home__services {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.home-svc {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 230px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid var(--glass-line);
+  border-radius: 18px;
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 18px 40px -28px rgba(0, 0, 0, 0.6);
+}
+
+.home-svc::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--tone, var(--line-strong));
+}
+
+.home-svc__head {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.home-svc__icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tone, var(--line-strong)) 16%, transparent);
+  color: var(--tone, var(--muted));
+}
+
+.home-svc__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.home-svc__icon--plain svg {
+  width: 36px;
+  height: 36px;
+}
+
+.home-svc__title h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.home-svc__title p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.home-svc__state {
+  grid-column: 2;
+  justify-self: start;
+  padding: 2px 9px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.home-svc__state--warn { color: var(--warning); }
+.home-svc__state--ok { color: var(--success); }
+
+.home-svc__kpis {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.home-svc__kpis > div {
+  padding: 9px 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+}
+
+.home-svc__kpis b {
+  display: block;
+  color: var(--text);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 1.15rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.home-svc__kpis small {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.home-svc__note {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.home-svc__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: auto;
+}
+
+/* O cofre mantém o amarelo do DonutVault no botão principal, com texto escuro nos dois temas. */
+.home-svc__vault-btn {
+  border-color: transparent;
+  background: #FFD90F;
+  color: #0E0D15;
+  font-weight: 700;
+}
+
+.home-svc__vault-btn:hover {
+  background: #FFE553;
+  color: #0E0D15;
+}
+
+.home-svc--soon {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--glass) 45%, transparent);
+  box-shadow: none;
+}
+
+.home-svc--soon::before {
+  display: none;
+}
+
+.home__lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .home__lower {
+    grid-template-columns: 1fr;
+  }
+}
+
+.home-panel {
+  padding: 18px 20px;
+  border: 1px solid var(--glass-line);
+  border-radius: 18px;
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.home-panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.home-panel__head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.home-panel__empty {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.home-activity {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.home-activity li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--glass-line);
+  color: var(--text-soft);
+  font-size: 0.84rem;
+}
+
+.home-activity li:first-child {
+  border-top: 0;
+}
+
+.home-activity b {
+  color: var(--text);
+}
+
+.home-activity time {
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.74rem;
+}
+
+.home-quick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.home-quick button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+  color: var(--text-soft);
+  font-size: 0.84rem;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.home-quick button:hover {
+  border-color: var(--glass-line-hover);
+  color: var(--text);
+}
+
+.home-quick button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.home-quick svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  color: var(--accent);
+}
+
+.home-quick span {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-quick small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 400;
+}
+
+.home-quick kbd {
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .home-quick {
+    grid-template-columns: 1fr;
+  }
+}
