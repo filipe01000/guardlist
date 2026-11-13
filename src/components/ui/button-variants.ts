@@ -1,23 +1,28 @@
 import { cva } from 'class-variance-authority';
 
-const raisedPress =
-  'shadow-shadow hover:not-data-disabled:translate-x-pressX hover:not-data-disabled:translate-y-pressY hover:not-data-disabled:shadow-press active:not-data-disabled:translate-x-boxShadowX active:not-data-disabled:translate-y-boxShadowY active:not-data-disabled:shadow-none';
+// Botões no padrão do GuardList: cantos de 8 px, sem borda grossa nem sombra deslocada.
+// O amarelo (default) é a única cor de ação; as variantes antigas de cor (sky, pink, emerald)
+// continuam aceitas e têm o estilo neutro.
+const quiet =
+  'border border-line-strong bg-transparent text-text-soft hover:not-data-disabled:bg-accent-soft hover:not-data-disabled:text-foreground';
 
 export const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-base text-sm font-extrabold transition-[translate,box-shadow,background-color,color] duration-[140ms] ease-out motion-reduce:transition-none gap-2 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50 cursor-pointer select-none',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-base text-sm font-bold transition-[background-color,color,border-color] duration-[140ms] ease-out motion-reduce:transition-none gap-2 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50 data-disabled:pointer-events-none data-disabled:opacity-50 cursor-pointer select-none',
   {
     variants: {
       variant: {
-        default: `text-main-foreground bg-main border-3 border-border ${raisedPress}`,
-        sky: `text-sky-foreground bg-sky border-3 border-border ${raisedPress}`,
-        pink: `text-pink-foreground bg-pink border-3 border-border ${raisedPress}`,
-        emerald: `text-white bg-emerald-500 border-3 border-border ${raisedPress}`,
-        outline: `bg-background text-foreground border-3 border-border ${raisedPress}`,
-        neutral: `bg-secondary-background text-foreground border-3 border-border ${raisedPress}`,
-        destructive: `bg-destructive text-destructive-foreground border-3 border-border ${raisedPress}`,
+        default:
+          'border border-transparent bg-main text-main-foreground hover:not-data-disabled:bg-main-hover',
+        sky: quiet,
+        pink: quiet,
+        emerald: quiet,
+        outline: quiet,
+        neutral: quiet,
+        destructive:
+          'border border-transparent bg-destructive text-destructive-foreground hover:not-data-disabled:brightness-110',
         ghost:
-          'border-3 border-transparent bg-transparent text-foreground hover:border-border hover:bg-main hover:text-main-foreground',
-        noShadow: 'text-main-foreground bg-main border-3 border-border',
+          'border border-transparent bg-transparent text-text-soft hover:not-data-disabled:bg-accent-soft hover:not-data-disabled:text-foreground',
+        noShadow: 'border border-transparent bg-main text-main-foreground',
       },
       size: {
         default: 'h-10 px-4 py-2',
