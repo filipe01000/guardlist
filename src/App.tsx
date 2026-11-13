@@ -1306,7 +1306,7 @@ export default function App() {
                 <Menu className="w-5 h-5" />
               )}
             </Button>
-            <BrandMark size={32} className="lg:hidden shrink-0" />
+            <BrandMark size={32} className="hidden sm:block lg:hidden shrink-0" />
             <span className="font-display text-base sm:text-lg font-extrabold truncate">
               {SIDEBAR_ITEMS.find((i) => i.id === activeTab)?.label}
             </span>

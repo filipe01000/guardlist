@@ -283,7 +283,7 @@ export function PasswordsView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl sm:text-3xl font-black">
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold">
               {mode === 'favorites'
                 ? 'Favoritos'
                 : mode === 'categories'
@@ -297,7 +297,7 @@ export function PasswordsView({
               tone="yellow"
             />
           </div>
-          <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
+          <p className="text-sm font-semibold text-muted mt-1">
             {mode === 'trash'
               ? 'Credenciais excluídas podem ser restauradas ou destruídas permanentemente.'
               : 'Tudo aqui é cifrado neste aparelho antes de ser salvo.'}
@@ -335,19 +335,19 @@ export function PasswordsView({
           <button
             type="button"
             onClick={() => onSelectCategoryId('all')}
-            className={`p-4 text-left rounded-base border-3 border-border transition-all cursor-pointer ${
+            className={`p-4 text-left rounded-base border border-line transition-all cursor-pointer ${
               effectiveCategory === 'all'
-                ? 'bg-main text-main-foreground shadow-shadow -translate-y-0.5'
-                : 'bg-secondary-background hover:bg-amber-50/60 dark:hover:bg-slate-800'
+                ? 'bg-accent-soft text-accent border-main'
+                : 'bg-secondary-background hover:bg-accent-soft '
             }`}
           >
             <div className="flex items-center justify-between">
               <FolderOpen className="w-5 h-5" />
-              <span className="font-mono text-xs font-black tabular-nums">
+              <span className="font-mono text-xs font-semibold tabular-nums">
                 {credentials.filter((c) => !c.deletedAt).length} itens
               </span>
             </div>
-            <p className="font-display font-black text-sm mt-2">
+            <p className="font-display font-extrabold text-sm mt-2">
               Todas as Categorias
             </p>
           </button>
@@ -362,22 +362,22 @@ export function PasswordsView({
                 key={cat.id}
                 type="button"
                 onClick={() => onSelectCategoryId(cat.id)}
-                className={`p-4 text-left rounded-base border-3 border-border transition-all cursor-pointer ${
+                className={`p-4 text-left rounded-base border border-line transition-all cursor-pointer ${
                   active
-                    ? 'bg-sky text-sky-foreground shadow-shadow -translate-y-0.5'
-                    : 'bg-secondary-background hover:bg-sky-50/50 dark:hover:bg-slate-800'
+                    ? 'bg-surface-raised text-sky-foreground -translate-y-0.5'
+                    : 'bg-secondary-background hover:bg-accent-soft '
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span
-                    className="w-3.5 h-3.5 rounded-full border-2 border-border"
+                    className="w-3.5 h-3.5 rounded-full border border-line"
                     style={{ backgroundColor: cat.color }}
                   />
-                  <span className="font-mono text-xs font-black tabular-nums">
+                  <span className="font-mono text-xs font-semibold tabular-nums">
                     {count} {count === 1 ? 'senha' : 'senhas'}
                   </span>
                 </div>
-                <p className="font-display font-black text-sm mt-2 truncate">
+                <p className="font-display font-extrabold text-sm mt-2 truncate">
                   {cat.name}
                 </p>
                 <p className="text-xs font-semibold opacity-75 truncate">
@@ -393,7 +393,7 @@ export function PasswordsView({
       <Card className="py-4">
         <CardContent className="px-4 flex flex-col md:flex-row items-stretch md:items-center gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <Input
               type="search"
               value={searchQuery}
@@ -411,7 +411,7 @@ export function PasswordsView({
                   aria-label="Filtrar por categoria"
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="h-10 px-3 text-xs font-extrabold bg-background border-3 border-border rounded-base shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer"
+                  className="h-10 px-3 text-xs font-extrabold bg-background border border-line rounded-base cursor-pointer"
                 >
                   <option value="all">Todas as categorias</option>
                   {VAULT_CATEGORIES.map((c) => (
@@ -434,15 +434,15 @@ export function PasswordsView({
             )}
 
             {/* Alternador de Visualização: Cards vs Tabela Neobrutal-UI */}
-            <div className="flex items-center border-3 border-border rounded-base overflow-hidden bg-background">
+            <div className="flex items-center border border-line rounded-base overflow-hidden bg-background">
               <button
                 type="button"
                 onClick={() => setLayoutMode('cards')}
                 aria-label="Visualização em Cartões"
                 className={`px-3 py-2 text-xs font-extrabold flex items-center gap-1 cursor-pointer ${
                   layoutMode === 'cards'
-                    ? 'bg-main text-main-foreground'
-                    : 'text-foreground hover:bg-stone-100 dark:hover:bg-slate-800'
+                    ? 'bg-accent-soft text-accent'
+                    : 'text-foreground hover:bg-accent-soft '
                 }`}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
@@ -452,10 +452,10 @@ export function PasswordsView({
                 type="button"
                 onClick={() => setLayoutMode('table')}
                 aria-label="Visualização em Tabela"
-                className={`px-3 py-2 text-xs font-extrabold flex items-center gap-1 border-l-3 border-border cursor-pointer ${
+                className={`px-3 py-2 text-xs font-extrabold flex items-center gap-1 border-l border-line cursor-pointer ${
                   layoutMode === 'table'
-                    ? 'bg-main text-main-foreground'
-                    : 'text-foreground hover:bg-stone-100 dark:hover:bg-slate-800'
+                    ? 'bg-accent-soft text-accent'
+                    : 'text-foreground hover:bg-accent-soft '
                 }`}
               >
                 <TableIcon className="w-3.5 h-3.5" />
@@ -469,9 +469,9 @@ export function PasswordsView({
       {/* Estado Vazio em Estilo Comic */}
       {filteredCredentials.length === 0 ? (
         <Card className="p-8 text-center items-center">
-          <KeyRound className="w-12 h-12 text-pink" />
-          <ComicSpeechBubble speaker="DETETIVE BARNABY" tone="yellow" tailDirection="top" className="max-w-md">
-            <p className="font-display text-lg font-black">
+          <KeyRound className="w-12 h-12 text-accent" />
+          <ComicSpeechBubble speaker="Dica" tone="yellow" tailDirection="top" className="max-w-md">
+            <p className="font-display text-lg font-extrabold">
               {mode === 'trash'
                 ? 'A lixeira está mais limpa que prato de rosquinha!'
                 : searchQuery
@@ -513,7 +513,7 @@ export function PasswordsView({
               return (
                 <TableRow key={cred.id}>
                   <TableCell>
-                    <div className="flex items-center gap-2 font-display font-extrabold">
+                    <div className="flex items-center gap-2 font-semibold max-w-[16rem] xl:max-w-[22rem]">
                       <button
                         type="button"
                         onClick={() => onToggleFavorite(cred.id)}
@@ -522,22 +522,22 @@ export function PasswordsView({
                       >
                         <Star
                           className={`w-4 h-4 ${
-                            cred.favorite ? 'fill-pink text-pink' : 'text-stone-400'
+                            cred.favorite ? 'fill-main text-accent' : 'text-muted'
                           }`}
                         />
                       </button>
                       <div className="min-w-0">
                         <span className="block truncate">{cred.serviceName}</span>
-                        <span className="block md:hidden text-xs font-semibold text-stone-500 truncate">
+                        <span className="block md:hidden text-xs font-semibold text-muted truncate">
                           {cred.username || cred.email}
                         </span>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-xs font-bold">
+                  <TableCell className="hidden md:table-cell font-mono text-xs max-w-[14rem] truncate" title={cred.username || cred.email}>
                     {cred.username || cred.email}
                   </TableCell>
-                  <TableCell className="hidden lg:table-cell text-xs font-bold text-[#0284C7] dark:text-sky">
+                  <TableCell className="hidden lg:table-cell text-xs text-muted whitespace-nowrap">
                     {catMeta.name}
                   </TableCell>
                   <TableCell className="hidden sm:table-cell">
@@ -547,7 +547,7 @@ export function PasswordsView({
                         type="button"
                         onClick={() => toggleReveal(cred.id)}
                         aria-label={isRevealed ? 'Esconder senha' : 'Mostrar senha'}
-                        className="p-1 hover:text-pink cursor-pointer"
+                        className="p-1 hover:text-accent cursor-pointer"
                       >
                         {isRevealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       </button>
@@ -607,16 +607,16 @@ export function PasswordsView({
                             ? `Remover ${cred.serviceName} dos favoritos`
                             : `Adicionar ${cred.serviceName} aos favoritos`
                         }
-                        className="text-stone-400 hover:text-pink transition-colors cursor-pointer shrink-0"
+                        className="text-muted hover:text-accent transition-colors cursor-pointer shrink-0"
                       >
                         <Star
                           className={`w-5 h-5 ${
-                            cred.favorite ? 'fill-pink text-pink' : ''
+                            cred.favorite ? 'fill-main text-accent' : ''
                           }`}
                         />
                       </button>
 
-                      <h3 className="font-display text-lg font-black text-foreground truncate">
+                      <h3 className="font-display text-lg font-extrabold text-foreground truncate">
                         {cred.serviceName}
                       </h3>
 
@@ -626,7 +626,7 @@ export function PasswordsView({
                           target="_blank"
                           rel="noopener noreferrer"
                           aria-label={`Abrir site de ${cred.serviceName}`}
-                          className="text-stone-500 hover:text-[#0284C7] shrink-0"
+                          className="text-muted hover:text-accent shrink-0"
                         >
                           <ExternalLink className="w-4 h-4" />
                         </a>
@@ -634,22 +634,30 @@ export function PasswordsView({
                     </div>
 
                     {/* Metadados limpos separados por ponto */}
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-stone-600 dark:text-slate-300">
-                      {cred.username && <span>Usuário: {cred.username}</span>}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 text-xs text-muted">
+                      {cred.username && (
+                        <span className="max-w-full truncate" title={cred.username}>
+                          Usuário: <span className="font-mono">{cred.username}</span>
+                        </span>
+                      )}
                       {cred.username && cred.email && <span aria-hidden="true">·</span>}
-                      {cred.email && <span>{cred.email}</span>}
+                      {cred.email && (
+                        <span className="max-w-full truncate font-mono" title={cred.email}>
+                          {cred.email}
+                        </span>
+                      )}
                       <span aria-hidden="true">·</span>
-                      <span className="font-extrabold text-[#0284C7] dark:text-sky">
+                      <span className="font-semibold text-text-soft">
                         {catMeta.name}
                       </span>
                       <span aria-hidden="true">·</span>
                       <span
-                        className={`font-black ${
+                        className={`font-semibold ${
                           pwdEval.level === 'strong'
-                            ? 'text-emerald-600 dark:text-emerald-400'
+                            ? 'text-success '
                             : pwdEval.level === 'medium'
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-rose-600 dark:text-rose-400'
+                              ? 'text-warning '
+                              : 'text-danger '
                         }`}
                       >
                         Força: {pwdEval.label}
@@ -657,7 +665,7 @@ export function PasswordsView({
                       {cred.tags.length > 0 && (
                         <>
                           <span aria-hidden="true">·</span>
-                          <span className="text-stone-500 dark:text-slate-400">
+                          <span className="text-muted ">
                             Tags: {cred.tags.join(', ')}
                           </span>
                         </>
@@ -665,7 +673,7 @@ export function PasswordsView({
                     </div>
 
                     {cred.notes && (
-                      <p className="text-xs text-stone-600 dark:text-slate-400 italic line-clamp-1 pt-0.5">
+                      <p className="text-xs text-muted italic line-clamp-1 pt-0.5">
                         &ldquo;{cred.notes}&rdquo;
                       </p>
                     )}
@@ -673,7 +681,7 @@ export function PasswordsView({
 
                   {/* Campo de Senha + Botões Neobrutal-UI */}
                   <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    <div className="flex items-center bg-background border-3 border-border rounded-base px-3 py-1.5 shadow-[2px_2px_0px_0px_var(--border)]">
+                    <div className="flex items-center bg-background border border-line rounded-base px-3 py-1.5 ">
                       <span className="font-mono text-xs sm:text-sm font-bold select-all tracking-wider pr-2">
                         {isRevealed ? cred.password : '••••••••••••••••'}
                       </span>
@@ -685,7 +693,7 @@ export function PasswordsView({
                             ? `Esconder senha de ${cred.serviceName}`
                             : `Mostrar senha de ${cred.serviceName}`
                         }
-                        className="p-1 text-stone-600 dark:text-slate-400 hover:text-foreground cursor-pointer"
+                        className="p-1 text-muted hover:text-foreground cursor-pointer"
                       >
                         {isRevealed ? (
                           <EyeOff className="w-4 h-4" />
@@ -778,13 +786,13 @@ export function PasswordsView({
           aria-labelledby="credential-modal-title"
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4 overflow-y-auto"
         >
-          <div className="bg-secondary-background border-4 border-border rounded-base max-w-xl w-full p-6 sm:p-7 shadow-[8px_8px_0px_0px_var(--border)] space-y-5 my-8 animate-comic-pop">
-            <div className="flex items-center justify-between border-b-3 border-border pb-3">
+          <div className="bg-secondary-background border border-line rounded-base max-w-xl w-full p-6 sm:p-7 space-y-5 my-8 animate-comic-pop">
+            <div className="flex items-center justify-between border-b border-line pb-3">
               <div className="flex items-center gap-2">
                 <ComicActionCallout text={editingItem ? 'EDITAR' : 'NOVA!'} tone="pink" />
                 <h2
                   id="credential-modal-title"
-                  className="font-display text-2xl font-black"
+                  className="font-display text-2xl font-extrabold"
                 >
                   {editingItem ? 'Editar Credencial' : 'Guardar Nova Senha'}
                 </h2>
@@ -830,7 +838,7 @@ export function PasswordsView({
                     id="cred-category"
                     value={category}
                     onChange={(e) => setCategory(e.target.value as CategoryId)}
-                    className="w-full h-11 px-3 text-sm font-bold bg-background border-3 border-border rounded-base shadow-[2px_2px_0px_0px_var(--border)]"
+                    className="w-full h-11 px-3 text-sm font-bold bg-background border border-line rounded-base "
                   >
                     {VAULT_CATEGORIES.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -907,7 +915,7 @@ export function PasswordsView({
                         })
                       )
                     }
-                    className="text-xs font-black text-pink hover:underline flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <Dices className="w-3.5 h-3.5" />
                     <span>Sortear senha forte (20 chars)</span>
@@ -927,7 +935,7 @@ export function PasswordsView({
                     type="button"
                     onClick={() => setShowModalPassword((s) => !s)}
                     aria-label={showModalPassword ? 'Esconder senha' : 'Mostrar senha'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-600 cursor-pointer"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted cursor-pointer"
                   >
                     {showModalPassword ? (
                       <EyeOff className="w-4 h-4" />
@@ -941,15 +949,15 @@ export function PasswordsView({
                   <span
                     className={
                       strength.level === 'strong'
-                        ? 'text-emerald-600'
+                        ? 'text-success'
                         : strength.level === 'medium'
-                          ? 'text-amber-600'
-                          : 'text-rose-600'
+                          ? 'text-warning'
+                          : 'text-danger'
                     }
                   >
                     Robustez: {strength.label}
                   </span>
-                  <span className="text-stone-600 dark:text-slate-400">
+                  <span className="text-muted ">
                     {strength.funnyMessage}
                   </span>
                 </div>
@@ -975,7 +983,7 @@ export function PasswordsView({
                       type="checkbox"
                       checked={favorite}
                       onChange={(e) => setFavorite(e.target.checked)}
-                      className="w-4 h-4 accent-pink"
+                      className="w-4 h-4 accent-main"
                     />
                     <span>🍩 Marcar como Favorito</span>
                   </label>
@@ -992,12 +1000,12 @@ export function PasswordsView({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Observações secretas, perguntas de segurança..."
-                  className="w-full px-3.5 py-2 text-sm font-semibold bg-background border-3 border-border rounded-base shadow-[2px_2px_0px_0px_var(--border)]"
+                  className="w-full px-3.5 py-2 text-sm font-semibold bg-background border border-line rounded-base "
                 />
               </div>
 
               {formError && (
-                <p className="text-xs font-black text-rose-600">{formError}</p>
+                <p className="text-xs font-semibold text-danger">{formError}</p>
               )}
 
               <div className="flex items-center justify-end gap-3 pt-2">

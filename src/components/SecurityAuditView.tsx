@@ -87,34 +87,34 @@ export function SecurityAuditView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl sm:text-3xl font-black">
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold">
               Saúde das senhas
             </h1>
             <ComicActionCallout text="NESTE APARELHO" tone="emerald" />
           </div>
-          <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
+          <p className="text-sm font-semibold text-muted mt-1">
             A análise roda neste aparelho. Nenhuma senha é enviada para fora.
           </p>
         </div>
       </div>
 
-      {/* Painel Principal de Saúde Neobrutal-UI + Mascote Comic */}
+      {/* Painel Principal de Saúde em vidro */}
       <Card>
         <CardContent className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-          <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col items-center gap-4 text-center border-b-3 lg:border-b-0 lg:border-r-3 border-border pb-6 lg:pb-0 lg:pr-6">
-            <div className="bg-[#E0F2FE] border-3 border-border rounded-2xl p-2 shadow-shadow animate-float">
+          <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col items-center gap-4 text-center border-b lg:border-b-0 lg:border-r-3 border-line pb-6 lg:pb-0 lg:pr-6">
+            <div className="shrink-0">
               <BrandMark size={116} />
             </div>
             <div>
-              <div className="font-display text-5xl font-black tabular-nums text-foreground">
+              <div className="font-display text-5xl font-extrabold tabular-nums text-foreground">
                 {auditReport.overallScore}
-                <span className="text-xl text-stone-500">/100</span>
+                <span className="text-xl text-muted">/100</span>
               </div>
-              <p className="text-xs font-black uppercase tracking-wider text-pink mt-1">
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent mt-1">
                 Saúde das senhas
               </p>
               <ComicSpeechBubble
-                speaker="INSPETOR BARNABY"
+                speaker="Resumo"
                 tone={auditReport.overallScore >= 85 ? 'mint' : 'yellow'}
                 tailDirection="top"
                 className="mt-3"
@@ -126,16 +126,16 @@ export function SecurityAuditView({
 
           {/* Recomendações Práticas + Filtros */}
           <div className="lg:col-span-8 space-y-4">
-            <h2 className="font-display text-lg font-black">
+            <h2 className="font-display text-lg font-extrabold">
               Recomendações Práticas do Inspetor de Segurança
             </h2>
             <ul className="space-y-2.5">
               {auditReport.globalRecommendations.map((rec, idx) => (
                 <li
                   key={idx}
-                  className="p-3.5 rounded-base bg-background border-3 border-border shadow-[2px_2px_0px_0px_var(--border)] text-xs sm:text-sm font-bold flex items-start gap-2.5"
+                  className="p-3.5 rounded-base bg-background border border-line text-xs sm:text-sm font-bold flex items-start gap-2.5"
                 >
-                  <ShieldCheck className="w-4 h-4 text-[#0284C7] shrink-0 mt-0.5" />
+                  <ShieldCheck className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                   <span>{rec}</span>
                 </li>
               ))}
@@ -146,17 +146,17 @@ export function SecurityAuditView({
               <button
                 type="button"
                 onClick={() => setFilterTab('all')}
-                className={`p-3 rounded-base border-3 border-border text-left cursor-pointer transition-all ${
+                className={`p-3 rounded-base border border-line text-left cursor-pointer transition-all ${
                   filterTab === 'all'
-                    ? 'bg-main text-main-foreground shadow-shadow -translate-y-0.5'
+                    ? 'bg-accent-soft text-accent border-main'
                     : 'bg-background'
                 }`}
               >
-                <div className="flex items-center justify-between text-xs font-black">
+                <div className="flex items-center justify-between text-xs font-semibold">
                   <span>Para Revisão</span>
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <AlertTriangle className="w-4 h-4 text-warning" />
                 </div>
-                <p className="font-display text-2xl font-black tabular-nums mt-1">
+                <p className="font-display text-2xl font-extrabold tabular-nums mt-1">
                   {auditReport.needsReviewCount}
                 </p>
               </button>
@@ -164,17 +164,17 @@ export function SecurityAuditView({
               <button
                 type="button"
                 onClick={() => setFilterTab('weak')}
-                className={`p-3 rounded-base border-3 border-border text-left cursor-pointer transition-all ${
+                className={`p-3 rounded-base border border-line text-left cursor-pointer transition-all ${
                   filterTab === 'weak'
-                    ? 'bg-rose-500 text-white shadow-shadow -translate-y-0.5'
+                    ? 'bg-destructive text-destructive-foreground -translate-y-0.5'
                     : 'bg-background'
                 }`}
               >
-                <div className="flex items-center justify-between text-xs font-black">
+                <div className="flex items-center justify-between text-xs font-semibold">
                   <span>Senhas Fracas</span>
-                  <ShieldAlert className="w-4 h-4 text-rose-600" />
+                  <ShieldAlert className="w-4 h-4 text-danger" />
                 </div>
-                <p className="font-display text-2xl font-black tabular-nums mt-1">
+                <p className="font-display text-2xl font-extrabold tabular-nums mt-1">
                   {auditReport.weakCount}
                 </p>
               </button>
@@ -182,17 +182,17 @@ export function SecurityAuditView({
               <button
                 type="button"
                 onClick={() => setFilterTab('reused')}
-                className={`p-3 rounded-base border-3 border-border text-left cursor-pointer transition-all ${
+                className={`p-3 rounded-base border border-line text-left cursor-pointer transition-all ${
                   filterTab === 'reused'
-                    ? 'bg-amber-400 text-[#09090B] shadow-shadow -translate-y-0.5'
+                    ? 'bg-warning/15 text-foreground -translate-y-0.5'
                     : 'bg-background'
                 }`}
               >
-                <div className="flex items-center justify-between text-xs font-black">
+                <div className="flex items-center justify-between text-xs font-semibold">
                   <span>Repetidas</span>
-                  <Repeat className="w-4 h-4 text-amber-600" />
+                  <Repeat className="w-4 h-4 text-warning" />
                 </div>
-                <p className="font-display text-2xl font-black tabular-nums mt-1">
+                <p className="font-display text-2xl font-extrabold tabular-nums mt-1">
                   {auditReport.reusedCount}
                 </p>
               </button>
@@ -200,17 +200,17 @@ export function SecurityAuditView({
               <button
                 type="button"
                 onClick={() => setFilterTab('old')}
-                className={`p-3 rounded-base border-3 border-border text-left cursor-pointer transition-all ${
+                className={`p-3 rounded-base border border-line text-left cursor-pointer transition-all ${
                   filterTab === 'old'
-                    ? 'bg-sky text-sky-foreground shadow-shadow -translate-y-0.5'
+                    ? 'bg-surface-raised text-sky-foreground -translate-y-0.5'
                     : 'bg-background'
                 }`}
               >
-                <div className="flex items-center justify-between text-xs font-black">
+                <div className="flex items-center justify-between text-xs font-semibold">
                   <span>Antigas (90d+)</span>
-                  <Clock className="w-4 h-4 text-[#0284C7]" />
+                  <Clock className="w-4 h-4 text-accent" />
                 </div>
-                <p className="font-display text-2xl font-black tabular-nums mt-1">
+                <p className="font-display text-2xl font-extrabold tabular-nums mt-1">
                   {auditReport.oldCount}
                 </p>
               </button>
@@ -221,17 +221,17 @@ export function SecurityAuditView({
 
       {/* Lista de Credenciais Auditadas */}
       <section className="space-y-3">
-        <h2 className="font-display text-xl font-black">
+        <h2 className="font-display text-xl font-extrabold">
           Credenciais que Merecem Atenção ({filteredItems.length})
         </h2>
 
         {filteredItems.length === 0 ? (
           <Card className="p-8 text-center items-center">
-            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
-            <p className="font-display text-lg font-black">
+            <CheckCircle2 className="w-10 h-10 text-success mx-auto" />
+            <p className="font-display text-lg font-extrabold">
               WOO-HOO! Nenhuma vulnerabilidade encontrada neste filtro!
             </p>
-            <p className="text-xs font-semibold text-stone-600 dark:text-slate-400">
+            <p className="text-xs font-semibold text-muted ">
               Suas rosquinhas digitais estão protegidas com excelência.
             </p>
           </Card>
@@ -242,20 +242,20 @@ export function SecurityAuditView({
                 <CardContent className="px-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                   <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-display text-lg font-black">
+                      <h3 className="font-display text-lg font-extrabold">
                         {item.credential.serviceName}
                       </h3>
                       <span aria-hidden="true">·</span>
-                      <span className="text-xs font-black text-rose-600 dark:text-rose-400">
+                      <span className="text-xs font-semibold text-danger ">
                         {item.reasons.join(' · ')}
                       </span>
                     </div>
-                    <p className="text-xs font-semibold text-stone-600 dark:text-slate-300">
+                    <p className="text-xs font-semibold text-muted ">
                       Conta: <strong>{item.credential.username || item.credential.email}</strong> · Última atualização há{' '}
-                      <span className="tabular-nums font-black">{item.ageDays}</span> dias
+                      <span className="tabular-nums font-semibold">{item.ageDays}</span> dias
                     </p>
                     {item.recommendations[0] && (
-                      <p className="text-xs text-stone-700 dark:text-slate-300 font-bold">
+                      <p className="text-xs text-muted font-bold">
                         💡 {item.recommendations[0]}
                       </p>
                     )}

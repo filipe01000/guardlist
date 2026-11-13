@@ -50,7 +50,7 @@ html {
   --ambient-streak: 124, 131, 173;
   --ambient-hot: 191, 169, 186;
   --ambient-strength: 0.55;
-  --ambient-mark: 0.07;
+  --ambient-mark: 0.04;
   --halftone: rgba(24, 35, 70, 0.06);
 }
 
@@ -86,9 +86,13 @@ html {
   --ambient-streak: 61, 83, 135;
   --ambient-hot: 217, 204, 214;
   --ambient-strength: 0.75;
-  --ambient-mark: 0.10;
+  --ambient-mark: 0.035;
   --halftone: rgba(255, 255, 255, 0.05);
 }
+
+/* Barras de rolagem e controles nativos acompanham o tema. */
+html { color-scheme: light; }
+html.dark { color-scheme: dark; }
 
 @theme inline {
   --color-background: var(--background);
