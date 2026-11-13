@@ -22,7 +22,8 @@ import {
   ShieldCheck,
   UploadCloud,
   X,
-  Fingerprint
+  Fingerprint,
+  LockKeyhole
 } from 'lucide-react';
 import { SessionUser } from '../types';
 import { useDialogFocus } from '../hooks/useDialogFocus';
@@ -324,6 +325,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               );
             })}
+            {/* O cofre de senhas (DonutVault) é servido por este mesmo servidor em /cofre. */}
+            <a className="gl-row gl-row--link" href="/cofre/" data-tip="Cofre de senhas" aria-label="Cofre de senhas">
+              <LockKeyhole aria-hidden="true" />
+              <span className="label">Cofre de senhas</span>
+            </a>
           </nav>
 
           <hr className="gl-divider" />
