@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  House,
   BarChart3,
   ClipboardCheck,
   Compass,
@@ -35,6 +36,7 @@ import { MenuPanel, useMenuDismiss, type ActionMenuEntry, type DismissReason, ty
 import { detectEntity, externalLookupEntries, openIpAnalysisTab, TYPE_LABEL, type ContextEntity, type IndicatorAction } from './contextActions';
 
 export const PAGES: Array<{ tab: AppTab; label: string; icon: typeof Search; key?: string; adminOnly?: boolean }> = [
+  { tab: 'home', label: 'Início', icon: House, key: 'G' },
   { tab: 'dashboard', label: 'Painel geral', icon: LayoutDashboard, key: 'D' },
   { tab: 'ip-analysis', label: 'Análise de IP', icon: Fingerprint },
   { tab: 'intelligence', label: 'Inteligência de IPs', icon: Radio, key: 'T' },

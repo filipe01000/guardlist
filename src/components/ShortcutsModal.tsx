@@ -15,6 +15,7 @@ export const ShortcutsModal: React.FC<{ open: boolean; onClose: () => void; isAd
       <dt><K>Shift</K> + <K>Botão direito</K></dt><dd>Menu normal do navegador</dd>
 
       <span className="shortcut-group">Ir para</span>
+      <dt><K>G</K></dt><dd>Início</dd>
       <dt><K>D</K></dt><dd>Painel geral</dd>
       <dt><K>I</K></dt><dd>Importação</dd>
       <dt><K>L</K></dt><dd>Listas dos clientes</dd>

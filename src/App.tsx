@@ -45,6 +45,7 @@ const IntelligenceView = lazy(() => import('./components/IntelligenceView').then
 const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
 const ClientManagerView = lazy(() => import('./components/ClientManagerView').then(m => ({ default: m.ClientManagerView })));
 const BackupView = lazy(() => import('./components/BackupView').then(m => ({ default: m.BackupView })));
+const HomeView = lazy(() => import('./components/HomeView').then(m => ({ default: m.HomeView })));
 const VaultView = lazy(() => import('./components/VaultView').then(m => ({ default: m.VaultView })));
 const ReviewView = lazy(() => import('./components/ReviewView').then(m => ({ default: m.ReviewView })));
 
@@ -65,6 +66,7 @@ export type ShowToast = (text: string, options?: ToastOptions | 'success' | 'inf
 
 // Atalhos de navegação (tecla única, fora de campos de texto).
 const NAV_SHORTCUTS: Record<string, AppTab> = {
+  g: 'home',
   d: 'dashboard',
   i: 'import',
   l: 'client-list',
@@ -98,7 +100,7 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
   });
   // Aberto com ?analisar=IP (vindo de "Analisar IP" em outra aba): começa direto na Análise de IP.
   const [initialAnalyzeIp] = useState(() => new URLSearchParams(window.location.search).get(ANALYZE_PARAM) || undefined);
-  const [currentTab, setCurrentTab] = useState<AppTab>(initialAnalyzeIp ? 'ip-analysis' : 'dashboard');
+  const [currentTab, setCurrentTab] = useState<AppTab>(initialAnalyzeIp ? 'ip-analysis' : 'home');
   // Tela anterior, para o botão Voltar da importação.
   const [previousTab, setPreviousTab] = useState<AppTab>('dashboard');
   const tabRef = useRef<AppTab>('dashboard');
@@ -524,6 +526,24 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
         )}
         {hasLoadedData && <PageBoundary key={currentTab}><Suspense fallback={<div className="app-loading" role="status"><Loader2 className="gl-spin" aria-hidden="true" />Abrindo página…</div>}>
         <div key={currentTab} className="view-enter">
+        {currentTab === 'home' && (
+          <HomeView
+            currentUser={currentUser}
+            clients={clients}
+            totalActiveAcrossAll={totalActiveAcrossAll}
+            addedThisWeekCount={addedThisWeekCount}
+            slaDays={settings.slaDays || 7}
+            pendingApprovals={notifications.pendingApprovals}
+            failedJobs={notifications.failedJobs}
+            daysSinceBackup={daysSinceBackup}
+            isBackupOutdated={isBackupOutdated}
+            onNavigate={setCurrentTab}
+            onOpenApprovals={() => { setAdminTab('approvals'); setCurrentTab('admin'); }}
+            onOpenSystemStatus={() => { setAdminTab('status'); setCurrentTab('admin'); }}
+            onOpenQuickSearch={() => setIsQuickSearchOpen(true)}
+          />
+        )}
+
         {currentTab === 'dashboard' && (
           <DashboardView
             clients={clients}

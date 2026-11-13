@@ -23,13 +23,14 @@ import {
   UploadCloud,
   X,
   Fingerprint,
-  LockKeyhole
+  LockKeyhole,
+  House
 } from 'lucide-react';
 import { SessionUser } from '../types';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import './Sidebar.css';
 
-export type AppTab = 'dashboard' | 'import' | 'client-list' | 'review' | 'intelligence' | 'ip-analysis' | 'history' | 'reports' | 'clients' | 'admin' | 'backup' | 'vault';
+export type AppTab = 'home' | 'dashboard' | 'import' | 'client-list' | 'review' | 'intelligence' | 'ip-analysis' | 'history' | 'reports' | 'clients' | 'admin' | 'backup' | 'vault';
 
 interface NavbarProps {
   currentTab: AppTab;
@@ -50,8 +51,8 @@ interface NavbarProps {
 type NavItem = { id: AppTab; label: string; icon: React.ElementType; adminOnly?: boolean };
 type NavGroup = { id: string; label: string; icon: React.ElementType; items: NavItem[] };
 
-// Painel geral sozinho no topo; o resto em grupos de telas relacionadas.
-const homeItem: NavItem = { id: 'dashboard', label: 'Painel geral', icon: LayoutDashboard };
+// Início (a página dos serviços) sozinho no topo; depois um grupo por serviço e a gestão.
+const homeItem: NavItem = { id: 'home', label: 'Início', icon: House };
 const vaultItem: NavItem = { id: 'vault', label: 'Cofre de senhas', icon: LockKeyhole };
 const navGroups: NavGroup[] = [
   {
@@ -59,6 +60,7 @@ const navGroups: NavGroup[] = [
     label: 'Bloqueios',
     icon: ShieldBan,
     items: [
+      { id: 'dashboard', label: 'Painel geral', icon: LayoutDashboard },
       { id: 'client-list', label: 'Listas dos clientes', icon: ListFilter },
       { id: 'import', label: 'Importação', icon: UploadCloud },
       { id: 'review', label: 'Revisão de bloqueios', icon: ClipboardCheck },
@@ -296,6 +298,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           <nav className="gl-nav" aria-label="Seções">
             {renderRow(homeItem)}
             {navGroups.map((group) => {
+              // Cofre de senhas (DonutVault, em /cofre): entre os serviços, antes da Gestão, e só para quem o master liberou.
+              const vaultRow = group.id === 'manage' && currentUser?.vaultAccess ? renderRow(vaultItem) : null;
               const items = group.items.filter((i) => !i.adminOnly || isAdmin);
               const isOpen = openGroups.has(group.id);
               const hasActive = items.some((i) => i.id === currentTab);
@@ -304,7 +308,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               const GroupIcon = group.icon;
               const listId = `${menuId}-${group.id}`;
               return (
-                <div key={group.id} className={`gl-group ${isOpen ? 'is-open' : ''} ${hasActive ? 'has-active' : ''}`}>
+                <React.Fragment key={group.id}>
+                {vaultRow}
+                <div className={`gl-group ${isOpen ? 'is-open' : ''} ${hasActive ? 'has-active' : ''}`}>
                   <button
                     type="button"
                     className="gl-row gl-group-head"
@@ -324,10 +330,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </ul>
                   </div>
                 </div>
+                </React.Fragment>
               );
             })}
-            {/* Cofre de senhas (DonutVault, em /cofre): só para quem o master liberou. */}
-            {currentUser?.vaultAccess && renderRow(vaultItem)}
           </nav>
 
           <hr className="gl-divider" />
