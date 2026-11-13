@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import ActionMenu, { openActionMenuAt } from './ActionMenu';
-import { Check, Copy, Eye, EyeOff, KeyRound, LockOpen, MonitorSmartphone, Plus, RefreshCw, ShieldOff, Trash2, UserCheck, UserX, Users } from 'lucide-react';
+import { Check, Copy, Crown, Eye, EyeOff, KeyRound, LockOpen, MonitorSmartphone, Plus, RefreshCw, ShieldOff, Trash2, UserCheck, UserX, Users } from 'lucide-react';
 import { Modal } from './Modal';
 import { SessionList } from './SessionList';
 import { listUserSessions, resetUserMfa, revokeAllUserSessions, revokeSession, unlockUser, type SessionInfo } from '../db/store';
@@ -215,17 +215,24 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
     }
   };
 
-  const handleUpdate = async (user: SessionUser, patch: Partial<Pick<SessionUser, 'role' | 'active'>>) => {
+  // Só o master muda papéis, libera o cofre e transfere o master (o servidor confere de novo).
+  const iAmMaster = Boolean(currentUser.isMaster);
+
+  const handleUpdate = async (user: SessionUser, patch: Partial<Pick<SessionUser, 'role' | 'active' | 'vaultAccess'>>) => {
     setError(null);
     try {
       await api(`/api/users/${user.id}`, { method: 'PATCH', body: JSON.stringify(patch) });
       setNotice({
         text:
-          patch.active === false
-            ? `${user.displayName} foi desativado e saiu de todas as sessões.`
-            : patch.active === true
-              ? `${user.displayName} foi reativado.`
-              : `${user.displayName} agora é ${ROLE_LABEL[patch.role ?? user.role].toLowerCase()}.`
+          patch.vaultAccess === true
+            ? `${user.displayName} agora pode abrir o cofre de senhas.`
+            : patch.vaultAccess === false
+              ? `${user.displayName} não abre mais o cofre de senhas.`
+              : patch.active === false
+                ? `${user.displayName} foi desativado e saiu de todas as sessões.`
+                : patch.active === true
+                  ? `${user.displayName} foi reativado.`
+                  : `${user.displayName} agora é ${ROLE_LABEL[patch.role ?? user.role].toLowerCase()}.${patch.role === 'analyst' && user.vaultAccess ? ' O acesso ao cofre foi retirado.' : ''}`
       });
       await load();
     } catch (err) {
@@ -254,6 +261,18 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
       await load();
     } catch (err) {
       setResetError(err instanceof Error ? err.message : 'Não foi possível redefinir a senha.');
+    }
+  };
+
+  const handleTransferMaster = async (user: SessionUser) => {
+    if (!window.confirm(`Passar o master para ${user.displayName} (${user.username})? Você continua administrador, com o acesso ao cofre que já tem, mas só ${user.displayName} poderá mudar papéis, liberar o cofre e transferir o master.`)) return;
+    setError(null);
+    try {
+      await api(`/api/users/${user.id}/master`, { method: 'POST' });
+      // O menu e as permissões desta sessão mudam: recarrega para refletir.
+      window.location.reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível transferir o master.');
     }
   };
 
@@ -328,7 +347,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
             <label className="field-label" htmlFor="nu-role">Papel</label>
             <select id="nu-role" className="field w-full" value={role} onChange={(e) => setRole(e.target.value as SessionUser['role'])}>
               <option value="analyst">Analista</option>
-              <option value="admin">Administrador</option>
+              <option value="admin" disabled={!iAmMaster}>Administrador{iAmMaster ? '' : ' (só o master)'}</option>
             </select>
           </div>
           <div className="new-user-form__password">
@@ -359,10 +378,11 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="data-table" style={{ minWidth: 760 }}>
+            <table className="data-table" style={{ minWidth: 920 }}>
               <colgroup>
                 <col />
                 <col style={{ width: '200px' }} />
+                <col style={{ width: '150px' }} />
                 <col style={{ width: '120px' }} />
                 <col style={{ width: '145px' }} />
                 <col style={{ width: '170px' }} />
@@ -371,6 +391,7 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                 <tr>
                   <th>Nome</th>
                   <th>Papel</th>
+                  <th>Cofre de senhas</th>
                   <th>Situação</th>
                   <th>Último acesso</th>
                   <th className="text-right">Ações</th>
@@ -382,7 +403,10 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                   return (
                     <tr key={user.id} className={user.active ? '' : 'opacity-60'} onContextMenu={openActionMenuAt}>
                       <td>
-                        <span className="block font-semibold text-white">{user.displayName}{isSelf && <span className="text-slate-500 font-normal"> (você)</span>}</span>
+                        <span className="block font-semibold text-white">
+                          {user.displayName}{isSelf && <span className="text-slate-500 font-normal"> (você)</span>}
+                          {user.isMaster && <span className="chip chip--warn ml-1.5" title="Muda papéis, libera o cofre de senhas e transfere o master">Master</span>}
+                        </span>
                         <span className="block font-mono text-[11px] text-slate-500">{user.username}</span>
                       </td>
                       <td>
@@ -391,12 +415,43 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                           value={user.role}
                           onChange={(e) => handleUpdate(user, { role: e.target.value as SessionUser['role'] })}
                           aria-label={`Papel de ${user.displayName}`}
-                          disabled={!user.active || isSelf}
-                          title={isSelf ? 'Peça a outro administrador para mudar o seu papel' : undefined}
+                          disabled={!user.active || isSelf || !iAmMaster || user.isMaster}
+                          title={
+                            !iAmMaster
+                              ? 'Só o usuário master muda papéis'
+                              : user.isMaster
+                                ? 'O master é sempre administrador'
+                                : isSelf
+                                  ? 'Peça a outro administrador para mudar o seu papel'
+                                  : undefined
+                          }
                         >
                           <option value="analyst">Analista</option>
                           <option value="admin">Administrador</option>
                         </select>
+                      </td>
+                      <td>
+                        <label
+                          className="inline-flex items-center gap-2 text-[0.74rem] cursor-pointer"
+                          title={
+                            user.isMaster
+                              ? 'O master sempre tem acesso ao cofre'
+                              : !iAmMaster
+                                ? 'Só o usuário master libera o cofre'
+                                : user.role !== 'admin'
+                                  ? 'Só administradores podem receber acesso ao cofre'
+                                  : undefined
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            checked={Boolean(user.vaultAccess || user.isMaster)}
+                            disabled={!iAmMaster || user.isMaster || user.role !== 'admin' || !user.active}
+                            onChange={(e) => handleUpdate(user, { vaultAccess: e.target.checked })}
+                            aria-label={`Acesso de ${user.displayName} ao cofre de senhas`}
+                          />
+                          <span>{user.vaultAccess || user.isMaster ? 'Liberado' : 'Sem acesso'}</span>
+                        </label>
                       </td>
                       <td>
                         {!user.active ? (
@@ -426,6 +481,9 @@ export const UsersView: React.FC<UsersViewProps> = ({ currentUser, embedded = fa
                                 { label: 'Gerar nova senha', icon: KeyRound, disabled: !user.active, onSelect: () => openReset(user) },
                                 ...(user.mfaEnabled
                                   ? [{ label: 'Zerar verificação em duas etapas', icon: ShieldOff, title: 'Para quem perdeu o celular e os códigos de recuperação', onSelect: () => handleResetMfa(user) }]
+                                  : []),
+                                ...(iAmMaster && user.role === 'admin' && user.active && !user.mustChangePassword
+                                  ? [{ label: 'Tornar master', icon: Crown, title: 'Passa o master para esta pessoa', onSelect: () => handleTransferMaster(user) }]
                                   : []),
                                 { type: 'divider' as const },
                                 user.active

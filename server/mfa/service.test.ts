@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test, { type TestContext } from 'node:test';
 import { openMemoryDatabase } from '../db.ts';
 import type { Actor } from '../store.ts';
+import { hashPassword } from '../../auth.ts';
 import { createUsers } from '../users.ts';
 import { createMfa } from './service.ts';
 import { totpAt } from './totp.ts';
@@ -13,7 +14,10 @@ async function setup(t: TestContext, mfaEnv: NodeJS.ProcessEnv = env) {
   const db = await openMemoryDatabase();
   t.after(() => db.close?.());
   const users = createUsers(db);
-  const boss = await users.create(admin, { username: 'chefe', displayName: 'Chefe', role: 'admin', password: 'senha-forte-123', mustChangePassword: false });
+  // Primeiro administrador, como na subida do servidor: vira o master.
+  await db.query("INSERT INTO users (username, display_name, password_hash, role) VALUES ('chefe', 'Chefe', $1, 'admin')", [hashPassword('senha-forte-123')]);
+  await users.ensureMaster();
+  const boss = (await users.list()).find((u) => u.username === 'chefe')!;
   const ana = await users.create(admin, { username: 'ana', displayName: 'Ana', role: 'analyst', password: 'senha-forte-456', mustChangePassword: false });
   const clock = { now: 1_800_000_000_000 };
   const mfa = createMfa(db, { env: mfaEnv, now: () => clock.now });

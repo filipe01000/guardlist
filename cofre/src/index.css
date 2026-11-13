@@ -90,6 +90,12 @@ html {
   --halftone: rgba(255, 255, 255, 0.05);
 }
 
+/* Dentro do GuardList: fundo transparente, o fundo é o do GuardList. */
+html.cofre-framed,
+html.cofre-framed body {
+  background: transparent;
+}
+
 /* Barras de rolagem e controles nativos acompanham o tema. */
 html { color-scheme: light; }
 html.dark { color-scheme: dark; }

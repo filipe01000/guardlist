@@ -22,6 +22,8 @@ export interface UserRow {
   mfa_enabled_at?: string | null;
   mfa_last_step?: string | number | null;
   mfa_recovery?: string[] | null;
+  is_master?: boolean;
+  vault_access?: boolean;
 }
 
 export interface SessionInfo {
@@ -51,6 +53,8 @@ export interface PublicUser {
   lastLoginAt: string | null;
   lockedUntil: string | null;
   mfaEnabled: boolean;
+  isMaster: boolean;
+  vaultAccess: boolean;
 }
 
 const USERNAME_RE = /^[a-z0-9._-]{2,64}$/;
@@ -67,8 +71,15 @@ export function toPublic(row: UserRow): PublicUser {
     createdAt: row.created_at,
     lastLoginAt: row.last_login_at,
     lockedUntil: row.locked_until && new Date(row.locked_until).getTime() > Date.now() ? new Date(row.locked_until).toISOString() : null,
-    mfaEnabled: Boolean(row.mfa_enabled_at)
+    mfaEnabled: Boolean(row.mfa_enabled_at),
+    isMaster: Boolean(row.is_master),
+    vaultAccess: canOpenVault(row)
   };
+}
+
+// Abre o cofre: conta ativa de administrador, sem troca de senha pendente e liberada pelo master.
+export function canOpenVault(row: Pick<UserRow, 'role' | 'active' | 'vault_access'> & { must_change_password?: boolean }): boolean {
+  return row.role === 'admin' && row.active && Boolean(row.vault_access) && !row.must_change_password;
 }
 
 export function toActor(row: UserRow): Actor {
@@ -115,6 +126,17 @@ export function createUsers(db: Database) {
     return rows[0]?.n ?? 0;
   }
 
+  async function requireMaster(actor: Actor): Promise<UserRow> {
+    const rows = await db.query<UserRow>('SELECT * FROM users WHERE username = $1 AND is_master AND active', [actor.username]);
+    if (!rows[0]) throw new StoreError('Só o usuário master pode fazer isso.', 403);
+    return rows[0];
+  }
+
+  async function isMaster(actor: Actor): Promise<boolean> {
+    const rows = await db.query('SELECT 1 FROM users WHERE username = $1 AND is_master AND active', [actor.username]);
+    return rows.length > 0;
+  }
+
   async function audit(actor: string, action: string, detail: Record<string, unknown>, query: Query = db.query) {
     await query('INSERT INTO audit_log (username, action, detail) VALUES ($1, $2, $3::jsonb)', [actor, action, JSON.stringify(detail)]);
   }
@@ -148,6 +170,21 @@ export function createUsers(db: Database) {
         created++;
       }
       return created;
+    },
+
+    // Sem master (primeira subida desta versão): o usuário "admin", ou o administrador ativo mais antigo, vira o
+    // master e ganha acesso ao cofre. Com um master já definido, não muda nada.
+    async ensureMaster(): Promise<string | null> {
+      const current = await db.query<{ username: string }>('SELECT username FROM users WHERE is_master');
+      if (current[0]) return null;
+      const rows = await db.query<UserRow>(
+        "SELECT * FROM users WHERE role = 'admin' AND active ORDER BY (username = 'admin') DESC, created_at, id LIMIT 1"
+      );
+      const row = rows[0];
+      if (!row) return null;
+      await db.query('UPDATE users SET is_master = TRUE, vault_access = TRUE WHERE id = $1', [row.id]);
+      await audit(row.username, 'user.master_assigned', { username: row.username, reason: 'sem master definido' });
+      return row.username;
     },
 
     // Resultado do login: usuário, conta travada (com horário de liberação) ou credenciais inválidas.
@@ -262,6 +299,7 @@ export function createUsers(db: Database) {
         throw new StoreError('Usuário inválido: use de 2 a 64 letras minúsculas, números, ponto, hífen ou sublinhado.');
       }
       const role = input.role === 'admin' ? 'admin' : 'analyst';
+      if (role === 'admin') await requireMaster(actor);
       const displayName = String(input.displayName ?? '').trim().slice(0, 80) || username;
       const password = checkPassword(input.password);
       const mustChange = input.mustChangePassword !== false;
@@ -275,11 +313,27 @@ export function createUsers(db: Database) {
       return toPublic(rows[0]);
     },
 
-    async update(actor: Actor, id: number, input: { displayName?: unknown; role?: unknown; active?: unknown; unlock?: unknown }) {
+    async update(actor: Actor, id: number, input: { displayName?: unknown; role?: unknown; active?: unknown; unlock?: unknown; vaultAccess?: unknown }) {
       const row = await byId(id);
       if (!row) throw new StoreError('Usuário não encontrado.', 404);
       const role = input.role === undefined ? row.role : input.role === 'admin' ? 'admin' : 'analyst';
       const active = input.active === undefined ? row.active : Boolean(input.active);
+      const actorIsMaster = await isMaster(actor);
+
+      // Papel e cofre: decisão só do master. O master não perde o papel nem o acesso: primeiro transfira.
+      if (role !== row.role && !actorIsMaster) throw new StoreError('Só o usuário master muda o papel de alguém.', 403);
+      if (input.vaultAccess !== undefined && !actorIsMaster) throw new StoreError('Só o usuário master libera o cofre de senhas.', 403);
+      if (row.is_master && (role !== 'admin' || !active)) {
+        throw new StoreError('O usuário master não pode deixar de ser administrador nem ser desativado. Transfira o master antes.', 409);
+      }
+      if (row.is_master && input.vaultAccess === false) {
+        throw new StoreError('O usuário master sempre tem acesso ao cofre.', 409);
+      }
+      if (input.vaultAccess === true && role !== 'admin') {
+        throw new StoreError('Só administradores podem receber acesso ao cofre de senhas.', 409);
+      }
+      // Quem deixa de ser administrador perde o cofre junto.
+      const vaultAccess = role !== 'admin' ? false : input.vaultAccess === undefined ? Boolean(row.vault_access) : Boolean(input.vaultAccess);
       const displayName = input.displayName === undefined ? row.display_name : String(input.displayName).trim().slice(0, 80) || row.username;
 
       // Nunca deixar a equipe sem um administrador ativo.
@@ -294,12 +348,35 @@ export function createUsers(db: Database) {
         await audit(actor.username, 'user.unlock', { username: row.username });
       }
       const rows = await db.query<UserRow>(
-        `UPDATE users SET display_name = $2, role = $3, active = $4,
+        `UPDATE users SET display_name = $2, role = $3, active = $4, vault_access = $6,
            session_version = session_version + $5 WHERE id = $1 RETURNING *`,
-        [id, displayName, role, active, revoke ? 1 : 0]
+        [id, displayName, role, active, revoke ? 1 : 0, vaultAccess]
       );
-      await audit(actor.username, 'user.update', { username: row.username, role, active });
+      await audit(actor.username, 'user.update', { username: row.username, role, active, vaultAccess });
       return toPublic(rows[0]);
+    },
+
+    // Passa o master para outro administrador ativo. O antigo continua administrador e com o acesso que já tinha.
+    // Zerar a verificação em duas etapas de um administrador também é decisão do master.
+    async assertCanResetMfa(actor: Actor, id: number) {
+      const row = await byId(id);
+      if (row && row.role === 'admin' && row.username !== actor.username) await requireMaster(actor);
+    },
+
+    async transferMaster(actor: Actor, id: number) {
+      const from = await requireMaster(actor);
+      const to = await byId(id);
+      if (!to) throw new StoreError('Usuário não encontrado.', 404);
+      if (to.id === from.id) throw new StoreError('Esse usuário já é o master.', 409);
+      if (to.role !== 'admin' || !to.active || to.must_change_password) {
+        throw new StoreError('O novo master precisa ser um administrador ativo que já trocou a senha provisória.', 409);
+      }
+      await db.tx(async (q) => {
+        await q('UPDATE users SET is_master = FALSE WHERE id = $1', [from.id]);
+        await q('UPDATE users SET is_master = TRUE, vault_access = TRUE WHERE id = $1', [to.id]);
+        await audit(actor.username, 'user.master_transfer', { from: from.username, to: to.username }, q);
+      });
+      return toPublic((await byId(to.id))!);
     },
 
     async resetPassword(actor: Actor, id: number, password: unknown, mustChangePassword: unknown = true) {
@@ -308,6 +385,8 @@ export function createUsers(db: Database) {
       if (row.username === actor.username) {
         throw new StoreError('Para a sua própria conta, use Alterar senha clicando no seu nome na barra lateral.');
       }
+      // Redefinir a senha de um administrador daria a outra pessoa a conta dele (e o cofre): só o master faz.
+      if (row.role === 'admin') await requireMaster(actor);
       const pass = checkPassword(password);
       const mustChange = mustChangePassword !== false;
       await db.query(
@@ -323,6 +402,7 @@ export function createUsers(db: Database) {
       const row = await byId(id);
       if (!row) throw new StoreError('Usuário não encontrado.', 404);
       if (row.username === actor.username) throw new StoreError('Você não pode apagar a própria conta.', 409);
+      if (row.is_master) throw new StoreError('O usuário master não pode ser apagado. Transfira o master antes.', 409);
       if (row.role === 'admin' && row.active && (await activeAdmins()) <= 1) {
         throw new StoreError('É preciso manter pelo menos um administrador ativo.', 409);
       }

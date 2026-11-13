@@ -29,7 +29,7 @@ import { SessionUser } from '../types';
 import { useDialogFocus } from '../hooks/useDialogFocus';
 import './Sidebar.css';
 
-export type AppTab = 'dashboard' | 'import' | 'client-list' | 'review' | 'intelligence' | 'ip-analysis' | 'history' | 'reports' | 'clients' | 'admin' | 'backup';
+export type AppTab = 'dashboard' | 'import' | 'client-list' | 'review' | 'intelligence' | 'ip-analysis' | 'history' | 'reports' | 'clients' | 'admin' | 'backup' | 'vault';
 
 interface NavbarProps {
   currentTab: AppTab;
@@ -52,6 +52,7 @@ type NavGroup = { id: string; label: string; icon: React.ElementType; items: Nav
 
 // Painel geral sozinho no topo; o resto em grupos de telas relacionadas.
 const homeItem: NavItem = { id: 'dashboard', label: 'Painel geral', icon: LayoutDashboard };
+const vaultItem: NavItem = { id: 'vault', label: 'Cofre de senhas', icon: LockKeyhole };
 const navGroups: NavGroup[] = [
   {
     id: 'blocks',
@@ -325,11 +326,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               );
             })}
-            {/* O cofre de senhas (DonutVault) é servido por este mesmo servidor em /cofre. */}
-            <a className="gl-row gl-row--link" href="/cofre/" data-tip="Cofre de senhas" aria-label="Cofre de senhas">
-              <LockKeyhole aria-hidden="true" />
-              <span className="label">Cofre de senhas</span>
-            </a>
+            {/* Cofre de senhas (DonutVault, em /cofre): só para quem o master liberou. */}
+            {currentUser?.vaultAccess && renderRow(vaultItem)}
           </nav>
 
           <hr className="gl-divider" />

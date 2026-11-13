@@ -36,6 +36,7 @@ import { checkMasterPasswordPolicy } from './utils/generator';
 import { StorageService } from './services/StorageService';
 import { SyncAdapter } from './services/SyncAdapter';
 import { API_BASE } from './lib/apiBase';
+import { FRAMED, forwardActivityToGuardList, onGuardListThemeChange, readGuardListTheme } from './lib/embed';
 import {
   createEncryptedVaultEnvelope,
   unlockEncryptedVaultEnvelope,
@@ -224,15 +225,31 @@ export default function App() {
     return () => clearTimeout(t);
   }, [comicToast]);
 
+  // Dentro do GuardList o tema é o dele: o do cofre fica guardado, mas não vale enquanto estiver embutido.
+  const [guardListTheme, setGuardListTheme] = useState<'light' | 'dark'>(() =>
+    FRAMED ? readGuardListTheme() : 'dark'
+  );
+  useEffect(() => {
+    if (!FRAMED) return;
+    document.documentElement.classList.add('cofre-framed');
+    const stopTheme = onGuardListThemeChange(setGuardListTheme);
+    const stopActivity = forwardActivityToGuardList();
+    return () => {
+      stopTheme();
+      stopActivity();
+    };
+  }, []);
+  const effectiveTheme = FRAMED ? guardListTheme : theme;
+
   // Sincroniza classe .dark no <html>
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'dark') {
+    if (effectiveTheme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
-  }, [theme]);
+  }, [effectiveTheme]);
 
   // Bloqueia o cofre limpando a chave DEK e o payload descriptografado da memória
   const lockVault = useCallback(() => {
@@ -1222,9 +1239,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen text-foreground flex flex-col lg:flex-row">
-      <AmbientBackground mark={<BrandMark size={640} />} />
+      {!FRAMED && <AmbientBackground mark={<BrandMark size={640} />} />}
 
-      {/* Menu lateral: console de vidro flutuante, como no GuardList */}
+      {/* Menu lateral: console de vidro flutuante, como no GuardList (fora dele; dentro, viram abas) */}
+      {!FRAMED && (
       <aside
         aria-label="Menu principal do cofre"
         className="glass hidden lg:flex lg:w-[280px] lg:sticky lg:top-6 lg:m-6 lg:mr-0 lg:max-h-[calc(100dvh-3rem)] lg:self-start shrink-0 rounded-console flex-col justify-between py-5 overflow-y-auto"
@@ -1276,7 +1294,7 @@ export default function App() {
 
         {/* Rodapé do menu: trancar o cofre e, dentro do GuardList, voltar para ele */}
         <div className="px-4 pt-4 mt-3 border-t border-glass-line space-y-2">
-          {API_BASE && (
+          {API_BASE && !FRAMED && (
             <a
               href="/"
               className="flex items-center justify-center gap-2 h-9 rounded-base text-sm font-semibold text-muted hover:text-foreground hover:bg-accent-soft"
@@ -1296,6 +1314,7 @@ export default function App() {
           </Button>
         </div>
       </aside>
+      )}
 
       {/* Conteúdo principal e barra do topo */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -1309,7 +1328,7 @@ export default function App() {
               size="icon-sm"
               onClick={() => setMobileMenuOpen((o) => !o)}
               aria-label="Abrir menu de navegação"
-              className="lg:hidden"
+              className={FRAMED ? 'hidden' : 'lg:hidden'}
             >
               {mobileMenuOpen ? (
                 <X className="w-5 h-5" />
@@ -1357,7 +1376,7 @@ export default function App() {
                 });
               }}
               aria-label="Alternar tema claro e escuro"
-              className="hover:text-foreground flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className={`${FRAMED ? 'hidden' : 'flex'} hover:text-foreground items-center gap-1 cursor-pointer whitespace-nowrap`}
             >
               {theme === 'dark' ? (
                 <Sun className="w-3.5 h-3.5" />
@@ -1384,6 +1403,38 @@ export default function App() {
             </Button>
           </div>
         </header>
+
+        {/* Dentro do GuardList o menu lateral é o dele: as seções do cofre viram abas no topo. */}
+        {FRAMED && (
+          <nav aria-label="Seções do cofre" className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] px-5 sm:px-8 pt-3 pb-1">
+            {SIDEBAR_ITEMS.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id)}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`shrink-0 h-9 px-3 rounded-base text-sm flex items-center gap-2 cursor-pointer whitespace-nowrap border-b-2 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring ${
+                    isActive
+                      ? 'bg-accent-soft text-accent font-semibold border-main'
+                      : 'text-muted font-medium border-transparent hover:bg-accent-soft hover:text-foreground'
+                  }`}
+                >
+                  <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>{item.label}</span>
+                  {item.id === 'trash' && trashCount > 0 && (
+                    <span className="font-mono text-xs tabular-nums">{trashCount}</span>
+                  )}
+                </button>
+              );
+            })}
+            <Button type="button" variant="neutral" size="sm" onClick={lockVault} className="ml-auto shrink-0">
+              <Lock className="w-4 h-4" />
+              <span>Trancar</span>
+            </Button>
+          </nav>
+        )}
 
         {/* Gaveta de navegação do celular */}
         {mobileMenuOpen && (

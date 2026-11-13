@@ -1816,3 +1816,20 @@ input[type="date"].field::-webkit-calendar-picker-indicator {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
+
+/* Cofre de senhas (/cofre) dentro da área de conteúdo: ocupa a altura visível, sem moldura. */
+.vault-frame {
+  display: block;
+  width: 100%;
+  height: calc(100dvh - 48px);
+  min-height: 560px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+}
+
+@media (max-width: 1024px) {
+  .vault-frame {
+    height: calc(100dvh - 120px);
+  }
+}

@@ -5,6 +5,7 @@ import * as dotenv from 'dotenv';
 import { createSyncApiRouter } from './src/server/syncRoutes.ts';
 import {
   extractClientIp,
+  pathWithinApp,
   sanitizedApiErrorMiddleware,
   securityHeadersAndAntiFingerprintMiddleware,
 } from './src/middleware/reconDefense.ts';
@@ -35,9 +36,7 @@ export async function createDonutVaultApp(options?: { skipVite?: boolean; embedd
 
   // 2. Bloqueio de varreduras automatizadas e arquivos sensíveis na raiz (/.env, /.git, /wp-admin, /admin, /phpmyadmin, /actuator)
   app.use((req, res, next) => {
-    const trap = scannerDetector.isSensitiveOrAdminTrapPath(
-      req.originalUrl || req.url
-    );
+    const trap = scannerDetector.isSensitiveOrAdminTrapPath(pathWithinApp(req));
     if (trap.trapped) {
       const clientIp = extractClientIp(req);
       const { shouldThrottle429 } =
