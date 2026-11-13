@@ -1,6 +1,6 @@
 # DonutVault
 
-Gerenciador de senhas zero-knowledge com cara de desenho animado dos anos 90.
+Gerenciador de senhas zero-knowledge com a cara do GuardList e um toque dos anos 90.
 
 - O cofre é cifrado no navegador (AES-256-GCM). A chave sai da Senha Mestra pelo Argon2id.
 - O servidor guarda só dados cifrados e nunca recebe a Senha Mestra nem as chaves.

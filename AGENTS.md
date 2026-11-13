@@ -21,8 +21,9 @@ npx vite build
   teste em produção. Não fazer deploy nem push sem o dono pedir.
 - Commits no estilo do histórico (`git log`): assunto em inglês no imperativo e corpo com tópicos
   explicando o quê e o porquê.
-- Comentários e textos de interface em português, claros e calmos, sem jargão na interface. O visual é
-  de desenho animado, mas momentos de risco são tratados com seriedade.
+- Comentários e textos de interface em português, claros e calmos, sem jargão na interface. O visual
+  segue o do GuardList, com toques dos anos 90 (desenho em `docs/superpowers/specs/`), e momentos de
+  risco são tratados com seriedade.
 - Não mexer no GuardList (é outro serviço, em outro repositório).
 
 ## Não quebrar

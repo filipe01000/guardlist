@@ -1,6 +1,6 @@
 # Visual novo do DonutVault, puxado do GuardList
 
-Data: 13/11/2026. Estado: aguardando aprovação do dono.
+Data: 13/11/2026. Estado: aprovado pelo dono e construído no ramo `docs/visual-guardlist`.
 Esboço de referência: [2026-11-13-visual-guardlist-esboco.html](2026-11-13-visual-guardlist-esboco.html) (abra no navegador).
 
 ## Intenção
