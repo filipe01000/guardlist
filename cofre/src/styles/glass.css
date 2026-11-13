@@ -1,0 +1,119 @@
+/* Fundo de faixas de luz com pontinhos de gibi e painéis de vidro fosco.
+   As faixas e o vidro vêm do GuardList (src/styles/glass.css de lá); os pontinhos são do DonutVault. */
+
+/* ---------- Fundo ---------- */
+
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--background);
+}
+
+/* Pontinhos de gibi, bem fracos, por baixo das faixas. */
+.ambient__halftone {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(var(--halftone) 1.4px, transparent 1.5px);
+  background-size: 14px 14px;
+}
+
+/* A marca grande e translúcida, centrada na área de conteúdo (à direita do menu). */
+.ambient__mark {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 140px);
+  translate: -50% -50%;
+  opacity: var(--ambient-mark);
+  user-select: none;
+}
+
+.ambient__mark svg {
+  width: min(80vh, 900px);
+  height: auto;
+}
+
+@media (max-width: 1024px) {
+  .ambient__mark { left: 50%; }
+  .ambient__mark svg { width: min(70vh, 80vw); }
+}
+
+/* Faixas de luz diagonais, derivando devagar. */
+.ambient__streak {
+  position: absolute;
+  left: -40vw;
+  width: 180vw;
+  height: 22vh;
+  border-radius: 50%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(var(--ambient-streak), 0) 18%,
+    rgba(var(--ambient-streak), 0.30) 42%,
+    rgba(var(--ambient-hot), 0.42) 50%,
+    rgba(var(--ambient-streak), 0.24) 60%,
+    transparent 82%);
+  filter: blur(28px);
+  transform: rotate(-17deg);
+  opacity: var(--ambient-strength);
+  will-change: translate;
+  animation: ambient-drift 32s ease-in-out infinite alternate;
+}
+
+.ambient__streak--1 { top: 6%; }
+.ambient__streak--2 { top: 40%; height: 30vh; opacity: calc(var(--ambient-strength) * 0.6); animation-duration: 40s; animation-delay: -10s; }
+.ambient__streak--3 { top: 66%; animation-duration: 36s; animation-delay: -18s; transform: rotate(-12deg); }
+.ambient__streak--4 { top: -14%; height: 16vh; opacity: calc(var(--ambient-strength) * 0.5); animation-duration: 46s; animation-delay: -5s; transform: rotate(-22deg); }
+
+.ambient__streak--line {
+  height: 2px;
+  border-radius: 2px;
+  filter: blur(0.6px);
+  background: linear-gradient(90deg, transparent 10%, rgba(var(--ambient-hot), 0) 25%, rgba(var(--ambient-hot), 0.7) 52%, rgba(var(--ambient-streak), 0) 75%, transparent 90%);
+}
+.ambient__streak--5 { top: 30%; animation-duration: 28s; }
+.ambient__streak--6 { top: 76%; animation-duration: 34s; animation-delay: -12s; transform: rotate(-14deg); opacity: calc(var(--ambient-strength) * 0.7); }
+
+@keyframes ambient-drift {
+  from { translate: -9vw 0; }
+  to { translate: 9vw 2vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient__streak { animation: none; }
+}
+
+/* ---------- Vidro ---------- */
+
+/* Painéis: menu lateral, cartões, tabelas, seções. */
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 18px 40px -28px var(--glass-shadow);
+}
+
+/* Sobreposições (modais, menus suspensos, avisos): vidro mais denso, para leitura. */
+.glass-strong {
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-line);
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 24px 60px -24px var(--glass-shadow);
+}
+
+/* Campos e busca. */
+.glass-field {
+  background: var(--surface-subtle);
+  border: 1px solid var(--line);
+}
+
+/* Navegadores sem backdrop-filter: painéis sólidos. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-strong {
+    background: var(--secondary-background);
+  }
+}

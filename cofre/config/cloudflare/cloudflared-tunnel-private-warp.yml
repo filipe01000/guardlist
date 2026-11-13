@@ -1,0 +1,58 @@
+# ==============================================================================
+# DONUTVAULT FASE 5C — REVISÃO TÉCNICA DA ARQUITETURA DE REDE PRIVADA
+# (CLOUDFLARE TUNNEL + WARP PRIVATE NETWORK ROUTING)
+#
+# STATUS DE EXECUÇÃO REAL: [NOT TESTED - PENDENTE DE IMPLANTAÇÃO EM INFRAESTRUTURA]
+# Este arquivo é uma especificação de engenharia corrigida. Nenhuma conexão real
+# com a borda da Cloudflare foi executada neste sandbox.
+#
+# CORREÇÕES DE ARQUITETURA APLICADAS NA FASE 5C (§5):
+#   1. Endereçamento Privado Realmente Existente na Origem:
+#      - O roteamento CIDR do `cloudflared` (`warp-routing: enabled: true`) encaminha
+#        pacotes IP diretamente para uma interface de rede real do host de origem.
+#      - Não se deve usar um IP fictício (`10.240.7.10/32`) a menos que ele esteja
+#        efetivamente vinculado a uma interface local dedicada (ex.: interface dummy
+#        `ip link add dev dvlt0 type dummy && ip addr add 10.240.7.10/32 dev dvlt0`)
+#        ou corresonda à sub-rede VPC real da VM (ex.: `10.128.0.0/20`).
+#   2. Configuração Obrigatória de Split Tunnels no Cloudflare Zero Trust:
+#      - Por padrão, o cliente Cloudflare WARP opera em modo "Exclude" para todas
+#        as faixas RFC 1918 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`).
+#      - Sem remover `10.240.7.10/32` da lista de exclusão do Split Tunnel no painel
+#        Zero Trust, os pacotes do PC/Celular NUNCA entrariam no túnel WARP!
+#   3. Isolamento L4 do PostgreSQL (Porta 5432) e Serviços Administrativos (SSH 22):
+#      - Como `warp-routing` opera em Camada 3/4, habilitar uma rota `/24` ou `/32`
+#        sem políticas de Gateway Network exporia todas as portas daquele IP ao
+#        dispositivo conectado ao WARP.
+#      - Portanto:
+#        (a) O PostgreSQL deve escutar estritamente em Unix Domain Socket
+#            (`/var/run/postgresql/.s.PGSQL.5432`) ou `127.0.0.1:5432` (nunca em
+#            `10.240.7.10:5432` ou `0.0.0.0:5432`);
+#        (b) O Gateway Network Firewall (L4) na Cloudflare deve permitir APENAS
+#            `TCP/3000` (ou `TCP/443` via proxy local) e bloquear explicitamente
+#            `TCP/5432` (PostgreSQL), `TCP/22` (SSH) e todas as demais portas.
+# ==============================================================================
+
+tunnel: "REPLACE_WITH_REAL_TUNNEL_UUID_AT_DEPLOYMENT"
+credentials-file: /etc/cloudflared/donutvault-private-warp-credentials.json
+
+protocol: quic
+no-autoupdate: true
+grace-period: 30s
+
+warp-routing:
+  enabled: true
+
+# Passos obrigatórios de validação de rede no host Linux antes de ativar:
+#   1. Criar interface isolada para o serviço DonutVault:
+#      sudo ip link add dev dvlt0 type dummy
+#      sudo ip addr add 10.240.7.10/32 dev dvlt0
+#      sudo ip link set up dev dvlt0
+#   2. Fazer bind do servidor Node.js exclusivamente em 10.240.7.10:3000
+#      e manter o PostgreSQL restrito a 127.0.0.1:5432.
+#   3. Registrar a rota no Cloudflare Tunnel:
+#      cloudflared tunnel route ip add 10.240.7.10/32 <TUNNEL_UUID>
+#   4. No painel Cloudflare Zero Trust -> Settings -> WARP Client -> Split Tunnels:
+#      Incluir `10.240.7.10/32` no túnel WARP.
+
+ingress:
+  - service: http_status:404

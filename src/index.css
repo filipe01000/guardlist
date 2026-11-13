@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* O cofre (DonutVault) tem estilos próprios. */
+@source not "../cofre";
 /* Paleta ativa. A anterior está guardada em ./styles/palettes/azul-noite.css: basta trocar esta linha. */
 @import "./styles/palettes/evening-mix.css";
 

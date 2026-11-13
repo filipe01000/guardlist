@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "reauth_verifier_sha256" text;

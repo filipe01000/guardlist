@@ -1,0 +1,62 @@
+# ==============================================================================
+# DONUTVAULT FASE 5B — CLOUDFLARE TUNNEL (OPÇÃO A: HOSTNAMES PÚBLICOS PROTEGIDOS
+# POR CLOUDFLARE ACCESS + MFA FIDO2 + DISPOSITIVO AUTORIZADO)
+#
+# Domínios planejados (NÃO PUBLICAR ANTES DA AUDITORIA INDEPENDENTE):
+#   - Frontend Web Vault: https://vault.filipeti.com.br
+#   - Backend E2EE API:   https://api-vault.filipeti.com.br
+#
+# Arquitetura de Rede:
+#   - O servidor de origem (Node.js + PostgreSQL) tem firewall deny-by-default
+#     para tráfego de entrada (0 portas abertas na internet pública).
+#   - O daemon `cloudflared` estabelece conexões apenas de saída (outbound QUIC/HTTP2)
+#     para a borda da Cloudflare e encaminha exclusivamente para `127.0.0.1:3000`.
+# ==============================================================================
+
+tunnel: "00000000-0000-0000-0000-donutvault5b"
+credentials-file: /etc/cloudflared/donutvault-tunnel-credentials.json
+
+protocol: quic
+no-autoupdate: true
+grace-period: 30s
+
+originRequest:
+  connectTimeout: 10s
+  tlsTimeout: 10s
+  tcpKeepAlive: 30s
+  noHappyEyeballs: false
+  keepAliveConnections: 100
+  keepAliveTimeout: 90s
+  httpHostHeader: "vault.filipeti.com.br"
+  disableChunkedEncoding: false
+
+ingress:
+  # 1. API Zero-Knowledge (Exige validação de CF-Access-Jwt-Assertion na borda e na origem)
+  - hostname: api-vault.filipeti.com.br
+    path: ^/api/v1/.*
+    service: http://127.0.0.1:3000
+    originRequest:
+      httpHostHeader: "api-vault.filipeti.com.br"
+      access:
+        required: true
+        teamName: "filipeti-zero-trust"
+        audTag:
+          - "REPLACE_WITH_CLOUDFLARE_ACCESS_API_AUD_TAG"
+
+  # Bloqueia qualquer rota fora de /api/v1/* no subdomínio da API
+  - hostname: api-vault.filipeti.com.br
+    service: http_status:404
+
+  # 2. Aplicação Web Criptográfica Client-Side (Protegida por Cloudflare Access + Passkey MFA)
+  - hostname: vault.filipeti.com.br
+    service: http://127.0.0.1:3000
+    originRequest:
+      httpHostHeader: "vault.filipeti.com.br"
+      access:
+        required: true
+        teamName: "filipeti-zero-trust"
+        audTag:
+          - "REPLACE_WITH_CLOUDFLARE_ACCESS_WEB_AUD_TAG"
+
+  # 3. Regra Catch-All Obrigatória (Qualquer outro Host header é imediatamente descartado)
+  - service: http_status:404

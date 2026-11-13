@@ -3,12 +3,16 @@ services:
     name: guardlist
     runtime: node
     plan: free
-    buildCommand: npm ci --include=dev && npm run build
+    buildCommand: npm ci --include=dev && npm run build && npm run build:cofre
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:
+      # Node 24: exigido pelo cofre (DonutVault, em /cofre).
       - key: NODE_VERSION
-        value: "22"
+        value: "24"
+      # Política de segurança de produção do cofre.
+      - key: NODE_ENV
+        value: production
       # Defina os valores no painel do Render (sync: false = não ficam no repositório).
       # Banco Postgres da equipe (Neon): cole a connection string completa.
       - key: DATABASE_URL
@@ -18,6 +22,9 @@ services:
       - key: ADMIN_INITIAL_PASSWORD
         sync: false
       - key: APP_USERS
+        sync: false
+      # Banco do cofre (/cofre): Neon próprio, nunca o mesmo da equipe.
+      - key: DONUTVAULT_DATABASE_URL
         sync: false
       - key: SESSION_SECRET
         generateValue: true

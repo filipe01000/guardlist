@@ -1,0 +1,50 @@
+; ==============================================================================
+; DONUTVAULT FASE 5B — PLANO DE INVENTÁRIO E BLINDAGEM DNS (`filipeti.com.br`)
+; STATUS: NÃO PUBLICAR EM PRODUÇÃO NESTA FASE (APENAS PLANEJAMENTO E AUDITORIA)
+; ==============================================================================
+;
+; 1. REALIDADE TÉCNICA SOBRE RECONHECIMENTO PASSIVO (SUBFINDER / AMASS / CRT.SH):
+;    - Qualquer registro DNS público (`vault.filipeti.com.br`) ou certificado TLS
+;      emitido por Autoridade Certificadora pública será indexado em logs de
+;      Certificate Transparency (CT) e descoberto por Subfinder/Amass passivo.
+;    - WAF e Rate Limiting NÃO impedem a descoberta passiva do nome DNS.
+;    - Portanto, a defesa baseia-se em:
+;      (a) Não expor o IP real da origem em nenhum registro A, AAAA, MX, SPF/TXT;
+;      (b) Apontar exclusivamente via CNAME Proxied (Orange Cloud) para o
+;          Cloudflare Tunnel (`<UUID>.cfargotunnel.com`), barrando conexão direta
+;          ao IP de origem (Nmap directo na origem encontra 0 portas abertas);
+;      (c) Restringir emissão de certificados via registros CAA;
+;      (d) Ou adotar a Opção B (`cloudflared-tunnel-private-warp.yml`), onde
+;          NENHUM registro DNS público é criado para o cofre!
+; ==============================================================================
+
+$ORIGIN filipeti.com.br.
+$TTL 300
+
+; ------------------------------------------------------------------------------
+; CONTROLE DE AUTORIDADE CERTIFICADORA (CAA) — Anti-Rogue Cert & Anti-Wildcard
+; Restringe emissão apenas à Cloudflare/Let's Encrypt/Google Trust Services e
+; proíbe certificados wildcard (`issuewild ";"`) para exigir auditoria explícita.
+; ------------------------------------------------------------------------------
+@                       IN  CAA 0 issue "letsencrypt.org"
+@                       IN  CAA 0 issue "pki.goog"
+@                       IN  CAA 0 issue "comodoca.com"
+@                       IN  CAA 0 issuewild ";"
+@                       IN  CAA 0 iodef "mailto:fars290191@gmail.com"
+
+; ------------------------------------------------------------------------------
+; SUBDOMÍNIOS PLANEJADOS DO DONUTVAULT (CNAME PROXIED -> CLOUDFLARE TUNNEL)
+; NUNCA usar registro A/AAAA apontando para IP da VM/Cloud Run diretamente!
+; NUNCA deixar CNAME apontando para serviço desativado (Prevenção Subdomain Takeover).
+; ------------------------------------------------------------------------------
+vault                   IN  CNAME 00000000-0000-0000-0000-donutvault5b.cfargotunnel.com. ; Cloudflare Proxied = TRUE
+api-vault               IN  CNAME 00000000-0000-0000-0000-donutvault5b.cfargotunnel.com. ; Cloudflare Proxied = TRUE
+
+; ------------------------------------------------------------------------------
+; POLÍTICA DE AUDITORIA CONTÍNUA CONTRA SUBDOMAIN TAKEOVER E VAZAMENTO DE IP:
+; 1. Revisar trimestralmente todos os registros CNAME, NS e A/AAAA de `filipeti.com.br`.
+; 2. Remover imediatamente subdomínios de homologação/teste abandonados (`dev`, `staging`, `old`).
+; 3. Garantir que registros TXT/SPF não contenham `ip4:<IP_DO_SERVIDOR_DO_COFRE>`.
+; 4. Ativar Certificate Transparency Monitoring na Cloudflare para receber alerta
+;    imediato por e-mail sempre que qualquer CA emitir certificado para `*.filipeti.com.br`.
+; ==============================================================================

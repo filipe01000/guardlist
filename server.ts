@@ -1,7 +1,7 @@
 import { config } from 'dotenv';
 import express, { type RequestHandler } from 'express';
 import { randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { isIP } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -725,6 +725,39 @@ app.post('/api/status/run/:job', adminOnly, adminAction, async (req, res) => {
     return res.status(400).json({ error: error instanceof Error ? error.message : 'Falha ao executar.' });
   }
 });
+
+// Cofre de senhas (DonutVault) em /cofre. Ele tem banco próprio (DONUTVAULT_DATABASE_URL) e nunca
+// usa o DATABASE_URL da equipe. Sem banco, sem build ou com falha na migração, /cofre mostra um aviso
+// e o GuardList segue normal.
+const cofreUnavailable = (motivo: string): RequestHandler => (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(503).type('text').send(`O cofre não está disponível neste servidor: ${motivo}`);
+};
+// "/cofre" sem a barra final vira "/cofre/", para os caminhos relativos do app funcionarem.
+app.use((req, res, next) => {
+  if (req.path !== '/cofre') return next();
+  const query = req.originalUrl.slice(req.originalUrl.indexOf('?') >= 0 ? req.originalUrl.indexOf('?') : req.originalUrl.length);
+  return res.redirect(301, `/cofre/${query}`);
+});
+if (!process.env.DONUTVAULT_DATABASE_URL && !process.env.DONUTVAULT_SQL_HOST) {
+  app.use('/cofre', cofreUnavailable('falta configurar DONUTVAULT_DATABASE_URL.'));
+} else if (!existsSync(path.join(rootDir, 'cofre', 'dist', 'index.html'))) {
+  app.use('/cofre', cofreUnavailable('o build do cofre não foi gerado (npm run build:cofre).'));
+} else {
+  try {
+    process.env.DONUTVAULT_EMBEDDED = '1';
+    // Caminho em variável: o tsc do GuardList não entra no código do cofre, que tem tsconfig próprio.
+    const cofreDir = './cofre';
+    const { migrateDonutVaultDatabase } = (await import(`${cofreDir}/src/db/migrateDatabase.ts`)) as { migrateDonutVaultDatabase: () => Promise<void> };
+    await migrateDonutVaultDatabase();
+    const { createDonutVaultApp } = (await import(`${cofreDir}/server.ts`)) as { createDonutVaultApp: (o: { embedded: true }) => Promise<RequestHandler> };
+    app.use('/cofre', await createDonutVaultApp({ embedded: true }));
+    console.log('Cofre (DonutVault) disponível em /cofre.');
+  } catch (error) {
+    console.error('Cofre indisponível: falha ao preparar o banco ou o servidor do cofre.', error instanceof Error ? error.message : error);
+    app.use('/cofre', cofreUnavailable('falha ao preparar o banco do cofre.'));
+  }
+}
 
 app.use('/api', (_req, res) => res.status(404).json({ error: 'Rota de API não encontrada.' }));
 
