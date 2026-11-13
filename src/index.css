@@ -144,27 +144,6 @@ html {
   font-variant-numeric: tabular-nums;
 }
 
-/* StreamUI Comic Halftone & Pop-Art Backgrounds */
-.bg-comic-halftone {
-  background-image: radial-gradient(rgba(9, 9, 11, 0.11) 1.5px, transparent 1.5px);
-  background-size: 14px 14px;
-}
-
-.dark .bg-comic-halftone {
-  background-image: radial-gradient(rgba(255, 217, 15, 0.12) 1.5px, transparent 1.5px);
-  background-size: 14px 14px;
-}
-
-.bg-comic-stripes {
-  background-image: repeating-linear-gradient(
-    -45deg,
-    rgba(255, 217, 15, 0.14),
-    rgba(255, 217, 15, 0.14) 10px,
-    transparent 10px,
-    transparent 20px
-  );
-}
-
 @keyframes spin-slow {
   from {
     transform: rotate(0deg);

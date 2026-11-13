@@ -9,5 +9,6 @@ import '@fontsource/ibm-plex-mono/latin-500.css';
 import '@fontsource/ibm-plex-mono/latin-600.css';
 import '@fontsource-variable/bricolage-grotesque/wght.css';
 import './index.css';
+import './styles/glass.css';
 
 createRoot(document.getElementById('root')!).render(<App />);
