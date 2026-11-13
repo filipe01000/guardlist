@@ -243,6 +243,10 @@
   transition: background 0.25s, color 0.25s;
 }
 
+.gl-row--link {
+  text-decoration: none;
+}
+
 .gl-row .label {
   flex: 1 1 auto;
 }

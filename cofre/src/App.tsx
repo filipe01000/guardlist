@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
+  ArrowLeft,
   Lock,
   Plus,
   Menu,
@@ -1273,8 +1274,17 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Rodapé do menu: trancar o cofre */}
-        <div className="px-4 pt-4 mt-3 border-t border-glass-line">
+        {/* Rodapé do menu: trancar o cofre e, dentro do GuardList, voltar para ele */}
+        <div className="px-4 pt-4 mt-3 border-t border-glass-line space-y-2">
+          {API_BASE && (
+            <a
+              href="/"
+              className="flex items-center justify-center gap-2 h-9 rounded-base text-sm font-semibold text-muted hover:text-foreground hover:bg-accent-soft"
+            >
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+              <span>Voltar ao GuardList</span>
+            </a>
+          )}
           <Button
             type="button"
             variant="neutral"
