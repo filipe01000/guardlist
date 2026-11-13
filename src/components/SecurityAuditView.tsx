@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import type { VaultSecurityAuditReport } from '../utils/audit';
 import { generateSecurePassword } from '../utils/generator';
-import { BarnabyMascot } from './CartoonIllustrations';
+import { BrandMark } from './BrandMark';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { ComicSpeechBubble, ComicActionCallout } from './ui/comic';
@@ -103,16 +103,7 @@ export function SecurityAuditView({
         <CardContent className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           <div className="lg:col-span-4 flex flex-col sm:flex-row lg:flex-col items-center gap-4 text-center border-b-3 lg:border-b-0 lg:border-r-3 border-border pb-6 lg:pb-0 lg:pr-6">
             <div className="bg-[#E0F2FE] border-3 border-border rounded-2xl p-2 shadow-shadow animate-float">
-              <BarnabyMascot
-                size={116}
-                mood={
-                  auditReport.overallScore >= 85
-                    ? 'celebrating'
-                    : auditReport.overallScore >= 65
-                      ? 'thinking'
-                      : 'panic'
-                }
-              />
+              <BrandMark size={116} />
             </div>
             <div>
               <div className="font-display text-5xl font-black tabular-nums text-foreground">

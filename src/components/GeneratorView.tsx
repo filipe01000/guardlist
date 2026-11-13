@@ -14,7 +14,7 @@ import {
   evaluatePasswordStrength,
 } from '../utils/generator';
 import { useStrengthEngineReady } from '../utils/strengthEngine';
-import { BarnabyMascot } from './CartoonIllustrations';
+import { BrandMark } from './BrandMark';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Input } from './ui/input';
@@ -430,7 +430,7 @@ export function GeneratorView({
         <Card className="lg:col-span-4 text-center">
           <CardContent className="space-y-4">
             <div className="mx-auto w-fit animate-float bg-[#E0F2FE] border-3 border-border rounded-2xl p-2 shadow-shadow">
-              <BarnabyMascot size={136} mood={strength.mascotMood} />
+              <BrandMark size={136} />
             </div>
 
             <ComicSpeechBubble

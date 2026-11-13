@@ -53,7 +53,7 @@ import {
   loadStrengthEngine,
   useStrengthEngineReady,
 } from './utils/strengthEngine';
-import { DonutVaultLogo } from './components/CartoonIllustrations';
+import { BrandMark } from './components/BrandMark';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { DashboardView } from './components/DashboardView';
 import { PasswordsView } from './components/PasswordsView';
@@ -1191,7 +1191,7 @@ export default function App() {
   if (isInitializing) {
     return (
       <div className="min-h-screen bg-background bg-comic-halftone flex flex-col items-center justify-center p-6 text-center space-y-4">
-        <DonutVaultLogo size={84} spinning={true} />
+        <BrandMark size={84} spinning={true} />
         <p className="font-display text-xl font-black">
           Assando rosquinhas criptográficas...
         </p>
@@ -1227,7 +1227,7 @@ export default function App() {
         <div className="space-y-6">
           {/* Identidade do Cofre na Sidebar */}
           <div className="flex items-center gap-3 pb-4 border-b-3 border-border">
-            <DonutVaultLogo size={48} />
+            <BrandMark size={48} />
             <div className="min-w-0">
               <span className="font-display text-xl font-black tracking-tight block truncate">
                 DonutVault

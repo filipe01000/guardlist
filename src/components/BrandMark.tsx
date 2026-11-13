@@ -1,0 +1,42 @@
+// Marca do DonutVault: rosquinha de cobertura rosa com confeitos e uma fechadura no centro.
+// Redesenhada em vetor a partir da arte enviada pelo dono. As cores são fixas: a marca é igual nos
+// dois temas.
+export function BrandMark({
+  size = 56,
+  spinning = false,
+  className = '',
+}: {
+  size?: number;
+  spinning?: boolean;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 200 200"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={`${spinning ? 'animate-spin-donut ' : ''}${className}`.trim() || undefined}
+      role="img"
+      aria-label="DonutVault"
+    >
+      <circle cx="100" cy="100" r="92" fill="#1C1917" />
+      <circle cx="100" cy="100" r="84" fill="#E3A857" />
+      <circle cx="100" cy="100" r="71" fill="#1C1917" />
+      <circle cx="100" cy="100" r="64" fill="#FF5CA8" />
+      <g stroke="#1C1917" strokeWidth="2.5">
+        <rect x="92" y="44" width="16" height="7" rx="3.5" fill="#38BDF8" transform="rotate(12 100 47)" />
+        <rect x="134" y="62" width="16" height="7" rx="3.5" fill="#FFD90F" transform="rotate(40 142 65)" />
+        <rect x="146" y="104" width="16" height="7" rx="3.5" fill="#38BDF8" transform="rotate(-62 154 107)" />
+        <rect x="134" y="142" width="16" height="7" rx="3.5" fill="#4ADE80" transform="rotate(-20 142 145)" />
+        <rect x="94" y="158" width="16" height="7" rx="3.5" fill="#FFFFFF" transform="rotate(-8 102 161)" />
+        <rect x="54" y="142" width="16" height="7" rx="3.5" fill="#FFD90F" transform="rotate(22 62 145)" />
+        <rect x="40" y="104" width="16" height="7" rx="3.5" fill="#FFFFFF" transform="rotate(62 48 107)" />
+        <rect x="54" y="62" width="16" height="7" rx="3.5" fill="#4ADE80" transform="rotate(-32 62 65)" />
+      </g>
+      <circle cx="100" cy="88" r="20" fill="#0F1220" />
+      <path d="M90 96L80 142H120L110 96Z" fill="#0F1220" />
+    </svg>
+  );
+}

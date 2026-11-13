@@ -16,7 +16,7 @@ import type { CredentialItem, NavigationTab } from '../types/vault';
 import type { VaultSecurityAuditReport } from '../utils/audit';
 import { VAULT_CATEGORIES } from '../utils/seedData';
 import { copySecretToClipboardWithAutoClear } from '../utils/security';
-import { BarnabyMascot } from './CartoonIllustrations';
+import { BrandMark } from './BrandMark';
 import { Button } from './ui/button';
 import {
   Card,
@@ -98,7 +98,7 @@ export function DashboardView({
       <section className="bg-main bg-comic-stripes text-main-foreground border-4 border-border rounded-base p-6 sm:p-7 shadow-[6px_6px_0px_0px_var(--border)] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 flex-1">
           <div className="shrink-0 bg-white border-4 border-border rounded-2xl p-2 shadow-[4px_4px_0px_0px_var(--border)] animate-float">
-            <BarnabyMascot size={96} mood={mascotMood} />
+            <BrandMark size={96} />
           </div>
 
           <div className="space-y-2 flex-1">

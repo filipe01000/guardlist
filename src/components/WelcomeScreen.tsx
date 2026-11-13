@@ -12,11 +12,8 @@ import {
   CheckCircle2,
   Download,
 } from 'lucide-react';
-import {
-  DonutVaultLogo,
-  BarnabyMascot,
-  CartoonVaultDoor,
-} from './CartoonIllustrations';
+import { BrandMark } from './BrandMark';
+import { CartoonVaultDoor } from './CartoonIllustrations';
 import {
   checkMasterPasswordPolicy,
   evaluatePasswordStrength,
@@ -263,7 +260,7 @@ export function WelcomeScreen({
               aria-label="Logotipo interativo DonutVault"
               className="focus-visible:outline-2 focus-visible:outline-pink rounded-full transition-transform active:scale-95 cursor-pointer"
             >
-              <DonutVaultLogo size={48} spinning={isProcessing} />
+              <BrandMark size={48} spinning={isProcessing} />
             </button>
             <span className="font-display text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap shrink-0">
               DonutVault
@@ -412,16 +409,7 @@ export function WelcomeScreen({
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
                     <div className="animate-float shrink-0 bg-white border-3 border-border rounded-2xl p-1 shadow-[3px_3px_0px_0px_var(--border)]">
-                      <BarnabyMascot
-                        size={82}
-                        mood={
-                          errorMsg
-                            ? 'panic'
-                            : isProcessing || vaultDoorOpen
-                              ? 'celebrating'
-                              : 'happy'
-                        }
-                      />
+                      <BrandMark size={82} />
                     </div>
                     <div>
                       <ComicActionCallout
