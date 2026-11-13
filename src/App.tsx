@@ -53,6 +53,7 @@ import {
   loadStrengthEngine,
   useStrengthEngineReady,
 } from './utils/strengthEngine';
+import { AmbientBackground } from './components/AmbientBackground';
 import { BrandMark } from './components/BrandMark';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { DashboardView } from './components/DashboardView';
@@ -167,7 +168,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newCredentialModalOpen, setNewCredentialModalOpen] = useState(false);
   const [prefilledPassword, setPrefilledPassword] = useState<string>('');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   const [comicToast, setComicToast] = useState<ComicToastMessage | null>(null);
 
   // Estado de Sincronização Zero-Knowledge (Fase 4B)
@@ -698,7 +699,7 @@ export default function App() {
       notes: [],
       settings: {
         autoLockMinutes: 5,
-        theme: 'light',
+        theme: 'dark',
         syncEnabled: enableSync,
         syncReauthSecretHex: CryptoEngine.generateVaultReauthSecret(),
       },
@@ -781,7 +782,7 @@ export default function App() {
     }
     sessionDekRef.current = sessionDek;
     setUnlockedPayload(payload);
-    setTheme(payload.settings?.theme || 'light');
+    setTheme(payload.settings?.theme || 'dark');
     setActiveTab('dashboard');
     const policy = checkMasterPasswordPolicy(masterPassword);
     if (!policy.ok) {
@@ -879,7 +880,7 @@ export default function App() {
     sessionDekRef.current = importedDek;
     setStoredEnvelope(restored.envelope);
     setUnlockedPayload(restored.payload);
-    setTheme(importedPayload.settings?.theme || 'light');
+    setTheme(importedPayload.settings?.theme || 'dark');
     setActiveTab('dashboard');
     triggerComicToast(
       'RESTAURADO!',
@@ -1190,9 +1191,9 @@ export default function App() {
 
   if (isInitializing) {
     return (
-      <div className="min-h-screen bg-background bg-comic-halftone flex flex-col items-center justify-center p-6 text-center space-y-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center space-y-4">
         <BrandMark size={84} spinning={true} />
-        <p className="font-display text-xl font-black">
+        <p className="font-display text-xl font-extrabold">
           Assando rosquinhas criptográficas...
         </p>
       </div>
@@ -1218,28 +1219,30 @@ export default function App() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-background bg-comic-halftone text-foreground flex flex-col lg:flex-row">
-      {/* Sidebar Desktop Neobrutal-UI (Azul-celeste com bordas pretas grossas e botões táteis) */}
+    <div className="min-h-screen text-foreground flex flex-col lg:flex-row">
+      <AmbientBackground mark={<BrandMark size={640} />} />
+
+      {/* Menu lateral: console de vidro flutuante, como no GuardList */}
       <aside
         aria-label="Menu principal do cofre"
-        className="hidden lg:flex lg:w-72 lg:sticky lg:top-0 lg:h-screen shrink-0 bg-[#E0F2FE] dark:bg-[#0F172A] border-r-4 border-border flex-col justify-between p-5"
+        className="glass hidden lg:flex lg:w-[280px] lg:sticky lg:top-6 lg:m-6 lg:mr-0 lg:max-h-[calc(100dvh-3rem)] lg:self-start shrink-0 rounded-console flex-col justify-between py-5 overflow-y-auto"
       >
-        <div className="space-y-6">
-          {/* Identidade do Cofre na Sidebar */}
-          <div className="flex items-center gap-3 pb-4 border-b-3 border-border">
-            <BrandMark size={48} />
+        <div>
+          {/* Identidade do cofre */}
+          <div className="flex items-center gap-3 px-6 pb-4 mb-2.5 border-b border-glass-line">
+            <BrandMark size={40} className="shrink-0" />
             <div className="min-w-0">
-              <span className="font-display text-xl font-black tracking-tight block truncate">
+              <span className="font-display text-lg font-extrabold tracking-tight block truncate">
                 DonutVault
               </span>
-              <span className="text-xs font-extrabold text-stone-700 dark:text-sky-300 block truncate">
+              <span className="text-xs text-muted block truncate">
                 {unlockedPayload.vaultName}
               </span>
             </div>
           </div>
 
-          {/* Lista de Navegação Neobrutal-UI com os 9 itens exatos */}
-          <nav className="space-y-2">
+          {/* Navegação com os 9 itens */}
+          <nav>
             {SIDEBAR_ITEMS.map((item) => {
               const isActive = activeTab === item.id;
               return (
@@ -1247,19 +1250,20 @@ export default function App() {
                   key={item.id}
                   type="button"
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full px-4 py-2.5 rounded-base text-left text-sm font-black transition-all flex items-center justify-between cursor-pointer whitespace-nowrap ${
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`w-full h-11 px-6 text-left text-sm transition-colors flex items-center justify-between cursor-pointer whitespace-nowrap border-l-[3px] focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2 ${
                     isActive
-                      ? 'bg-main text-main-foreground border-3 border-border shadow-shadow translate-x-[1px] translate-y-[1px]'
-                      : 'text-foreground hover:bg-white/80 dark:hover:bg-slate-800 border-3 border-transparent hover:border-border'
+                      ? 'bg-accent-soft text-accent font-semibold border-main'
+                      : 'text-muted font-medium border-transparent hover:bg-accent-soft hover:text-foreground'
                   }`}
                 >
-                  <span className="flex items-center gap-2.5 min-w-0">
-                    <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span className="flex items-center gap-3.5 min-w-0">
+                    <item.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
                     <span className="truncate">{item.label}</span>
                   </span>
                   {item.id === 'trash' && trashCount > 0 && (
                     <span className="font-mono text-xs tabular-nums">
-                      ({trashCount})
+                      {trashCount}
                     </span>
                   )}
                 </button>
@@ -1268,8 +1272,8 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Rodapé da Sidebar: Botão Neobrutal-UI de Trancar Cofre */}
-        <div className="pt-4 border-t-3 border-border">
+        {/* Rodapé do menu: trancar o cofre */}
+        <div className="px-4 pt-4 mt-3 border-t border-glass-line">
           <Button
             type="button"
             variant="neutral"
@@ -1282,15 +1286,15 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Conteúdo Principal + Top Header Neobrutal-UI */}
+      {/* Conteúdo principal e barra do topo */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Bar seguindo o Top Bar Contract (3 zonas: Contexto, Links Rápidos, 1 CTA Primário) */}
-        <header className="w-full flex items-center justify-between gap-4 px-5 sm:px-8 py-4 bg-secondary-background border-b-4 border-border">
-          {/* Zona 1: Menu Mobile + Título da Seção Ativa */}
+        {/* Topo em 3 zonas: contexto, links rápidos e 1 ação principal */}
+        <header className="w-full flex items-center justify-between gap-4 px-5 sm:px-8 pt-6 pb-2">
+          {/* Zona 1: menu do celular e título da seção ativa */}
           <div className="flex items-center gap-3 min-w-0">
             <Button
               type="button"
-              variant="default"
+              variant="neutral"
               size="icon-sm"
               onClick={() => setMobileMenuOpen((o) => !o)}
               aria-label="Abrir menu de navegação"
@@ -1302,33 +1306,34 @@ export default function App() {
                 <Menu className="w-5 h-5" />
               )}
             </Button>
-            <span className="font-display text-base sm:text-lg font-black truncate">
+            <BrandMark size={32} className="lg:hidden shrink-0" />
+            <span className="font-display text-base sm:text-lg font-extrabold truncate">
               {SIDEBAR_ITEMS.find((i) => i.id === activeTab)?.label}
             </span>
           </div>
 
-          {/* Zona 2: Links concisos de navegação rápida no desktop */}
-          <nav className="hidden xl:flex items-center gap-6 text-xs font-extrabold text-stone-700 dark:text-slate-300">
+          {/* Zona 2: links rápidos no desktop */}
+          <nav className="hidden xl:flex items-center gap-6 text-xs font-semibold text-muted">
             <button
               type="button"
               onClick={() => setActiveTab('dashboard')}
-              className="hover:text-pink cursor-pointer whitespace-nowrap"
+              className="hover:text-foreground cursor-pointer whitespace-nowrap"
             >
               Início
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('generator')}
-              className="hover:text-pink cursor-pointer whitespace-nowrap"
+              className="hover:text-foreground cursor-pointer whitespace-nowrap"
             >
               Gerador
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('security')}
-              className="hover:text-pink cursor-pointer whitespace-nowrap"
+              className="hover:text-foreground cursor-pointer whitespace-nowrap"
             >
-              Saúde ({auditReport.overallScore}%)
+              Saúde (<span className="font-mono tabular-nums">{auditReport.overallScore}%</span>)
             </button>
             <button
               type="button"
@@ -1341,7 +1346,7 @@ export default function App() {
                 });
               }}
               aria-label="Alternar tema claro e escuro"
-              className="hover:text-pink flex items-center gap-1 cursor-pointer whitespace-nowrap"
+              className="hover:text-foreground flex items-center gap-1 cursor-pointer whitespace-nowrap"
             >
               {theme === 'dark' ? (
                 <Sun className="w-3.5 h-3.5" />
@@ -1352,7 +1357,7 @@ export default function App() {
             </button>
           </nav>
 
-          {/* Zona 3: 1 Ação Primária ("Guardar nova senha") */}
+          {/* Zona 3: 1 ação principal ("Guardar nova senha") */}
           <div className="flex items-center shrink-0">
             <Button
               type="button"
@@ -1369,11 +1374,11 @@ export default function App() {
           </div>
         </header>
 
-        {/* Gaveta de Navegação Mobile */}
+        {/* Gaveta de navegação do celular */}
         {mobileMenuOpen && (
           <nav
             aria-label="Menu mobile"
-            className="lg:hidden bg-[#E0F2FE] dark:bg-[#0F172A] border-b-4 border-border p-4 space-y-2"
+            className="glass-strong lg:hidden mx-5 sm:mx-8 mt-2 rounded-surface py-2 overflow-hidden"
           >
             {SIDEBAR_ITEMS.map((item) => (
               <button
@@ -1383,27 +1388,30 @@ export default function App() {
                   setActiveTab(item.id);
                   setMobileMenuOpen(false);
                 }}
-                className={`w-full px-4 py-2.5 rounded-base text-left text-sm font-black flex items-center justify-between ${
+                aria-current={activeTab === item.id ? 'page' : undefined}
+                className={`w-full h-11 px-5 text-left text-sm flex items-center justify-between border-l-[3px] cursor-pointer ${
                   activeTab === item.id
-                    ? 'bg-main text-main-foreground border-3 border-border shadow-shadow'
-                    : 'text-foreground'
+                    ? 'bg-accent-soft text-accent font-semibold border-main'
+                    : 'text-muted font-medium border-transparent'
                 }`}
               >
-                <span className="flex items-center gap-2.5">
-                  <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span className="flex items-center gap-3">
+                  <item.icon className="w-5 h-5 shrink-0" aria-hidden="true" />
                   <span>{item.label}</span>
                 </span>
               </button>
             ))}
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={lockVault}
-              className="w-full mt-2"
-            >
-              <Lock className="w-4 h-4" />
-              <span>Trancar Cofre</span>
-            </Button>
+            <div className="px-4 pt-2 pb-2 mt-2 border-t border-glass-line">
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={lockVault}
+                className="w-full"
+              >
+                <Lock className="w-4 h-4" />
+                <span>Trancar Cofre</span>
+              </Button>
+            </div>
           </nav>
         )}
 
