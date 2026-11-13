@@ -28,10 +28,10 @@ interface SecretNotesViewProps {
 }
 
 const COLOR_STYLES: Record<SecretNote['colorTint'], string> = {
-  yellow: 'bg-[#FEF08A] text-[#09090B]',
-  pink: 'bg-[#FCE7F3] text-[#09090B]',
-  blue: 'bg-[#E0F2FE] text-[#09090B]',
-  mint: 'bg-[#DCFCE7] text-[#09090B]',
+  yellow: 'bg-warning/15 text-foreground',
+  pink: 'bg-surface-raised text-foreground',
+  blue: 'bg-surface-raised text-foreground',
+  mint: 'bg-success/15 text-foreground',
 };
 
 export function SecretNotesView({
@@ -123,7 +123,7 @@ export function SecretNotesView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl sm:text-3xl font-black">
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold">
               Notas seguras
             </h1>
             <ComicActionCallout
@@ -131,7 +131,7 @@ export function SecretNotesView({
               tone="pink"
             />
           </div>
-          <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
+          <p className="text-sm font-semibold text-muted mt-1">
             Guarde códigos de recuperação, chaves de licença e outros segredos. Tudo cifrado neste aparelho.
           </p>
         </div>
@@ -162,7 +162,7 @@ export function SecretNotesView({
       <Card className="py-4">
         <CardContent className="px-4 space-y-3">
           <div className="relative">
-            <Search className="w-4 h-4 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <Input
               type="search"
               value={searchQuery}
@@ -201,8 +201,8 @@ export function SecretNotesView({
 
       {displayedNotes.length === 0 ? (
         <Card className="p-8 text-center items-center">
-          <FileText className="w-10 h-10 text-pink mx-auto" />
-          <ComicSpeechBubble speaker="CADERNINHO DO BARNABY" tone="yellow" tailDirection="top">
+          <FileText className="w-10 h-10 text-accent mx-auto" />
+          <ComicSpeechBubble speaker="Dica" tone="yellow" tailDirection="top">
             {showTrash
               ? 'Nenhuma nota secreta está na lixeira no momento!'
               : 'Nenhuma nota secreta encontrada! Guarde receitas de cobertura rosa ou códigos de recuperação aqui.'}
@@ -222,11 +222,11 @@ export function SecretNotesView({
             >
               <CardContent className="px-5 space-y-2.5">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-display text-lg font-black leading-snug">
+                  <h3 className="font-display text-lg font-extrabold leading-snug">
                     {note.title}
                   </h3>
                   {note.favorite && (
-                    <Star className="w-4 h-4 fill-pink text-pink shrink-0 mt-1" />
+                    <Star className="w-4 h-4 fill-main text-accent shrink-0 mt-1" />
                   )}
                 </div>
 
@@ -239,12 +239,12 @@ export function SecretNotesView({
                   </span>
                 </div>
 
-                <pre className="font-sans text-xs sm:text-sm font-semibold whitespace-pre-wrap leading-relaxed pt-2 border-t-2 border-black/20">
+                <pre className="font-sans text-xs sm:text-sm font-semibold whitespace-pre-wrap leading-relaxed pt-2 border-t border-line">
                   {note.content}
                 </pre>
               </CardContent>
 
-              <div className="px-5 pt-3 border-t-2 border-black/20 flex items-center justify-end gap-2">
+              <div className="px-5 pt-3 border-t border-line flex items-center justify-end gap-2">
                 {showTrash ? (
                   <>
                     <Button
@@ -310,9 +310,9 @@ export function SecretNotesView({
           aria-labelledby="note-modal-title"
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
         >
-          <div className="bg-secondary-background border-4 border-border rounded-base max-w-lg w-full p-6 space-y-4 shadow-[8px_8px_0px_0px_var(--border)] animate-comic-pop">
-            <div className="flex items-center justify-between border-b-3 border-border pb-3">
-              <h2 id="note-modal-title" className="font-display text-xl font-black">
+          <div className="bg-secondary-background border border-line rounded-base max-w-lg w-full p-6 space-y-4 animate-comic-pop">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <h2 id="note-modal-title" className="font-display text-xl font-extrabold">
                 {editingNote ? 'Editar Nota Secreta' : 'Nova Nota Secreta'}
               </h2>
               <Button
@@ -364,7 +364,7 @@ export function SecretNotesView({
                     onChange={(e) =>
                       setColorTint(e.target.value as SecretNote['colorTint'])
                     }
-                    className="w-full h-11 px-3 text-sm font-bold bg-background border-3 border-border rounded-base"
+                    className="w-full h-11 px-3 text-sm font-bold bg-background border border-line rounded-base"
                   >
                     <option value="yellow">Amarelo</option>
                     <option value="pink">Rosa Rosquinha</option>
@@ -384,7 +384,7 @@ export function SecretNotesView({
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Digite suas anotações ultrassecretas..."
-                  className="w-full px-3.5 py-2 text-sm font-semibold bg-background border-3 border-border rounded-base shadow-[2px_2px_0px_0px_var(--border)]"
+                  className="w-full px-3.5 py-2 text-sm font-semibold bg-background border border-line rounded-base "
                   required
                 />
               </div>
@@ -394,7 +394,7 @@ export function SecretNotesView({
                   type="checkbox"
                   checked={favorite}
                   onChange={(e) => setFavorite(e.target.checked)}
-                  className="w-4 h-4 accent-pink"
+                  className="w-4 h-4 accent-main"
                 />
                 <span>Marcar nota como favorita</span>
               </label>

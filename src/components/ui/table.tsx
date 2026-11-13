@@ -5,7 +5,7 @@ function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
     <div
       data-slot="table-container"
-      className="relative w-full overflow-auto rounded-base border-3 border-border shadow-shadow bg-secondary-background"
+      className="glass relative w-full overflow-x-auto rounded-surface"
       tabIndex={0}
     >
       <table
@@ -22,7 +22,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
     <thead
       data-slot="table-header"
       className={cn(
-        'bg-main text-main-foreground [&_tr]:bg-main [&_tr]:hover:bg-main [&_tr]:border-b-3 [&_tr]:border-border',
+        '[&_tr]:bg-[color-mix(in_srgb,var(--background)_35%,transparent)] [&_tr]:hover:bg-[color-mix(in_srgb,var(--background)_35%,transparent)] [&_tr]:border-0',
         className
       )}
       {...props}
@@ -34,7 +34,7 @@ function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn('[&_tr:last-child]:border-0', className)}
+      className={cn('[&_tr]:border-t [&_tr]:border-glass-line', className)}
       {...props}
     />
   );
@@ -45,7 +45,7 @@ function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
     <tr
       data-slot="table-row"
       className={cn(
-        'border-b-2 border-border bg-secondary-background font-semibold text-foreground transition-colors hover:bg-amber-50/70 dark:hover:bg-slate-800/80',
+        'text-foreground transition-colors hover:bg-accent-soft',
         className
       )}
       {...props}
@@ -58,7 +58,7 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
     <th
       data-slot="table-head"
       className={cn(
-        'h-11 px-4 text-left align-middle font-display font-extrabold text-xs uppercase tracking-wider text-main-foreground whitespace-nowrap',
+        'h-10 px-4 text-left align-middle text-[12.5px] font-semibold text-muted whitespace-nowrap',
         className
       )}
       {...props}

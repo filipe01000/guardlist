@@ -48,7 +48,7 @@ export interface SyncDashboardProps {
 }
 
 const cardClassName =
-  'bg-[#E0F2FE]/85 dark:bg-slate-900 border-4 border-border shadow-[6px_6px_0px_0px_var(--border)]';
+  'bg-surface-subtle border border-line ';
 
 function isMobilePlatform(platform: string): boolean {
   return platform.includes('mobile') || platform === 'ios' || platform === 'android';
@@ -76,11 +76,11 @@ export function SyncDashboardPanel({
       <Card data-testid="sync-dashboard-panel" className={cardClassName}>
         <CardHeader className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Cloud className="w-5 h-5 text-[#0284C7] dark:text-sky" />
+            <Cloud className="w-5 h-5 text-accent " />
             <CardTitle className="text-lg sm:text-xl">Sincronização desligada</CardTitle>
             <ComicActionCallout text="SÓ NESTE NAVEGADOR" tone="yellow" />
           </div>
-          <CardDescription className="text-xs font-bold text-stone-700 dark:text-slate-300">
+          <CardDescription className="text-xs font-bold text-muted ">
             Seu cofre está guardado só neste navegador. Ao ativar, o servidor passa a guardar
             uma cópia cifrada: os registros e a chave do cofre, protegida pela sua Senha Mestra.
             Ele não lê nada sem ela, mas uma senha fraca pode ser quebrada por quem tiver acesso
@@ -104,18 +104,18 @@ export function SyncDashboardPanel({
 
   return (
     <Card data-testid="sync-dashboard-panel" className={cardClassName}>
-      <CardHeader className="border-b-3 border-border">
+      <CardHeader className="border-b border-line">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Cloud className="w-5 h-5 text-[#0284C7] dark:text-sky" />
+              <Cloud className="w-5 h-5 text-accent " />
               <CardTitle className="text-lg sm:text-xl">Sincronização</CardTitle>
               <ComicActionCallout
                 text={!isOnline ? 'SEM CONEXÃO' : isSyncing ? 'SINCRONIZANDO…' : 'ATIVA'}
                 tone={!isOnline ? 'yellow' : isSyncing ? 'sky' : 'emerald'}
               />
             </div>
-            <CardDescription className="text-xs font-bold text-stone-700 dark:text-slate-300">
+            <CardDescription className="text-xs font-bold text-muted ">
               Seus registros são cifrados neste aparelho antes de sair. O servidor guarda só
               dados cifrados e não consegue ler suas senhas nem suas notas.
             </CardDescription>
@@ -155,12 +155,12 @@ export function SyncDashboardPanel({
             <div>
               <p
                 data-testid="sync-status-headline"
-                className="font-display text-sm sm:text-base font-black text-foreground flex items-center gap-1.5"
+                className="font-display text-sm sm:text-base font-extrabold text-foreground flex items-center gap-1.5"
               >
-                {!isOnline && <WifiOff className="w-4 h-4 shrink-0 text-amber-700" />}
+                {!isOnline && <WifiOff className="w-4 h-4 shrink-0 text-warning" />}
                 <span>{syncHeadline}</span>
               </p>
-              <p className="text-xs font-bold text-stone-600 dark:text-slate-300 mt-0.5">
+              <p className="text-xs font-bold text-muted mt-0.5">
                 {lastSyncedAt
                   ? `Última sincronização: ${new Date(lastSyncedAt).toLocaleTimeString('pt-BR')}`
                   : 'Ainda não sincronizado'}
@@ -168,7 +168,7 @@ export function SyncDashboardPanel({
             </div>
 
             {conflictsCount > 0 && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-base bg-rose-200 dark:bg-rose-950 border-2 border-border text-xs font-black text-rose-950 dark:text-rose-200">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-base bg-danger/15 border border-line text-xs font-semibold text-danger ">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
                 <span>
                   {conflictsCount === 1
@@ -181,36 +181,36 @@ export function SyncDashboardPanel({
         </ComicSpeechBubble>
 
         <div className="grid grid-cols-3 gap-3 text-xs">
-          <div className="p-3 rounded-base bg-white dark:bg-slate-800 border-3 border-border text-[#09090B] dark:text-white">
-            <span className="font-black uppercase opacity-80 block">Na fila</span>
+          <div className="p-3 rounded-base bg-surface-raised border border-line text-foreground ">
+            <span className="font-semibold uppercase opacity-80 block">Na fila</span>
             <span
               data-testid="sync-pending-count"
-              className="font-display text-xl font-black mt-1 block tabular-nums"
+              className="font-display text-xl font-extrabold mt-1 block tabular-nums"
             >
               {pendingCount}
             </span>
           </div>
-          <div className="p-3 rounded-base bg-white dark:bg-slate-800 border-3 border-border text-[#09090B] dark:text-white">
-            <span className="font-black uppercase opacity-80 block">Aparelhos</span>
+          <div className="p-3 rounded-base bg-surface-raised border border-line text-foreground ">
+            <span className="font-semibold uppercase opacity-80 block">Aparelhos</span>
             <span
               data-testid="sync-devices-count"
-              className="font-display text-xl font-black mt-1 block tabular-nums"
+              className="font-display text-xl font-extrabold mt-1 block tabular-nums"
             >
               {activeDevices.length}
             </span>
           </div>
-          <div className="p-3 rounded-base bg-white dark:bg-slate-800 border-3 border-border text-[#09090B] dark:text-white">
-            <span className="font-black uppercase opacity-80 block">Conflitos</span>
-            <span className="font-display text-xl font-black mt-1 block tabular-nums">
+          <div className="p-3 rounded-base bg-surface-raised border border-line text-foreground ">
+            <span className="font-semibold uppercase opacity-80 block">Conflitos</span>
+            <span className="font-display text-xl font-extrabold mt-1 block tabular-nums">
               {conflictsCount}
             </span>
           </div>
         </div>
 
         {!compact && (
-          <div className="p-4 rounded-base bg-white dark:bg-slate-800 border-3 border-border space-y-3">
-            <h3 className="font-display text-sm font-black flex items-center gap-1.5">
-              <Smartphone className="w-4 h-4 text-[#0284C7]" />
+          <div className="p-4 rounded-base bg-surface-raised border border-line space-y-3">
+            <h3 className="font-display text-sm font-extrabold flex items-center gap-1.5">
+              <Smartphone className="w-4 h-4 text-accent" />
               <span>Aparelhos conectados ({activeDevices.length})</span>
             </h3>
 
@@ -221,33 +221,33 @@ export function SyncDashboardPanel({
                 return (
                   <div
                     key={dev.deviceId}
-                    className={`p-2.5 rounded-base border-2 border-border flex items-center justify-between gap-2 text-xs ${
+                    className={`p-2.5 rounded-base border border-line flex items-center justify-between gap-2 text-xs ${
                       isRevoked
-                        ? 'bg-stone-200/70 dark:bg-slate-900 opacity-65'
+                        ? 'bg-surface-subtle opacity-65'
                         : 'bg-secondary-background'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       {isMobilePlatform(dev.platform) ? (
-                        <Smartphone className="w-4 h-4 text-pink shrink-0" />
+                        <Smartphone className="w-4 h-4 text-accent shrink-0" />
                       ) : (
-                        <Monitor className="w-4 h-4 text-[#0284C7] shrink-0" />
+                        <Monitor className="w-4 h-4 text-accent shrink-0" />
                       )}
                       <div className="min-w-0">
                         <p className="font-extrabold truncate">
                           {dev.deviceName}{' '}
                           {isCurrent && (
-                            <span className="text-[10px] font-black px-1.5 py-0.5 bg-main text-main-foreground border border-border ml-1">
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-current text-accent ml-1">
                               ESTE APARELHO
                             </span>
                           )}
                           {isRevoked && (
-                            <span className="text-[10px] font-black px-1.5 py-0.5 bg-rose-700 text-white border border-border ml-1">
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 bg-destructive text-destructive-foreground border border-line ml-1">
                               REVOGADO
                             </span>
                           )}
                         </p>
-                        <p className="text-[11px] font-semibold text-stone-600 dark:text-slate-400 truncate">
+                        <p className="text-[11px] font-semibold text-muted truncate">
                           {isMobilePlatform(dev.platform) ? 'Celular' : 'Computador'} · conectado
                           em {new Date(dev.authorizedAt).toLocaleDateString('pt-BR')}
                         </p>
@@ -271,7 +271,7 @@ export function SyncDashboardPanel({
               })}
             </div>
 
-            <p className="text-[11px] font-semibold text-stone-600 dark:text-slate-400 leading-snug">
+            <p className="text-[11px] font-semibold text-muted leading-snug">
               Revogar um aparelho bloqueia as próximas sincronizações dele na hora. O que ele já
               tinha baixado continua guardado nele, cifrado.
             </p>
@@ -279,7 +279,7 @@ export function SyncDashboardPanel({
         )}
       </CardContent>
 
-      <CardFooter className="border-t-3 border-border text-[11px] font-bold text-stone-700 dark:text-slate-300 flex flex-wrap justify-between gap-2">
+      <CardFooter className="border-t border-line text-[11px] font-bold text-muted flex flex-wrap justify-between gap-2">
         <span>O servidor vê só quando você sincroniza e o tamanho dos dados cifrados.</span>
         <span>A sincronização não substitui um backup exportado.</span>
       </CardFooter>

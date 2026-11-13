@@ -16,7 +16,7 @@ import type { CredentialItem, NavigationTab } from '../types/vault';
 import type { VaultSecurityAuditReport } from '../utils/audit';
 import { VAULT_CATEGORIES } from '../utils/seedData';
 import { copySecretToClipboardWithAutoClear } from '../utils/security';
-import { BarnabyMascot } from './CartoonIllustrations';
+import { BrandMark } from './BrandMark';
 import { Button } from './ui/button';
 import {
   Card,
@@ -95,10 +95,10 @@ export function DashboardView({
   return (
     <div className="space-y-7">
       {/* Banner Principal em Estilo Quadrinhos StreamUI + Neobrutal-UI */}
-      <section className="bg-main bg-comic-stripes text-main-foreground border-4 border-border rounded-base p-6 sm:p-7 shadow-[6px_6px_0px_0px_var(--border)] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+      <section className="glass text-foreground rounded-surface p-6 sm:p-7 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 flex-1">
-          <div className="shrink-0 bg-white border-4 border-border rounded-2xl p-2 shadow-[4px_4px_0px_0px_var(--border)] animate-float">
-            <BarnabyMascot size={96} mood={mascotMood} />
+          <div className="shrink-0">
+            <BrandMark size={96} />
           </div>
 
           <div className="space-y-2 flex-1">
@@ -114,15 +114,15 @@ export function DashboardView({
             </div>
 
             <ComicSpeechBubble
-              speaker="INSPETOR BARNABY"
+              speaker="Resumo"
               tone="white"
               tailDirection="left"
               className="max-w-2xl"
             >
-              <span className="font-display text-base sm:text-lg font-black block text-foreground">
+              <span className="font-display text-base sm:text-lg font-extrabold block text-foreground">
                 {auditReport.healthHeadline}
               </span>
-              <span className="text-xs font-semibold text-stone-600 dark:text-slate-300 block mt-0.5">
+              <span className="text-xs font-semibold text-muted block mt-0.5">
                 Tudo aqui é cifrado neste aparelho com a sua Senha Mestra.
               </span>
             </ComicSpeechBubble>
@@ -148,29 +148,29 @@ export function DashboardView({
         aria-label="Métricas principais do cofre"
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
       >
-        <Card className="py-5 gap-2 bg-[#E0F2FE] dark:bg-slate-800 text-[#09090B] dark:text-white">
+        <Card className="py-5 gap-2 text-foreground ">
           <CardContent className="px-5">
-            <div className="flex items-center justify-between text-xs font-black uppercase">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase">
               <span>SENHAS CADASTRADAS</span>
-              <KeyRound className="w-4 h-4 text-[#0284C7] dark:text-sky" />
+              <KeyRound className="w-4 h-4 text-accent " />
             </div>
-            <p className="font-display text-4xl font-black mt-2 tabular-nums">
+            <p className="font-display text-4xl font-extrabold mt-2 tabular-nums">
               {auditReport.totalActiveCredentials}
             </p>
             <p className="text-xs font-bold opacity-85 mt-1 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
+              <ShieldCheck className="w-3.5 h-3.5 text-success shrink-0" />
               <span>{auditReport.strongCount} senhas fortes blindadas</span>
             </p>
           </CardContent>
         </Card>
 
-        <Card className="py-5 gap-2 bg-[#FCE7F3] dark:bg-slate-800 text-[#09090B] dark:text-white">
+        <Card className="py-5 gap-2 text-foreground ">
           <CardContent className="px-5">
-            <div className="flex items-center justify-between text-xs font-black uppercase text-rose-900 dark:text-rose-400">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase text-danger ">
               <span>SENHAS FRACAS</span>
-              <ShieldAlert className="w-4 h-4 text-rose-700 dark:text-rose-400" />
+              <ShieldAlert className="w-4 h-4 text-danger " />
             </div>
-            <p className="font-display text-4xl font-black mt-2 tabular-nums text-rose-700 dark:text-rose-400">
+            <p className="font-display text-4xl font-extrabold mt-2 tabular-nums text-danger ">
               {auditReport.weakCount}
             </p>
             <p className="text-xs font-bold opacity-80 mt-1">
@@ -181,13 +181,13 @@ export function DashboardView({
           </CardContent>
         </Card>
 
-        <Card className="py-5 gap-2 bg-[#FEF08A] dark:bg-slate-800 text-[#09090B] dark:text-white">
+        <Card className="py-5 gap-2 bg-warning/15 text-foreground ">
           <CardContent className="px-5">
-            <div className="flex items-center justify-between text-xs font-black uppercase text-amber-950 dark:text-amber-300">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase text-warning ">
               <span>SENHAS REUTILIZADAS</span>
-              <Repeat className="w-4 h-4 text-amber-800 dark:text-amber-300" />
+              <Repeat className="w-4 h-4 text-warning " />
             </div>
-            <p className="font-display text-4xl font-black mt-2 tabular-nums text-amber-900 dark:text-amber-300">
+            <p className="font-display text-4xl font-extrabold mt-2 tabular-nums text-warning ">
               {auditReport.reusedCount}
             </p>
             <p className="text-xs font-bold opacity-80 mt-1">
@@ -198,13 +198,13 @@ export function DashboardView({
           </CardContent>
         </Card>
 
-        <Card className="py-5 gap-2 bg-[#DCFCE7] dark:bg-slate-800 text-[#09090B] dark:text-white">
+        <Card className="py-5 gap-2 text-foreground ">
           <CardContent className="px-5">
-            <div className="flex items-center justify-between text-xs font-black uppercase text-emerald-950 dark:text-emerald-300">
+            <div className="flex items-center justify-between text-xs font-semibold uppercase text-success ">
               <span>SENHAS ANTIGAS</span>
-              <Clock className="w-4 h-4 text-emerald-800 dark:text-emerald-400" />
+              <Clock className="w-4 h-4 text-success " />
             </div>
-            <p className="font-display text-4xl font-black mt-2 tabular-nums text-emerald-900 dark:text-emerald-300">
+            <p className="font-display text-4xl font-extrabold mt-2 tabular-nums text-success ">
               {auditReport.oldCount}
             </p>
             <p className="text-xs font-bold opacity-80 mt-1">
@@ -223,7 +223,7 @@ export function DashboardView({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         {/* Coluna Esquerda (5 cols): Medidor Geral de Segurança */}
         <Card className="lg:col-span-5 justify-between">
-          <CardHeader className="border-b-3 border-border">
+          <CardHeader className="border-b border-line">
             <div className="flex items-center justify-between">
               <CardTitle>Saúde das senhas</CardTitle>
             </div>
@@ -234,11 +234,11 @@ export function DashboardView({
 
           <CardContent className="space-y-5">
             <div className="flex items-center gap-5">
-              <div className="w-24 h-24 rounded-2xl border-4 border-border bg-main text-main-foreground flex flex-col items-center justify-center shrink-0 shadow-shadow -rotate-2">
-                <span className="font-display text-3xl font-black tabular-nums">
+              <div className="w-24 h-24 rounded-surface border border-line bg-surface-subtle text-foreground flex flex-col items-center justify-center shrink-0 ">
+                <span className="font-display text-3xl font-extrabold tabular-nums">
                   {auditReport.overallScore}%
                 </span>
-                <span className="text-[11px] font-black uppercase">
+                <span className="text-[11px] font-semibold uppercase">
                   Saúde
                 </span>
               </div>
@@ -247,7 +247,7 @@ export function DashboardView({
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs font-extrabold">
                     <span>Fortes ({auditReport.strongCount})</span>
-                    <span className="tabular-nums text-emerald-600 dark:text-emerald-400">
+                    <span className="tabular-nums text-success ">
                       {auditReport.totalActiveCredentials > 0
                         ? Math.round(
                             (auditReport.strongCount /
@@ -258,9 +258,9 @@ export function DashboardView({
                       %
                     </span>
                   </div>
-                  <div className="w-full h-3.5 bg-stone-200 dark:bg-slate-700 rounded-md overflow-hidden border-2 border-border">
+                  <div className="w-full h-3.5 bg-surface-subtle rounded-md overflow-hidden border border-line">
                     <div
-                      className="h-full bg-emerald-500 transition-all"
+                      className="h-full bg-success transition-all"
                       style={{
                         width: `${
                           auditReport.totalActiveCredentials > 0
@@ -277,7 +277,7 @@ export function DashboardView({
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs font-extrabold">
                     <span>Médias ({auditReport.mediumCount})</span>
-                    <span className="tabular-nums text-amber-600 dark:text-amber-400">
+                    <span className="tabular-nums text-warning ">
                       {auditReport.totalActiveCredentials > 0
                         ? Math.round(
                             (auditReport.mediumCount /
@@ -288,9 +288,9 @@ export function DashboardView({
                       %
                     </span>
                   </div>
-                  <div className="w-full h-3.5 bg-stone-200 dark:bg-slate-700 rounded-md overflow-hidden border-2 border-border">
+                  <div className="w-full h-3.5 bg-surface-subtle rounded-md overflow-hidden border border-line">
                     <div
-                      className="h-full bg-amber-400 transition-all"
+                      className="h-full bg-warning/15 transition-all"
                       style={{
                         width: `${
                           auditReport.totalActiveCredentials > 0
@@ -307,7 +307,7 @@ export function DashboardView({
                 <div className="space-y-1">
                   <div className="flex justify-between text-xs font-extrabold">
                     <span>Fracas ({auditReport.weakCount})</span>
-                    <span className="tabular-nums text-rose-600 dark:text-rose-400">
+                    <span className="tabular-nums text-danger ">
                       {auditReport.totalActiveCredentials > 0
                         ? Math.round(
                             (auditReport.weakCount /
@@ -318,9 +318,9 @@ export function DashboardView({
                       %
                     </span>
                   </div>
-                  <div className="w-full h-3.5 bg-stone-200 dark:bg-slate-700 rounded-md overflow-hidden border-2 border-border">
+                  <div className="w-full h-3.5 bg-surface-subtle rounded-md overflow-hidden border border-line">
                     <div
-                      className="h-full bg-rose-500 transition-all"
+                      className="h-full bg-destructive transition-all"
                       style={{
                         width: `${
                           auditReport.totalActiveCredentials > 0
@@ -337,7 +337,7 @@ export function DashboardView({
             </div>
           </CardContent>
 
-          <CardFooter className="border-t-3 border-border justify-between gap-3 flex-wrap">
+          <CardFooter className="border-t border-line justify-between gap-3 flex-wrap">
             <Button
               type="button"
               variant="sky"
@@ -354,7 +354,7 @@ export function DashboardView({
               size="sm"
               onClick={() => onNavigate('generator')}
             >
-              <Dices className="w-4 h-4 text-pink" />
+              <Dices className="w-4 h-4 text-accent" />
               <span>Gerador de Senhas</span>
             </Button>
           </CardFooter>
@@ -362,7 +362,7 @@ export function DashboardView({
 
         {/* Coluna Direita (7 cols): Credenciais Adicionadas Recentemente em Tabela Neobrutal-UI */}
         <Card className="lg:col-span-7 justify-between">
-          <CardHeader className="border-b-3 border-border">
+          <CardHeader className="border-b border-line">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <CardTitle>Credenciais Adicionadas Recentemente</CardTitle>
@@ -384,8 +384,8 @@ export function DashboardView({
           <CardContent>
             {recentCredentials.length === 0 ? (
               <div className="py-8 text-center space-y-3">
-                <Sparkles className="w-8 h-8 text-pink mx-auto" />
-                <p className="text-sm font-black">
+                <Sparkles className="w-8 h-8 text-accent mx-auto" />
+                <p className="text-sm font-semibold">
                   O prato de rosquinhas está vazio!
                 </p>
                 <Button
@@ -413,11 +413,11 @@ export function DashboardView({
                         <div className="font-extrabold text-sm text-foreground">
                           {cred.serviceName}
                         </div>
-                        <div className="text-xs text-stone-600 dark:text-slate-400 truncate max-w-[200px]">
+                        <div className="text-xs text-muted truncate max-w-[200px]">
                           {cred.username || cred.email}
                         </div>
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell text-xs font-bold text-stone-700 dark:text-slate-300">
+                      <TableCell className="hidden sm:table-cell text-xs font-bold text-muted ">
                         {getCategoryName(cred.category)}
                       </TableCell>
                       <TableCell className="text-right">
@@ -448,8 +448,8 @@ export function DashboardView({
             )}
           </CardContent>
 
-          <CardFooter className="border-t-3 border-border flex-wrap gap-2">
-            <span className="text-xs font-black uppercase mr-1">
+          <CardFooter className="border-t border-line flex-wrap gap-2">
+            <span className="text-xs font-semibold uppercase mr-1">
               Categorias:
             </span>
             {VAULT_CATEGORIES.slice(0, 4).map((cat) => (

@@ -14,7 +14,7 @@ import {
   evaluatePasswordStrength,
 } from '../utils/generator';
 import { useStrengthEngineReady } from '../utils/strengthEngine';
-import { BarnabyMascot } from './CartoonIllustrations';
+import { BrandMark } from './BrandMark';
 import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { Input } from './ui/input';
@@ -116,12 +116,12 @@ export function GeneratorView({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl sm:text-3xl font-black">
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold">
               Gerador de senhas
             </h1>
             <ComicActionCallout text="ALEATÓRIO DE VERDADE" tone="sky" />
           </div>
-          <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
+          <p className="text-sm font-semibold text-muted mt-1">
             Cada caractere é sorteado pelo gerador criptográfico do navegador, sem viés.
           </p>
         </div>
@@ -132,26 +132,26 @@ export function GeneratorView({
         <Card className="lg:col-span-8">
           <CardContent className="space-y-6">
             {/* Visor Brutalista da Senha Gerada */}
-            <div className="bg-background bg-comic-halftone border-4 border-border rounded-base p-5 shadow-shadow space-y-4">
-              <div className="font-mono text-lg sm:text-2xl font-black break-all select-all text-foreground tracking-wide min-h-[3.5rem] flex items-center">
+            <div className="bg-background border border-line rounded-base p-5 space-y-4">
+              <div className="font-mono text-lg sm:text-2xl font-semibold break-all select-all text-foreground tracking-wide min-h-[3.5rem] flex items-center">
                 {generatedPassword}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t-3 border-border">
-                <div className="flex items-center gap-2 text-xs font-black">
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-line">
+                <div className="flex items-center gap-2 text-xs font-semibold">
                   <span
                     className={
                       strength.level === 'strong'
-                        ? 'text-emerald-600 dark:text-emerald-400'
+                        ? 'text-success '
                         : strength.level === 'medium'
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-rose-600 dark:text-rose-400'
+                          ? 'text-warning '
+                          : 'text-danger '
                     }
                   >
                     Força: {strength.label}
                   </span>
                   <span aria-hidden="true">·</span>
-                  <span className="text-stone-600 dark:text-slate-300 tabular-nums">
+                  <span className="text-muted tabular-nums">
                     Tempo de quebra: {strength.crackTimeDisplay}
                   </span>
                 </div>
@@ -227,10 +227,10 @@ export function GeneratorView({
                   <div className="flex items-center justify-between">
                     <label
                       htmlFor="length-slider"
-                      className="text-sm font-black"
+                      className="text-sm font-semibold"
                     >
                       Comprimento da Senha:{' '}
-                      <span className="font-mono text-pink tabular-nums">
+                      <span className="font-mono text-accent tabular-nums">
                         {config.length}
                       </span>{' '}
                       caracteres
@@ -247,7 +247,7 @@ export function GeneratorView({
                           length: Math.max(8, Math.min(128, Number(e.target.value) || 8)),
                         }))
                       }
-                      className="w-20 h-9 text-center font-mono font-black tabular-nums"
+                      className="w-20 h-9 text-center font-mono font-semibold tabular-nums"
                     />
                   </div>
                   <input
@@ -259,9 +259,9 @@ export function GeneratorView({
                     onChange={(e) =>
                       setConfig((c) => ({ ...c, length: Number(e.target.value) }))
                     }
-                    className="w-full accent-pink cursor-pointer"
+                    className="w-full accent-main cursor-pointer"
                   />
-                  <div className="flex justify-between text-[11px] font-mono font-bold text-stone-500">
+                  <div className="flex justify-between text-[11px] font-mono font-bold text-muted">
                     <span>8 (Mínimo)</span>
                     <span>16 (Recomendado)</span>
                     <span>64 (Blindado)</span>
@@ -271,61 +271,61 @@ export function GeneratorView({
 
                 {/* Opções de Conjuntos de Caracteres em Caixas Brutalistas */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <label className="flex items-center gap-3 p-3.5 rounded-base border-3 border-border bg-background shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer">
+                  <label className="flex items-center gap-3 p-3.5 rounded-base border border-line bg-background cursor-pointer">
                     <input
                       type="checkbox"
                       checked={config.uppercase}
                       onChange={(e) =>
                         setConfig((c) => ({ ...c, uppercase: e.target.checked }))
                       }
-                      className="w-4 h-4 accent-pink"
+                      className="w-4 h-4 accent-main"
                     />
                     <span className="text-sm font-extrabold">
                       Letras Maiúsculas (A–Z)
                     </span>
                   </label>
 
-                  <label className="flex items-center gap-3 p-3.5 rounded-base border-3 border-border bg-background shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer">
+                  <label className="flex items-center gap-3 p-3.5 rounded-base border border-line bg-background cursor-pointer">
                     <input
                       type="checkbox"
                       checked={config.lowercase}
                       onChange={(e) =>
                         setConfig((c) => ({ ...c, lowercase: e.target.checked }))
                       }
-                      className="w-4 h-4 accent-pink"
+                      className="w-4 h-4 accent-main"
                     />
                     <span className="text-sm font-extrabold">
                       Letras Minúsculas (a–z)
                     </span>
                   </label>
 
-                  <label className="flex items-center gap-3 p-3.5 rounded-base border-3 border-border bg-background shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer">
+                  <label className="flex items-center gap-3 p-3.5 rounded-base border border-line bg-background cursor-pointer">
                     <input
                       type="checkbox"
                       checked={config.numbers}
                       onChange={(e) =>
                         setConfig((c) => ({ ...c, numbers: e.target.checked }))
                       }
-                      className="w-4 h-4 accent-pink"
+                      className="w-4 h-4 accent-main"
                     />
                     <span className="text-sm font-extrabold">Números (0–9)</span>
                   </label>
 
-                  <label className="flex items-center gap-3 p-3.5 rounded-base border-3 border-border bg-background shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer">
+                  <label className="flex items-center gap-3 p-3.5 rounded-base border border-line bg-background cursor-pointer">
                     <input
                       type="checkbox"
                       checked={config.symbols}
                       onChange={(e) =>
                         setConfig((c) => ({ ...c, symbols: e.target.checked }))
                       }
-                      className="w-4 h-4 accent-pink"
+                      className="w-4 h-4 accent-main"
                     />
                     <span className="text-sm font-extrabold">
                       Símbolos (!@#$%^&*)
                     </span>
                   </label>
 
-                  <label className="sm:col-span-2 flex items-center gap-3 p-3.5 rounded-base border-3 border-border bg-background shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer">
+                  <label className="sm:col-span-2 flex items-center gap-3 p-3.5 rounded-base border border-line bg-background cursor-pointer">
                     <input
                       type="checkbox"
                       checked={config.avoidAmbiguous}
@@ -335,7 +335,7 @@ export function GeneratorView({
                           avoidAmbiguous: e.target.checked,
                         }))
                       }
-                      className="w-4 h-4 accent-pink"
+                      className="w-4 h-4 accent-main"
                     />
                     <span className="text-sm font-extrabold">
                       Evitar caracteres semelhantes (0, O, 1, l, I, |)
@@ -349,10 +349,10 @@ export function GeneratorView({
                 <div>
                   <label
                     htmlFor="word-count-slider"
-                    className="block text-sm font-black mb-1"
+                    className="block text-sm font-semibold mb-1"
                   >
                     Quantidade de Palavras:{' '}
-                    <span className="font-mono text-pink">{config.wordCount}</span>{' '}
+                    <span className="font-mono text-accent">{config.wordCount}</span>{' '}
                     palavras
                   </label>
                   <input
@@ -364,7 +364,7 @@ export function GeneratorView({
                     onChange={(e) =>
                       setConfig((c) => ({ ...c, wordCount: Number(e.target.value) }))
                     }
-                    className="w-full accent-pink cursor-pointer"
+                    className="w-full accent-main cursor-pointer"
                   />
                 </div>
 
@@ -382,7 +382,7 @@ export function GeneratorView({
                       onChange={(e) =>
                         setConfig((c) => ({ ...c, wordSeparator: e.target.value }))
                       }
-                      className="w-full h-10 px-3 text-sm font-bold bg-background border-3 border-border rounded-base"
+                      className="w-full h-10 px-3 text-sm font-bold bg-background border border-line rounded-base"
                     >
                       <option value="-">Hífen (-)</option>
                       <option value=".">Ponto (.)</option>
@@ -391,7 +391,7 @@ export function GeneratorView({
                     </select>
                   </div>
 
-                  <label className="flex items-center gap-2.5 p-3 rounded-base border-3 border-border bg-background cursor-pointer">
+                  <label className="flex items-center gap-2.5 p-3 rounded-base border border-line bg-background cursor-pointer">
                     <input
                       type="checkbox"
                       checked={config.capitalizeWords}
@@ -401,12 +401,12 @@ export function GeneratorView({
                           capitalizeWords: e.target.checked,
                         }))
                       }
-                      className="w-4 h-4 accent-pink"
+                      className="w-4 h-4 accent-main"
                     />
                     <span className="text-xs font-extrabold">Iniciais Maiúsculas</span>
                   </label>
 
-                  <label className="flex items-center gap-2.5 p-3 rounded-base border-3 border-border bg-background cursor-pointer">
+                  <label className="flex items-center gap-2.5 p-3 rounded-base border border-line bg-background cursor-pointer">
                     <input
                       type="checkbox"
                       checked={config.includeNumberInPassphrase}
@@ -416,7 +416,7 @@ export function GeneratorView({
                           includeNumberInPassphrase: e.target.checked,
                         }))
                       }
-                      className="w-4 h-4 accent-pink"
+                      className="w-4 h-4 accent-main"
                     />
                     <span className="text-xs font-extrabold">Incluir Número</span>
                   </label>
@@ -426,15 +426,15 @@ export function GeneratorView({
           </CardContent>
         </Card>
 
-        {/* Coluna Direita: Reação em Quadrinhos StreamUI do Mascote Barnaby */}
+        {/* Coluna Direita: Veredito da senha gerada */}
         <Card className="lg:col-span-4 text-center">
           <CardContent className="space-y-4">
-            <div className="mx-auto w-fit animate-float bg-[#E0F2FE] border-3 border-border rounded-2xl p-2 shadow-shadow">
-              <BarnabyMascot size={136} mood={strength.mascotMood} />
+            <div className="mx-auto w-fit">
+              <BrandMark size={136} />
             </div>
 
             <ComicSpeechBubble
-              speaker="VEREDITO DO BARNABY"
+              speaker="Veredito"
               tone={
                 strength.level === 'strong'
                   ? 'mint'
@@ -444,23 +444,23 @@ export function GeneratorView({
               }
               tailDirection="top"
             >
-              <span className="font-display text-base font-black block">
+              <span className="font-display text-base font-extrabold block">
                 &ldquo;{strength.funnyMessage}&rdquo;
               </span>
             </ComicSpeechBubble>
 
-            <div className="text-left space-y-2 pt-3 border-t-3 border-border text-xs font-semibold text-stone-600 dark:text-slate-300">
-              <div className="flex items-center gap-1.5 font-black text-foreground">
-                <ShieldCheck className="w-4 h-4 text-[#0284C7]" />
+            <div className="text-left space-y-2 pt-3 border-t border-line text-xs font-semibold text-muted ">
+              <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                <ShieldCheck className="w-4 h-4 text-accent" />
                 <span>Por que este gerador é seguro?</span>
               </div>
               <p className="leading-relaxed">
                 Jamais usamos <code className="font-mono">Math.random()</code>. Cada caractere é sorteado pela fonte de entropia do navegador com <strong>rejection sampling</strong> para eliminar qualquer viés estatístico.
               </p>
               {strength.level === 'strong' && (
-                <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-black pt-1">
+                <div className="flex items-center gap-1.5 text-success font-semibold pt-1">
                   <Sparkles className="w-4 h-4 shrink-0" />
-                  <span>WOO-HOO! Barnaby está comemorando sua senha!</span>
+                  <span>Senha forte!</span>
                 </div>
               )}
             </div>

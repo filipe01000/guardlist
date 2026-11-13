@@ -176,12 +176,12 @@ export function SettingsView({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="font-display text-2xl sm:text-3xl font-black">
+            <h1 className="font-display text-2xl sm:text-3xl font-extrabold">
               Configurações
             </h1>
             
           </div>
-          <p className="text-sm font-semibold text-stone-600 dark:text-slate-400 mt-1">
+          <p className="text-sm font-semibold text-muted mt-1">
             Gerencie sua Senha Mestra, bloqueio por inatividade, backups criptografados e tema visual.
           </p>
         </div>
@@ -198,7 +198,7 @@ export function SettingsView({
         {/* Coluna Esquerda: Tema, Bloqueio Automático e Alterar Senha Mestra */}
         <div className="lg:col-span-6 space-y-6">
           <Card>
-            <CardHeader className="border-b-3 border-border">
+            <CardHeader className="border-b border-line">
               <CardTitle>Aparência e Bloqueio Automático</CardTitle>
               <CardDescription>
                 Personalize a experiência visual e o timer de segurança
@@ -206,10 +206,10 @@ export function SettingsView({
             </CardHeader>
 
             <CardContent className="space-y-5">
-              <div className="flex items-center justify-between gap-4 pb-4 border-b-2 border-border">
+              <div className="flex items-center justify-between gap-4 pb-4 border-b border-line">
                 <div>
                   <p className="font-extrabold text-sm">Tema</p>
-                  <p className="text-xs font-semibold text-stone-600 dark:text-slate-400">
+                  <p className="text-xs font-semibold text-muted ">
                     Alterne entre o tema claro e o escuro.
                   </p>
                 </div>
@@ -239,10 +239,10 @@ export function SettingsView({
                     htmlFor="autolock-select"
                     className="font-extrabold text-sm flex items-center gap-1.5"
                   >
-                    <Clock className="w-4 h-4 text-[#0284C7]" />
+                    <Clock className="w-4 h-4 text-accent" />
                     <span>Bloqueio Automático por Inatividade</span>
                   </label>
-                  <p className="text-xs font-semibold text-stone-600 dark:text-slate-400">
+                  <p className="text-xs font-semibold text-muted ">
                     Tranca o cofre quando você fica um tempo sem usar.
                   </p>
                 </div>
@@ -251,7 +251,7 @@ export function SettingsView({
                   id="autolock-select"
                   value={autoLockMinutes}
                   onChange={(e) => onUpdateAutoLock(Number(e.target.value))}
-                  className="h-10 px-3 text-xs font-extrabold bg-background border-3 border-border rounded-base shadow-[2px_2px_0px_0px_var(--border)] cursor-pointer"
+                  className="h-10 px-3 text-xs font-extrabold bg-background border border-line rounded-base cursor-pointer"
                 >
                   <option value={1}>1 minuto</option>
                   <option value={5}>5 minutos</option>
@@ -265,9 +265,9 @@ export function SettingsView({
 
           {/* Alterar Senha Mestra */}
           <Card>
-            <CardHeader className="border-b-3 border-border">
+            <CardHeader className="border-b border-line">
               <div className="flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-pink" />
+                <KeyRound className="w-5 h-5 text-accent" />
                 <CardTitle>Alterar Senha Mestra</CardTitle>
               </div>
               <CardDescription>
@@ -354,7 +354,7 @@ export function SettingsView({
         {/* Coluna Direita: Backups Criptografados, Especificações e Exclusão */}
         <div className="lg:col-span-6 space-y-6">
           <Card>
-            <CardHeader className="border-b-3 border-border">
+            <CardHeader className="border-b border-line">
               <CardTitle>Backup Criptografado & Recuperação Segura</CardTitle>
               <CardDescription>
                 Exporte ou restaure seu envelope (<code className="font-mono">DONUTVAULT_ENCRYPTED_V1</code>) com mesclagem sem perda de dados existentes
@@ -377,7 +377,7 @@ export function SettingsView({
                   variant="neutral"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Upload className="w-4 h-4 text-pink" />
+                  <Upload className="w-4 h-4 text-accent" />
                   <span>Importar Backup Criptografado</span>
                 </Button>
                 <input
@@ -392,7 +392,7 @@ export function SettingsView({
               {importJson && (
                 <form
                   onSubmit={handleImportSubmit}
-                  className="p-4 rounded-base bg-background border-3 border-border space-y-3"
+                  className="p-4 rounded-base bg-background border border-line space-y-3"
                 >
                   <p className="text-xs font-extrabold">
                     Arquivo selecionado: {importFileName}
@@ -414,7 +414,7 @@ export function SettingsView({
                         );
                         setConfirmReplaceBackup(false);
                       }}
-                      className="w-full h-10 px-3 text-xs font-extrabold bg-secondary-background border-3 border-border rounded-base"
+                      className="w-full h-10 px-3 text-xs font-extrabold bg-secondary-background border border-line rounded-base"
                     >
                       <option value="merge">
                         Mesclar com cofre atual (Sem perda de dados existentes)
@@ -426,14 +426,14 @@ export function SettingsView({
                   </div>
 
                   {importStrategy === 'replace' && (
-                    <label className="flex items-start gap-2 p-2.5 rounded-base bg-rose-100 dark:bg-rose-950/60 border-2 border-border text-xs font-bold cursor-pointer">
+                    <label className="flex items-start gap-2 p-2.5 rounded-base bg-danger/15 border border-line text-xs font-bold cursor-pointer">
                       <input
                         type="checkbox"
                         checked={confirmReplaceBackup}
                         onChange={(e) =>
                           setConfirmReplaceBackup(e.target.checked)
                         }
-                        className="mt-0.5 accent-pink"
+                        className="mt-0.5 accent-main"
                       />
                       <span>
                         Confirmo explicitamente que desejo substituir as credenciais e notas atuais por este backup.
@@ -449,7 +449,7 @@ export function SettingsView({
                     className="font-mono"
                     required
                   />
-                  <Button type="submit" variant="pink" size="sm">
+                  <Button type="submit" variant="default" size="sm">
                     {importStrategy === 'merge'
                       ? 'Verificar e mesclar'
                       : 'Verificar e substituir o cofre atual'}
@@ -458,7 +458,7 @@ export function SettingsView({
               )}
 
               {importStatus && (
-                <p className="text-xs font-black text-[#0284C7] dark:text-sky">
+                <p className="text-xs font-semibold text-accent ">
                   {importStatus}
                 </p>
               )}
@@ -467,9 +467,9 @@ export function SettingsView({
 
           {/* Especificações Criptográficas Reais */}
           <Card>
-            <CardHeader className="border-b-3 border-border">
+            <CardHeader className="border-b border-line">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                <ShieldCheck className="w-5 h-5 text-success" />
                 <CardTitle className="text-lg">
                   Detalhes técnicos
                 </CardTitle>
@@ -477,7 +477,7 @@ export function SettingsView({
             </CardHeader>
 
             <CardContent className="space-y-3">
-              <div className="text-xs space-y-1.5 font-mono font-bold text-foreground bg-background p-4 rounded-base border-3 border-border shadow-[2px_2px_0px_0px_var(--border)]">
+              <div className="text-xs space-y-1.5 font-mono font-bold text-foreground bg-background p-4 rounded-base border border-line ">
                 <div>
                   Formato: {envelope.format} (v{envelope.version} · Revisão #
                   {envelope.revision ?? 1})
@@ -496,8 +496,8 @@ export function SettingsView({
                 <div className="truncate">SHA-256 Integridade: {envelope.integritySha256Hex.slice(0, 32)}...</div>
               </div>
 
-              <div className="p-3 rounded-base bg-[#FEF08A]/60 dark:bg-slate-800 border-2 border-border text-[11px] font-semibold text-stone-800 dark:text-slate-200 space-y-1 leading-relaxed">
-                <p className="font-black uppercase text-xs">
+              <div className="p-3 rounded-base bg-warning/15 border border-line text-[11px] font-semibold text-foreground space-y-1 leading-relaxed">
+                <p className="font-semibold uppercase text-xs">
                   Proteção de Memória & Limitações do Navegador:
                 </p>
                 <p>
@@ -507,19 +507,19 @@ export function SettingsView({
                 </p>
               </div>
 
-              <p className="text-[11px] font-semibold text-stone-600 dark:text-slate-400 leading-relaxed">
+              <p className="text-[11px] font-semibold text-muted leading-relaxed">
                 O DonutVault usa Argon2id, AES-256-GCM e o gerador aleatório do navegador. O código ainda não passou por auditoria de segurança independente.
               </p>
             </CardContent>
           </Card>
 
           {/* Zona de Perigo: Excluir Cofre */}
-          <Card className="bg-rose-100 dark:bg-rose-950/40">
+          <Card className="bg-danger/15 ">
             <CardContent className="space-y-3">
-              <h2 className="font-display text-lg font-black text-rose-800 dark:text-rose-300">
+              <h2 className="font-display text-lg font-extrabold text-danger ">
                 Zona de perigo
               </h2>
-              <p className="text-xs font-semibold text-stone-800 dark:text-slate-200">
+              <p className="text-xs font-semibold text-foreground ">
                 Excluir o cofre apaga de vez o cofre cifrado guardado neste navegador.
               </p>
               {!confirmDeleteVault ? (
