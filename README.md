@@ -82,6 +82,13 @@ Defina no Render `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`
 
 O DonutVault, o gerenciador de senhas, vive na pasta `cofre/` e é servido por este mesmo servidor em `/cofre`. O cofre é cifrado no navegador; o servidor só guarda dados cifrados. Regras do cofre em `cofre/AGENTS.md`.
 
+**Quem acessa:**
+
+- Existe um único **usuário master**. Na primeira subida desta versão, o usuário `admin` (ou o administrador ativo mais antigo) vira o master.
+- Só o master muda papéis, cria administradores, redefine senha ou verificação em duas etapas de administradores, libera o cofre e transfere o master (**Administração → Usuários → Tornar master**).
+- O cofre abre só para administradores liberados pelo master (coluna **Cofre de senhas**), sem senha provisória pendente. O master sempre tem acesso e não pode ser rebaixado, desativado nem apagado; primeiro transfira.
+- Quem tem acesso vê **Cofre de senhas** no menu, e o cofre abre dentro da área de conteúdo, num quadro da mesma origem, seguindo o tema do GuardList. Abrir `/cofre` direto também exige esse login; sem ele, o servidor volta para a tela de login. A Senha Mestra continua sendo o que abre o cofre.
+
 - **Banco próprio:** `DONUTVAULT_DATABASE_URL` (no Render, a URL do Neon do DonutVault). O cofre nunca usa o `DATABASE_URL` da equipe. Sem essa variável, `/cofre` mostra um aviso e o resto do GuardList funciona normalmente.
 - **Build:** `npm run build:cofre` instala e constrói o cofre (`cofre/dist`). O `render.yaml` já inclui esse passo; se o serviço foi criado pelo painel, o Build Command precisa terminar com `&& npm run build:cofre`.
 - **Migrações:** aplicadas ao subir o servidor. Se falharem, `/cofre` mostra um aviso e o GuardList sobe mesmo assim.

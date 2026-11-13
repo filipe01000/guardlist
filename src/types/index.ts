@@ -316,6 +316,10 @@ export interface SessionUser {
   lastLoginAt: string | null;
   lockedUntil?: string | null;
   mfaEnabled?: boolean;
+  // Usuário master (um só): muda papéis, libera o cofre de senhas e transfere o master.
+  isMaster?: boolean;
+  // Pode abrir o cofre de senhas (/cofre).
+  vaultAccess?: boolean;
 }
 
 // Relatório de um período (geral ou de um cliente), gerado no servidor.

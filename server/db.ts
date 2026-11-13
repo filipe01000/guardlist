@@ -89,6 +89,11 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_recovery JSONB;
 -- Bloqueio temporário da conta após várias senhas erradas.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_logins INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+-- Usuário master (um só): administra tudo e é o único que libera o cofre de senhas e muda papéis.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_master BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS users_single_master ON users (is_master) WHERE is_master;
+-- Acesso ao cofre de senhas (/cofre): só administradores, e só quando o master libera.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS vault_access BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Sessões abertas (uma por login), para listar e encerrar. O id guardado é o hash do token.
 CREATE TABLE IF NOT EXISTS sessions (

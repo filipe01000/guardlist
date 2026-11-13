@@ -19,7 +19,7 @@ import { recipients, sendMail, smtpConfigured } from './server/mailer.ts';
 import { seedDemoData } from './server/seed.ts';
 import { createStore, PUBLIC_OPS, StoreError, type Actor } from './server/store.ts';
 import { createLoginAlerts } from './server/loginAlerts.ts';
-import { createUsers, SESSION_IDLE_MS, toActor, toPublic, type UserRow } from './server/users.ts';
+import { canOpenVault, createUsers, SESSION_IDLE_MS, toActor, toPublic, type UserRow } from './server/users.ts';
 
 const app = express();
 config({ path: ['.env.local', '.env'], quiet: true });
@@ -51,6 +51,8 @@ if (db.kind === 'pglite') {
 }
 const bootstrapped = await users.bootstrapFromEnv();
 if (bootstrapped > 0) console.log(`Usuários iniciais criados: ${bootstrapped}.`);
+const newMaster = await users.ensureMaster();
+if (newMaster) console.log(`Usuário master definido: ${newMaster}.`);
 if ((await users.count()) === 0) {
   console.warn('Aviso: nenhum usuário cadastrado. Defina APP_USERS ou ADMIN_INITIAL_PASSWORD para criar o primeiro administrador.');
 }
@@ -442,8 +444,18 @@ app.post('/api/mfa/policy', adminOnly, jsonSmall, async (req, res) => {
 
 app.post('/api/users/:id/mfa/reset', adminOnly, async (req, res) => {
   try {
+    await users.assertCanResetMfa(res.locals.actor as Actor, Number(req.params.id));
     await mfa.reset(res.locals.actor as Actor, Number(req.params.id));
     return res.json({ ok: true });
+  } catch (error) {
+    return sendError(res, error);
+  }
+});
+
+// Transferir o master: só o master atual (conferido em users.transferMaster).
+app.post('/api/users/:id/master', adminOnly, async (req, res) => {
+  try {
+    return res.json({ user: await users.transferMaster(res.locals.actor as Actor, Number(req.params.id)) });
   } catch (error) {
     return sendError(res, error);
   }
@@ -738,6 +750,18 @@ app.use((req, res, next) => {
   if (req.path !== '/cofre') return next();
   const query = req.originalUrl.slice(req.originalUrl.indexOf('?') >= 0 ? req.originalUrl.indexOf('?') : req.originalUrl.length);
   return res.redirect(301, `/cofre/${query}`);
+});
+// Só entra no cofre quem está logado no GuardList como administrador liberado pelo master. Páginas sem
+// permissão voltam para o login do GuardList; a API do cofre responde 401/403.
+app.use('/cofre', async (req, res, next) => {
+  const row = await currentUser(req).catch(() => null);
+  if (row && canOpenVault(row)) return next();
+  res.setHeader('Cache-Control', 'no-store');
+  if (req.path.startsWith('/api/')) {
+    return res.status(row ? 403 : 401).json({ error: row ? 'Sem acesso ao cofre de senhas.' : 'Entre no GuardList para usar o cofre.' });
+  }
+  if (row) return res.status(403).type('text').send('Sua conta do GuardList não tem acesso ao cofre de senhas. Peça ao usuário master.');
+  return res.redirect(302, '/');
 });
 if (!process.env.DONUTVAULT_DATABASE_URL && !process.env.DONUTVAULT_SQL_HOST) {
   app.use('/cofre', cofreUnavailable('falta configurar DONUTVAULT_DATABASE_URL.'));
