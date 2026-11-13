@@ -34,6 +34,7 @@ import { CryptoEngine, NEW_VAULT_ARGON2_PARAMS } from './services/CryptoEngine';
 import { checkMasterPasswordPolicy } from './utils/generator';
 import { StorageService } from './services/StorageService';
 import { SyncAdapter } from './services/SyncAdapter';
+import { API_BASE } from './lib/apiBase';
 import {
   createEncryptedVaultEnvelope,
   unlockEncryptedVaultEnvelope,
@@ -340,7 +341,7 @@ export default function App() {
         const vaultId = activeEnvelope.vaultId || activePayload.vaultId;
         const keyEpoch = activeEnvelope.keyEpoch || activePayload.keyEpoch || 1;
 
-        await syncAdapterRef.current.registerVaultOnBackend('', activeAuth, {
+        await syncAdapterRef.current.registerVaultOnBackend(API_BASE, activeAuth, {
           vaultId,
           activeKeyEpoch: keyEpoch,
           kdfParams: activeEnvelope.kdfParams,
@@ -353,7 +354,7 @@ export default function App() {
         // 1. Push da fila offline pendente
         const pushOutcome =
           await syncAdapterRef.current.flushOfflineQueueToBackend(
-            '',
+            API_BASE,
             activeAuth,
             vaultId,
             activeDek,
@@ -363,7 +364,7 @@ export default function App() {
         // 2. Pull incremental a partir do último cursor conhecido
         const pullOutcome =
           await syncAdapterRef.current.pullAndDecryptFromBackend(
-            '',
+            API_BASE,
             activeAuth,
             vaultId,
             serverCursorRef.current,
@@ -428,7 +429,7 @@ export default function App() {
         setSyncHeadline(SYNC_HEADLINE_DONE);
 
         // Atualiza lista de dispositivos autorizados
-        const devRes = await fetch('/api/v1/auth/devices', {
+        const devRes = await fetch(`${API_BASE}/api/v1/auth/devices`, {
           headers: {
             Authorization: `Bearer ${activeAuth.sessionToken}`,
             'X-Device-Id': activeAuth.deviceId,
@@ -504,7 +505,7 @@ export default function App() {
             storedEnvelope.vaultId || unlockedPayload.vaultId
           );
           const registered =
-            await syncAdapterRef.current.registerDeviceOnBackend('', {
+            await syncAdapterRef.current.registerDeviceOnBackend(API_BASE, {
               userUid: vaultBasedUid,
               email: `${vaultBasedUid}@donutvault.local`,
               deviceName: thisDevice.name,
@@ -564,7 +565,7 @@ export default function App() {
         // Conecta ao SSE para notificações em tempo real usando Cookie HttpOnly (jamais envia token na URL!)
         if (typeof EventSource !== 'undefined' && currentAuth) {
           const vaultId = storedEnvelope.vaultId || unlockedPayload.vaultId;
-          const sseUrl = `/api/v1/sync/events?vaultId=${encodeURIComponent(
+          const sseUrl = `${API_BASE}/api/v1/sync/events?vaultId=${encodeURIComponent(
             vaultId
           )}`;
           eventSource = new EventSource(sseUrl, { withCredentials: true });
@@ -1113,7 +1114,7 @@ export default function App() {
     if (!syncAuthSession) return;
     try {
       const res = await fetch(
-        `/api/v1/auth/devices/${encodeURIComponent(targetDeviceId)}/revoke`,
+        `${API_BASE}/api/v1/auth/devices/${encodeURIComponent(targetDeviceId)}/revoke`,
         {
           method: 'POST',
           headers: {

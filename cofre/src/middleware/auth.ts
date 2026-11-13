@@ -54,17 +54,28 @@ export function setSecureSessionCookies(
 ): void {
   const isProd = process.env.NODE_ENV === 'production';
   const secureFlag = isProd ? '; Secure' : '';
+  const path = sessionCookiePath(res);
   res.setHeader('Set-Cookie', [
-    `dvlt_sid=${encodeURIComponent(rawSessionToken)}; Path=/api/v1; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Strict${secureFlag}`,
-    `dvlt_did=${encodeURIComponent(deviceId)}; Path=/api/v1; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Strict${secureFlag}`,
+    `dvlt_sid=${encodeURIComponent(rawSessionToken)}; Path=${path}; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Strict${secureFlag}`,
+    `dvlt_did=${encodeURIComponent(deviceId)}; Path=${path}; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Strict${secureFlag}`,
   ]);
 }
 
 export function clearSecureSessionCookies(res: Response): void {
+  const path = sessionCookiePath(res);
   res.setHeader('Set-Cookie', [
-    'dvlt_sid=; Path=/api/v1; Max-Age=0; HttpOnly; SameSite=Strict',
-    'dvlt_did=; Path=/api/v1; Max-Age=0; HttpOnly; SameSite=Strict',
+    `dvlt_sid=; Path=${path}; Max-Age=0; HttpOnly; SameSite=Strict`,
+    `dvlt_did=; Path=${path}; Max-Age=0; HttpOnly; SameSite=Strict`,
   ]);
+}
+
+/**
+ * Caminho dos cookies de sessão: onde a API está montada. Sozinho é /api/v1; dentro do GuardList,
+ * /cofre/api/v1. Só aceita caminhos simples, para nunca escrever um atributo vindo da requisição.
+ */
+export function sessionCookiePath(res: Response): string {
+  const base = res.req?.baseUrl || '';
+  return /^\/[A-Za-z0-9/_-]*$/.test(base) ? base : '/api/v1';
 }
 
 interface RateLimitBucket {

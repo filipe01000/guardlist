@@ -10,6 +10,7 @@
     "dev": "tsx server.ts",
     "start": "npm run db:migrate && tsx server.ts",
     "build": "vite build",
+    "build:embedded": "vite build --base=/cofre/",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",

@@ -24,7 +24,11 @@ npx vite build
 - Comentários e textos de interface em português, claros e calmos, sem jargão na interface. O visual
   segue o do GuardList, com toques dos anos 90 (desenho em `docs/superpowers/specs/`), e momentos de
   risco são tratados com seriedade.
-- Não mexer no GuardList (é outro serviço, em outro repositório).
+- O cofre vive dentro do repositório do GuardList, na pasta `cofre/`, e é servido pelo mesmo serviço
+  do Render em `/cofre`. Ele tem banco próprio (`DONUTVAULT_DATABASE_URL`) e nunca usa o
+  `DATABASE_URL` do GuardList, que é o banco da equipe. Não importar código do GuardList aqui dentro.
+- Chamadas à API usam `API_BASE` (`src/lib/apiBase.ts`); os cookies de sessão seguem o ponto de
+  montagem (`sessionCookiePath`). Nunca escrever `/api/v1` fixo no cliente.
 
 ## Não quebrar
 

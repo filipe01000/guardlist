@@ -78,6 +78,17 @@ Contas novas e senhas redefinidas recebem uma senha provisória, trocada obrigat
 
 Defina no Render `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `REPORT_EMAILS` e `BACKUP_EMAILS` (veja `.env.example`). Com isso o servidor envia, no dia 1º, o relatório geral do mês anterior (HTML com a marca + planilha CSV) e, todo dia, um backup compactado (.json.gz). Falhas aparecem em Administração → Status do sistema e num aviso para os administradores. O Neon também permite restaurar o banco para um horário anterior (Branches → Restore); a janela disponível depende do plano.
 
+## Cofre de senhas (/cofre)
+
+O DonutVault, o gerenciador de senhas, vive na pasta `cofre/` e é servido por este mesmo servidor em `/cofre`. O cofre é cifrado no navegador; o servidor só guarda dados cifrados. Regras do cofre em `cofre/AGENTS.md`.
+
+- **Banco próprio:** `DONUTVAULT_DATABASE_URL` (no Render, a URL do Neon do DonutVault). O cofre nunca usa o `DATABASE_URL` da equipe. Sem essa variável, `/cofre` mostra um aviso e o resto do GuardList funciona normalmente.
+- **Build:** `npm run build:cofre` instala e constrói o cofre (`cofre/dist`). O `render.yaml` já inclui esse passo; se o serviço foi criado pelo painel, o Build Command precisa terminar com `&& npm run build:cofre`.
+- **Migrações:** aplicadas ao subir o servidor. Se falharem, `/cofre` mostra um aviso e o GuardList sobe mesmo assim.
+- **Node 24 e `NODE_ENV=production`:** exigidos pelo cofre (o último ativa a política de segurança de produção dele).
+- **Local:** suba o Postgres do cofre (`docker start donutvault-postgres-dev`, ou `docker compose up -d` dentro de `cofre/`), defina `DONUTVAULT_SQL_*` como no `.env.example`, rode `npm run build:cofre` e depois `npm run dev`.
+- **Testes do cofre:** dentro de `cofre/`, seguindo `cofre/AGENTS.md` (sempre no banco de teste).
+
 ## Limitações das integrações CTI
 
 As ocorrências e correlações entre clientes são calculadas com os dados reais do aplicativo. As consultas ao AbuseIPDB, GreyNoise e OTX são feitas pelo servidor, com as chaves em `ABUSEIPDB_API_KEY`, `GREYNOISE_API_KEY` e `OTX_API_KEY`, cache e limite por usuário. Quando uma chave não está configurada ou o provedor não responde, a fonte aparece como indisponível e nenhum dado é inventado. Nunca coloque essas chaves em variáveis `VITE_*`, porque elas ficariam visíveis no JavaScript entregue ao usuário.

@@ -1,5 +1,8 @@
 # Homologação: Render Free + Neon Free
 
+> **Atual:** o cofre é servido pelo serviço do GuardList em `/cofre` (veja "Cofre de senhas" no README
+> do GuardList). O serviço separado `donutvault-hml` descrito abaixo é o arranjo anterior.
+
 Node.js 24.22.1. Código identificado como DonutVault 0.9.3 pelo proprietário.
 
 ## Render
@@ -31,7 +34,6 @@ Node.js 24.22.1. Código identificado como DonutVault 0.9.3 pelo proprietário.
   mostra `[client-ip]` e o servidor usa o endereço da conexão.
 - Kit de Emergência: o pacote de recuperação só sai com o token derivado da Chave de Recuperação
   (o servidor guarda apenas o hash). Kits gerados antes desta versão precisam ser gerados de novo.
-- O GuardList usa outro serviço e repositório; não é alterado por este projeto.
 
 ## Banco
 

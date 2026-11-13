@@ -16,7 +16,11 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export async function createDonutVaultApp(options?: { skipVite?: boolean }) {
+/**
+ * embedded: montado dentro do GuardList em /cofre. Serve sempre o build pronto (cofre/dist, gerado com
+ * `npm run build:embedded`) e não abre um servidor Vite próprio.
+ */
+export async function createDonutVaultApp(options?: { skipVite?: boolean; embedded?: boolean }) {
   const app = express();
   app.disable('x-powered-by');
 
@@ -73,7 +77,14 @@ export async function createDonutVaultApp(options?: { skipVite?: boolean }) {
   // 4. Monta API REST Versionada Zero-Knowledge (/api/v1/*)
   app.use('/api/v1', createSyncApiRouter());
 
-  if (!options?.skipVite) {
+  if (options?.embedded) {
+    const distPath = path.join(__dirname, 'dist');
+    app.use(express.static(distPath, { index: false }));
+    app.get('*', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  } else if (!options?.skipVite) {
     if (process.env.NODE_ENV !== 'production') {
       const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({

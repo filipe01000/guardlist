@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
+    "build:cofre": "npm ci --prefix cofre --include=dev && npm --prefix cofre run build:embedded",
     "preview": "npm run build && tsx server.ts --production",
     "start": "tsx server.ts --production",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
