@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Download,
 } from 'lucide-react';
+import { AmbientBackground } from './AmbientBackground';
 import { BrandMark } from './BrandMark';
 import { CartoonVaultDoor } from './CartoonIllustrations';
 import {
@@ -249,32 +250,33 @@ export function WelcomeScreen({
   };
 
   return (
-    <div className="min-h-screen bg-background bg-comic-halftone text-foreground flex flex-col justify-between">
+    <div className="min-h-screen text-foreground flex flex-col justify-between">
+      <AmbientBackground />
       {/* Top Bar Neobrutalista (3 zonas limpas) */}
-      <header className="w-full bg-secondary-background border-b-4 border-border">
+      <header className="w-full border-b border-glass-line">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-8 px-4 sm:px-6 py-4">
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               type="button"
               onClick={() => setDonutClicks((c) => c + 1)}
               aria-label="Logotipo interativo DonutVault"
-              className="focus-visible:outline-2 focus-visible:outline-pink rounded-full transition-transform active:scale-95 cursor-pointer"
+              className="focus-visible:outline-2 focus-visible:outline-ring rounded-full transition-transform active:scale-95 cursor-pointer"
             >
               <BrandMark size={48} spinning={isProcessing} />
             </button>
-            <span className="font-display text-xl sm:text-2xl font-black tracking-tight whitespace-nowrap shrink-0">
+            <span className="font-display text-xl sm:text-2xl font-extrabold tracking-tight whitespace-nowrap shrink-0">
               DonutVault
             </span>
           </div>
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-extrabold">
-            <a href="#criptografia" className="hover:text-pink transition-colors whitespace-nowrap shrink-0">
+            <a href="#criptografia" className="hover:text-accent transition-colors whitespace-nowrap shrink-0">
               Como protege
             </a>
-            <a href="#auditoria" className="hover:text-pink transition-colors whitespace-nowrap shrink-0">
+            <a href="#auditoria" className="hover:text-accent transition-colors whitespace-nowrap shrink-0">
               Saúde das senhas
             </a>
-            <a href="#sincronizacao" className="hover:text-pink transition-colors whitespace-nowrap shrink-0">
+            <a href="#sincronizacao" className="hover:text-accent transition-colors whitespace-nowrap shrink-0">
               Sincronização
             </a>
           </nav>
@@ -294,32 +296,40 @@ export function WelcomeScreen({
       {/* Hero Principal Neobrutal-UI + StreamUI Comic */}
       <main className="w-full max-w-7xl mx-auto px-6 py-6 lg:py-8 flex-1 flex flex-col justify-center">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-          {/* Coluna Esquerda: Título Cartoon Anos 90 + 3 Ações Principais */}
+          {/* Coluna Esquerda: palco da marca, título e 3 ações principais */}
           <div className="lg:col-span-7 space-y-5">
+            {/* Palco da marca, como o login é no GuardList */}
+            <div className="relative w-fit">
+              <span
+                aria-hidden="true"
+                className="absolute -inset-10 -z-10 rounded-full bg-[radial-gradient(circle,rgba(255,217,15,0.16),transparent_68%)]"
+              />
+              <BrandMark size={132} className="size-24 sm:size-[132px]" />
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <ComicActionCallout text="EDIÇÃO ANOS 90!" tone="pink" />
-              <span className="text-xs sm:text-sm font-extrabold text-stone-700 dark:text-slate-300 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-[#0284C7]" />
+              <span className="text-xs sm:text-sm font-extrabold text-muted flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-accent" />
                 <span>Gerenciador de senhas · criptografia feita no seu navegador</span>
               </span>
             </div>
 
             <h1
-              className="font-display text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.06] text-foreground"
+              className="font-display text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.06] text-foreground"
               style={{ textWrap: 'balance' }}
             >
               Suas senhas estão mais protegidas que a{' '}
-              <span className="inline-block bg-main text-main-foreground px-3 py-0.5 border-3 border-border shadow-[4px_4px_0px_0px_var(--border)] -rotate-1">
+              <span className="text-accent">
                 última rosquinha!
               </span>
             </h1>
 
-            <p className="text-base sm:text-lg font-semibold text-stone-700 dark:text-slate-300 max-w-2xl leading-relaxed">
-              O <strong>DonutVault</strong> guarda suas senhas com cara de desenho animado e criptografia de verdade. Tudo é cifrado aqui, no seu navegador, antes de ser salvo, e só a sua <strong>Senha Mestra</strong> abre o cofre. Nem o servidor consegue ler.
+            <p className="text-base sm:text-lg font-semibold text-muted max-w-2xl leading-relaxed">
+              O <strong>DonutVault</strong> guarda suas senhas com um toque dos anos 90 e criptografia de verdade. Tudo é cifrado aqui, no seu navegador, antes de ser salvo, e só a sua <strong>Senha Mestra</strong> abre o cofre. Nem o servidor consegue ler.
             </p>
 
             {donutClicks >= 3 && (
-              <ComicSpeechBubble speaker="EASTER EGG DO INSPETOR BARNABY" tone="yellow" tailDirection="none">
+              <ComicSpeechBubble speaker="Rosquinha secreta" tone="yellow" tailDirection="none">
                 &ldquo;Você achou a rosquinha secreta! Ela também é cifrada.&rdquo;
               </ComicSpeechBubble>
             )}
@@ -345,7 +355,7 @@ export function WelcomeScreen({
                     size="lg"
                     onClick={() => requestReplace('import')}
                   >
-                    <Upload className="w-5 h-5 text-pink" />
+                    <Upload className="w-5 h-5 text-accent" />
                     <span>Restaurar backup</span>
                   </Button>
                 </>
@@ -377,7 +387,7 @@ export function WelcomeScreen({
                     size="lg"
                     onClick={() => requestReplace('import')}
                   >
-                    <Upload className="w-5 h-5 text-pink" />
+                    <Upload className="w-5 h-5 text-accent" />
                     <span>Importar backup criptografado</span>
                   </Button>
                 </>
@@ -393,7 +403,7 @@ export function WelcomeScreen({
             </div>
 
             {/* Resumo técnico em texto limpo sem pílulas */}
-            <div className="pt-2 flex flex-wrap items-center gap-y-2 gap-x-3 text-xs font-extrabold text-stone-700 dark:text-slate-300">
+            <div className="pt-2 flex flex-wrap items-center gap-y-2 gap-x-3 text-xs font-extrabold text-muted ">
               <span>AES-256-GCM e Argon2id</span>
               <span aria-hidden="true">·</span>
               <span>Funciona sem internet</span>
@@ -402,22 +412,22 @@ export function WelcomeScreen({
             </div>
           </div>
 
-          {/* Coluna Direita: Neobrutal-UI Card com Mascote Barnaby e Balão Comic */}
+          {/* Coluna Direita: painel de vidro com os formulários */}
           <div className="lg:col-span-5">
-            <Card className="border-4 shadow-[8px_8px_0px_0px_var(--border)] bg-secondary-background">
-              <CardHeader className="border-b-3 border-border pb-5 bg-[#E0F2FE] dark:bg-slate-800 rounded-t-[10px] -mt-6 pt-6">
+            <Card className="border">
+              <CardHeader className="border-b border-line pb-5 bg-surface-raised rounded-t-[10px] -mt-6 pt-6">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
-                    <div className="animate-float shrink-0 bg-white border-3 border-border rounded-2xl p-1 shadow-[3px_3px_0px_0px_var(--border)]">
+                    <div className="shrink-0">
                       <BrandMark size={82} />
                     </div>
                     <div>
                       <ComicActionCallout
-                        text="GUARDIÃO BARNABY"
+                        text="DonutVault"
                         tone="yellow"
                         className="mb-1.5 text-[10px] px-2 py-0.5"
                       />
-                      <CardTitle className="text-xl text-[#09090B] dark:text-white">
+                      <CardTitle className="text-xl text-foreground ">
                         {activeModal === 'confirm-replace'
                           ? 'Substituir o cofre deste navegador?'
                           : activeModal === 'create'
@@ -426,7 +436,7 @@ export function WelcomeScreen({
                               ? 'Restaurar Backup'
                               : 'Seu cofre'}
                       </CardTitle>
-                      <CardDescription className="text-xs font-bold text-stone-700 dark:text-slate-300 mt-0.5">
+                      <CardDescription className="text-xs font-bold text-muted mt-0.5">
                         {hasExistingVault
                           ? `Cofre local pronto${existingVaultDate ? ` · ${existingVaultDate}` : ''}`
                           : 'Crie seu cofre criptografado em segundos!'}
@@ -444,11 +454,11 @@ export function WelcomeScreen({
                 {activeModal === 'none' && (
                   <div className="space-y-4">
                     <ComicSpeechBubble
-                      speaker="BARNABY ROSQUINHA"
+                      speaker="Como funciona"
                       tone="yellow"
                       tailDirection="top"
                     >
-                      &ldquo;Oi! Eu sou o <strong>Barnaby</strong>, o guarda deste cofre. Suas senhas são cifradas aqui mesmo, no seu navegador, antes de qualquer coisa.&rdquo;
+                      &ldquo;Suas senhas são cifradas aqui mesmo, no seu navegador, antes de qualquer coisa.&rdquo;
                     </ComicSpeechBubble>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -476,9 +486,9 @@ export function WelcomeScreen({
                     backup oferecido antes e ação destrutiva só depois de marcar que entendeu. */}
                 {activeModal === 'confirm-replace' && (
                   <div className="space-y-4" aria-live="polite">
-                    <div className="flex items-start gap-3 p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border-3 border-border">
-                      <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-rose-700 dark:text-rose-300" />
-                      <div className="space-y-1.5 text-sm text-stone-900 dark:text-rose-50">
+                    <div className="flex items-start gap-3 p-3.5 rounded-surface bg-danger/15 border border-line">
+                      <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-danger " />
+                      <div className="space-y-1.5 text-sm text-foreground ">
                         <p className="font-extrabold">
                           {replaceIntent === 'create'
                             ? 'Criar outro cofre apaga o cofre salvo neste navegador.'
@@ -505,7 +515,7 @@ export function WelcomeScreen({
                           <span>Baixar backup do cofre atual</span>
                         </Button>
                         {backupDownloaded && (
-                          <span className="flex items-center gap-1.5 text-xs font-extrabold text-emerald-800 dark:text-emerald-300">
+                          <span className="flex items-center gap-1.5 text-xs font-extrabold text-success ">
                             <CheckCircle2 className="w-4 h-4" />
                             Backup baixado
                           </span>
@@ -546,9 +556,9 @@ export function WelcomeScreen({
                 {activeModal === 'create' && (
                   <form onSubmit={handleCreateSubmit} className="space-y-3.5">
                     {hasExistingVault && (
-                      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border-2 border-border text-xs">
-                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-700 dark:text-rose-300" />
-                        <span className="font-semibold text-stone-900 dark:text-rose-50">
+                      <div className="flex items-start gap-2.5 p-3 rounded-surface bg-danger/15 border border-line text-xs">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-danger " />
+                        <span className="font-semibold text-foreground ">
                           Este cofre novo vai substituir o cofre salvo neste navegador.{' '}
                           <button
                             type="button"
@@ -598,12 +608,12 @@ export function WelcomeScreen({
                           type="button"
                           onClick={() => setShowPassword((s) => !s)}
                           aria-label={showPassword ? 'Esconder senha mestra' : 'Mostrar senha mestra'}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-600 dark:text-slate-400 hover:text-foreground cursor-pointer"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted hover:text-foreground cursor-pointer"
                         >
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
-                      <p className="mt-1 text-[11px] font-semibold text-stone-600 dark:text-slate-300">
+                      <p className="mt-1 text-[11px] font-semibold text-muted ">
                         Mínimo de {MASTER_PASSWORD_MIN_LENGTH} caracteres e força "Forte". Uma frase
                         com várias palavras funciona bem.
                       </p>
@@ -611,18 +621,18 @@ export function WelcomeScreen({
                         <div className="mt-2 space-y-1">
                           <div className="flex items-center justify-between text-xs font-extrabold">
                             <span>Força: {strength.label}</span>
-                            <span className="text-stone-600 dark:text-slate-300">
+                            <span className="text-muted ">
                               {strength.funnyMessage}
                             </span>
                           </div>
-                          <div className="w-full h-3 bg-stone-200 dark:bg-slate-700 rounded-full overflow-hidden border-2 border-border">
+                          <div className="w-full h-3 bg-surface-subtle rounded-full overflow-hidden border border-line">
                             <div
                               className={`h-full transition-all ${
                                 strength.level === 'strong'
-                                  ? 'w-full bg-emerald-500'
+                                  ? 'w-full bg-success'
                                   : strength.level === 'medium'
-                                    ? 'w-2/3 bg-amber-400'
-                                    : 'w-1/3 bg-rose-500'
+                                    ? 'w-2/3 bg-warning/15'
+                                    : 'w-1/3 bg-destructive'
                               }`}
                             />
                           </div>
@@ -649,12 +659,12 @@ export function WelcomeScreen({
                     </div>
 
 
-                    <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#E0F2FE]/70 dark:bg-slate-800 border-2 border-border cursor-pointer text-xs">
+                    <label className="flex items-start gap-2.5 p-3 rounded-surface bg-surface-subtle border border-line cursor-pointer text-xs">
                       <input
                         type="checkbox"
                         checked={enableSync}
                         onChange={(e) => setEnableSync(e.target.checked)}
-                        className="mt-0.5 accent-pink w-4 h-4"
+                        className="mt-0.5 accent-main w-4 h-4"
                       />
                       <span className="font-semibold text-foreground">
                         <strong>Sincronizar com o servidor</strong> (opcional). O servidor guarda uma
@@ -693,12 +703,12 @@ export function WelcomeScreen({
                 {activeModal === 'unlock' && (
                   <form onSubmit={handleUnlockSubmit} className="space-y-4">
                     {!hasExistingVault && (
-                      <ComicSpeechBubble speaker="DICA DO BARNABY" tone="sky" tailDirection="top">
+                      <ComicSpeechBubble speaker="Dica" tone="sky" tailDirection="top">
                         Você ainda não possui um cofre salvo neste navegador. Clique em{' '}
                         <button
                           type="button"
                           onClick={() => resetForm('create')}
-                          className="underline font-black text-pink cursor-pointer"
+                          className="underline font-semibold text-accent cursor-pointer"
                         >
                           Criar meu cofre
                         </button>{' '}
@@ -727,7 +737,7 @@ export function WelcomeScreen({
                           type="button"
                           onClick={() => setShowPassword((s) => !s)}
                           aria-label={showPassword ? 'Esconder senha' : 'Mostrar senha'}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-600 dark:text-slate-400 cursor-pointer"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted cursor-pointer"
                         >
                           {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -746,7 +756,7 @@ export function WelcomeScreen({
                     <div className="flex items-center gap-3">
                       <Button
                         type="submit"
-                        variant="sky"
+                        variant="default"
                         disabled={isProcessing || !hasExistingVault}
                         className="flex-1"
                       >
@@ -758,7 +768,7 @@ export function WelcomeScreen({
                     </div>
 
                     {hasExistingVault && (
-                      <p className="text-xs font-semibold text-stone-700 dark:text-slate-300">
+                      <p className="text-xs font-semibold text-muted ">
                         Quer começar do zero?{' '}
                         <button
                           type="button"
@@ -776,9 +786,9 @@ export function WelcomeScreen({
                 {activeModal === 'import' && (
                   <form onSubmit={handleImportSubmit} className="space-y-4">
                     {hasExistingVault && (
-                      <div className="flex items-start gap-2.5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/50 border-2 border-border text-xs">
-                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-700 dark:text-rose-300" />
-                        <span className="font-semibold text-stone-900 dark:text-rose-50">
+                      <div className="flex items-start gap-2.5 p-3 rounded-surface bg-danger/15 border border-line text-xs">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-danger " />
+                        <span className="font-semibold text-foreground ">
                           Este backup vai substituir o cofre salvo neste navegador.{' '}
                           <button
                             type="button"
@@ -790,9 +800,9 @@ export function WelcomeScreen({
                         </span>
                       </div>
                     )}
-                    <div className="p-3 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 border-3 border-border text-xs flex items-center gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
-                      <span className="font-bold text-stone-900 dark:text-emerald-200 truncate">
+                    <div className="p-3 rounded-surface bg-success/15 border border-line text-xs flex items-center gap-2.5">
+                      <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
+                      <span className="font-bold text-foreground truncate">
                         Arquivo: <strong>{importedFileName || 'backup.donutvault.json'}</strong>
                       </span>
                     </div>
@@ -827,7 +837,7 @@ export function WelcomeScreen({
                     <div className="flex items-center gap-3">
                       <Button
                         type="submit"
-                        variant="pink"
+                        variant="default"
                         disabled={isProcessing}
                         className="flex-1"
                       >
@@ -853,11 +863,11 @@ export function WelcomeScreen({
         {/* Como o cofre protege, em linguagem comum */}
         <section
           id="criptografia"
-          className="mt-8 pt-6 border-t-3 border-border grid grid-cols-1 md:grid-cols-4 gap-5"
+          className="mt-8 pt-6 border-t border-line grid grid-cols-1 md:grid-cols-4 gap-5"
         >
-          <Card className="py-4 gap-2 bg-[#FEF08A] dark:bg-slate-800 text-[#09090B] dark:text-white">
+          <Card className="py-4 gap-2 bg-warning/15 text-foreground ">
             <CardContent className="px-5">
-              <h3 className="font-display text-base font-black">Cifrado no seu aparelho</h3>
+              <h3 className="font-display text-base font-extrabold">Cifrado no seu aparelho</h3>
               <p className="text-xs font-semibold opacity-85 mt-1 leading-relaxed">
                 Cada senha é cifrada no navegador antes de ser salva. Sem a Senha Mestra, o que
                 fica guardado é ilegível, inclusive para o servidor.
@@ -865,9 +875,9 @@ export function WelcomeScreen({
             </CardContent>
           </Card>
 
-          <Card className="py-4 gap-2 bg-[#E0F2FE] dark:bg-slate-800 text-[#09090B] dark:text-white">
+          <Card className="py-4 gap-2 text-foreground ">
             <CardContent className="px-5">
-              <h3 className="font-display text-base font-black">Difícil de adivinhar</h3>
+              <h3 className="font-display text-base font-extrabold">Difícil de adivinhar</h3>
               <p className="text-xs font-semibold opacity-85 mt-1 leading-relaxed">
                 A Senha Mestra passa pelo Argon2id, que deixa cada tentativa de adivinhação lenta
                 e cara. Por isso o cofre exige uma senha forte.
@@ -875,9 +885,9 @@ export function WelcomeScreen({
             </CardContent>
           </Card>
 
-          <Card id="auditoria" className="py-4 gap-2 bg-[#FCE7F3] dark:bg-slate-800 text-[#09090B] dark:text-white">
+          <Card id="auditoria" className="py-4 gap-2 text-foreground ">
             <CardContent className="px-5">
-              <h3 className="font-display text-base font-black">Saúde das senhas</h3>
+              <h3 className="font-display text-base font-extrabold">Saúde das senhas</h3>
               <p className="text-xs font-semibold opacity-85 mt-1 leading-relaxed">
                 Mostra senhas fracas, repetidas e antigas e ajuda a trocar. A análise roda no seu
                 aparelho, sem enviar nada para fora.
@@ -885,9 +895,9 @@ export function WelcomeScreen({
             </CardContent>
           </Card>
 
-          <Card id="sincronizacao" className="py-4 gap-2 bg-[#DCFCE7] dark:bg-slate-800 text-[#09090B] dark:text-white">
+          <Card id="sincronizacao" className="py-4 gap-2 text-foreground ">
             <CardContent className="px-5">
-              <h3 className="font-display text-base font-black">Você escolhe onde fica</h3>
+              <h3 className="font-display text-base font-extrabold">Você escolhe onde fica</h3>
               <p className="text-xs font-semibold opacity-85 mt-1 leading-relaxed">
                 Use só neste navegador, exporte um backup cifrado ou ative a sincronização. O
                 cofre tranca sozinho quando você se afasta.
@@ -898,8 +908,8 @@ export function WelcomeScreen({
       </main>
 
       {/* Rodapé com a versão e uma nota honesta sobre auditoria */}
-      <footer className="w-full bg-secondary-background border-t-3 border-border">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-stone-600 dark:text-slate-400">
+      <footer className="w-full border-t border-glass-line">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-muted ">
           <span>
             <strong>DonutVault v0.9.3</strong> · Criptografia no navegador com Web Crypto e
             Argon2id.
