@@ -1,82 +1,123 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
-  --font-display: 'Bricolage Grotesque', system-ui, -apple-system, sans-serif;
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+/* Sistema visual puxado do GuardList (paleta Evening Mix, vidro fosco, IBM Plex), com o amarelo do
+   DonutVault como única cor de ação. Desenho em docs/superpowers/specs/2026-11-13-visual-guardlist-design.md.
+   Os dois temas precisam ter os mesmos tokens (src/utils/theme-tokens.test.ts confere). */
 
-  /* Neobrutal-UI + DonutVault 90s Cartoon Tokens */
-  --radius: 14px;
-  --box-shadow-x: 4px;
-  --box-shadow-y: 4px;
-  --reverse-box-shadow-x: -4px;
-  --reverse-box-shadow-y: -4px;
-  --base-font-weight: 600;
+/* Valores iguais nos dois temas. */
+html {
+  --font-display: 'Bricolage Grotesque Variable', system-ui, -apple-system, sans-serif;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  --radius: 8px;
+  --radius-surface: 12px;
+  --radius-console: 24px;
+  --base-font-weight: 400;
   --heading-font-weight: 800;
-
-  --background: #FFFDF2;
-  --secondary-background: #FFFFFF;
-  --foreground: #09090B;
-  --main: #FFD90F;
-  --main-foreground: #09090B;
-  --sky: #38BDF8;
-  --sky-foreground: #09090B;
-  --pink: #FF5CA8;
-  --pink-foreground: #FFFFFF;
-  --border: #09090B;
-  --input: #09090B;
-  --ring: #FF5CA8;
-  --destructive: #DC2626; /* red-600: texto branco a 4,8:1 (o #EF4444 anterior dava 3,8:1) */
-  --destructive-foreground: #FFFFFF;
-  --shadow: var(--box-shadow-x) var(--box-shadow-y) 0px 0px var(--border);
+  --glass-blur: blur(18px) saturate(135%);
 }
 
-.dark {
-  --background: #0F172A;
-  --secondary-background: #1E293B;
-  --foreground: #F8FAFC;
+/* Tema claro: papel frio. */
+:root {
+  --background: #F1EEF3;
+  --secondary-background: #FFFFFF;
+  --surface-raised: #F6F3F7;
+  --surface-subtle: #EBE7EE;
+  --foreground: #182346;
+  --text-soft: #2F3C66;
+  --muted: #5D6389;
+  --border: #DAD4E0;
+  --input: #DAD4E0;
+  --line: #DAD4E0;
+  --line-strong: #BFA9BA;
   --main: #FFD90F;
-  --main-foreground: #09090B;
-  --sky: #38BDF8;
-  --sky-foreground: #09090B;
-  --pink: #FF5CA8;
-  --pink-foreground: #FFFFFF;
-  --border: #000000;
-  --input: #000000;
-  --ring: #FFD90F;
-  --destructive: #DC2626; /* red-600: texto branco a 4,8:1 (o #EF4444 anterior dava 3,8:1) */
+  --main-hover: #F2CC00;
+  --main-foreground: #0E0D15;
+  --accent: #3D5387; /* amarelo sobre branco não dá leitura: item ativo e links usam o azul-marinho */
+  --accent-soft: rgba(61, 83, 135, 0.10);
+  --ring: #3D5387;
+  --destructive: #b4233c;
   --destructive-foreground: #FFFFFF;
-  --shadow: var(--box-shadow-x) var(--box-shadow-y) 0px 0px #000000;
+  --danger: #b4233c;
+  --warning: #9a5b08;
+  --success: #167653;
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.92);
+  --glass-line: rgba(24, 35, 70, 0.09);
+  --glass-hi: rgba(255, 255, 255, 0.7);
+  --glass-shadow: rgba(15, 45, 90, 0.35);
+  --ambient-streak: 124, 131, 173;
+  --ambient-hot: 191, 169, 186;
+  --ambient-strength: 0.55;
+  --ambient-mark: 0.07;
+  --halftone: rgba(24, 35, 70, 0.06);
+}
+
+/* Tema escuro: azul-noite. */
+.dark {
+  --background: #0E0D15;
+  --secondary-background: #182346;
+  --surface-raised: #1F2D58;
+  --surface-subtle: #131A35;
+  --foreground: #F3F0F6;
+  --text-soft: #D5CCD8;
+  --muted: #9EA4C8;
+  --border: #2C3C68;
+  --input: #2C3C68;
+  --line: #2C3C68;
+  --line-strong: #3D5387;
+  --main: #FFD90F;
+  --main-hover: #FFE553;
+  --main-foreground: #0E0D15;
+  --accent: #FFD90F;
+  --accent-soft: rgba(255, 217, 15, 0.12);
+  --ring: #FFD90F;
+  --destructive: #ff6b7a;
+  --destructive-foreground: #0E0D15;
+  --danger: #ff6b7a;
+  --warning: #f2b04f;
+  --success: #3fd69b;
+  --glass: rgba(24, 35, 70, 0.52);
+  --glass-strong: rgba(24, 35, 70, 0.86);
+  --glass-line: rgba(191, 169, 186, 0.16);
+  --glass-hi: rgba(255, 255, 255, 0.055);
+  --glass-shadow: rgba(0, 0, 0, 0.6);
+  --ambient-streak: 61, 83, 135;
+  --ambient-hot: 217, 204, 214;
+  --ambient-strength: 0.75;
+  --ambient-mark: 0.10;
+  --halftone: rgba(255, 255, 255, 0.05);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-secondary-background: var(--secondary-background);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-subtle: var(--surface-subtle);
   --color-foreground: var(--foreground);
-  --color-main: var(--main);
-  --color-main-foreground: var(--main-foreground);
-  --color-sky: var(--sky);
-  --color-sky-foreground: var(--sky-foreground);
-  --color-pink: var(--pink);
-  --color-pink-foreground: var(--pink-foreground);
+  --color-text-soft: var(--text-soft);
+  --color-muted: var(--muted);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-main: var(--main);
+  --color-main-hover: var(--main-hover);
+  --color-main-foreground: var(--main-foreground);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-ring: var(--ring);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-
-  --shadow-shadow: var(--shadow);
-  --shadow-brutal-lg: 6px 6px 0px 0px var(--border);
-  --shadow-brutal-sm: 2px 2px 0px 0px var(--border);
-  --shadow-press: 1px 1px 0px 0px var(--border);
-
-  --spacing-boxShadowX: var(--box-shadow-x);
-  --spacing-boxShadowY: var(--box-shadow-y);
-  --spacing-pressX: 3px;
-  --spacing-pressY: 3px;
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-glass-line: var(--glass-line);
 
   --radius-base: var(--radius);
+  --radius-surface: var(--radius-surface);
+  --radius-console: var(--radius-console);
   --font-weight-base: var(--base-font-weight);
   --font-weight-heading: var(--heading-font-weight);
 }
@@ -84,6 +125,7 @@
 @layer base {
   body {
     font-family: var(--font-sans);
+    font-weight: var(--base-font-weight);
     background-color: var(--background);
     color: var(--foreground);
   }
