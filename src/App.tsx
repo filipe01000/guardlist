@@ -45,6 +45,7 @@ const IntelligenceView = lazy(() => import('./components/IntelligenceView').then
 const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
 const ClientManagerView = lazy(() => import('./components/ClientManagerView').then(m => ({ default: m.ClientManagerView })));
 const BackupView = lazy(() => import('./components/BackupView').then(m => ({ default: m.BackupView })));
+const VaultView = lazy(() => import('./components/VaultView').then(m => ({ default: m.VaultView })));
 const ReviewView = lazy(() => import('./components/ReviewView').then(m => ({ default: m.ReviewView })));
 
 interface AppProps {
@@ -605,6 +606,8 @@ export default function App({ currentUser, onLogout, onUserChange }: AppProps) {
         )}
 
         {currentTab === 'reports' && <ReportsView clients={clients} />}
+
+        {currentTab === 'vault' && currentUser.vaultAccess && <VaultView />}
 
         {currentTab === 'admin' && isAdmin && (
           <AdminView

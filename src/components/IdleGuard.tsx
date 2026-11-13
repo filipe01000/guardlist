@@ -10,7 +10,8 @@ import { sendActivity } from '../db/store';
 const KEY = 'guardlist-last-activity';
 const HEARTBEAT_MS = 30_000;
 const WARN_MS = 60_000;
-const EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'scroll'] as const;
+// guardlist-activity: uso dentro do cofre de senhas (quadro em /cofre), repassado por VaultView.
+const EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'wheel', 'scroll', 'guardlist-activity'] as const;
 
 function readShared(): number {
   try {

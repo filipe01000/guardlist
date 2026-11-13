@@ -43,6 +43,24 @@ const APP_CSP_DEVELOPMENT = APP_CSP_PRODUCTION.replace(
   .replace("connect-src 'self'", "connect-src 'self' ws: wss:");
 
 /**
+ * Caminho da requisição a partir de onde o app está montado. Sozinho é o caminho inteiro; dentro do
+ * GuardList (app montado em /cofre), /cofre/api/v1/x vira /api/v1/x, para a API manter os cabeçalhos
+ * de API e as armadilhas de scanner continuarem valendo.
+ */
+export function pathWithinApp(req: Pick<Request, 'originalUrl' | 'url'> & { app?: { mountpath?: unknown } }): string {
+  const full = req.originalUrl || req.url || '/';
+  const mount = typeof req.app?.mountpath === 'string' ? req.app.mountpath : '';
+  if (!mount || mount === '/' || !full.startsWith(mount)) return full;
+  const rest = full.slice(mount.length);
+  return rest.startsWith('/') ? rest : `/${rest}`;
+}
+
+export function appCsp(production: boolean, embedded: boolean): string {
+  const base = production ? APP_CSP_PRODUCTION : APP_CSP_DEVELOPMENT;
+  return embedded ? base.replace("frame-ancestors 'none'", "frame-ancestors 'self'") : base;
+}
+
+/**
  * Domínios oficiais planejados para produção (Fase 5B):
  * - Frontend Web Vault: https://vault.filipeti.com.br
  * - Backend Zero-Knowledge API: https://api-vault.filipeti.com.br
@@ -111,7 +129,7 @@ export function securityHeadersAndAntiFingerprintMiddleware(
     'accelerometer=(), autoplay=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()'
   );
 
-  const effectivePath = req.originalUrl || req.baseUrl || req.path || '';
+  const effectivePath = pathWithinApp(req);
   if (effectivePath.startsWith('/api/')) {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader(
@@ -126,10 +144,13 @@ export function securityHeadersAndAntiFingerprintMiddleware(
     res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
   } else {
     // Antes a CSP ia numa tag do index.html e liberava script inline também em produção.
-    res.setHeader('X-Frame-Options', 'DENY');
+    // Dentro do GuardList a página do cofre pode ser aberta num quadro do próprio GuardList (mesma
+    // origem); qualquer outro site continua proibido de embutir o cofre.
+    const embedded = process.env.DONUTVAULT_EMBEDDED === '1';
+    res.setHeader('X-Frame-Options', embedded ? 'SAMEORIGIN' : 'DENY');
     res.setHeader(
       'Content-Security-Policy',
-      process.env.NODE_ENV === 'production' ? APP_CSP_PRODUCTION : APP_CSP_DEVELOPMENT
+      appCsp(process.env.NODE_ENV === 'production', embedded)
     );
   }
 
@@ -266,7 +287,7 @@ async function runAntiReconAndScannerTrap(
   }
 
   // 3B. Bloqueia sondagens a endpoints administrativos, arquivos ocultos (.env, .git) e rotas de debug/demo
-  const trapResult = scannerDetector.isSensitiveOrAdminTrapPath(fullPath);
+  const trapResult = scannerDetector.isSensitiveOrAdminTrapPath(pathWithinApp(req));
   if (trapResult.trapped) {
     const { shouldThrottle429 } = scannerDetector.recordAdminOrSensitivePathProbe({
       clientIp,

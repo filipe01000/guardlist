@@ -29,6 +29,11 @@ npx vite build
   `DATABASE_URL` do GuardList, que é o banco da equipe. Não importar código do GuardList aqui dentro.
 - Chamadas à API usam `API_BASE` (`src/lib/apiBase.ts`); os cookies de sessão seguem o ponto de
   montagem (`sessionCookiePath`). Nunca escrever `/api/v1` fixo no cliente.
+- No servidor, decisões por caminho usam `pathWithinApp(req)`, que tira o `/cofre` da frente. Comparar
+  `req.originalUrl` com `/api/` falha quando o cofre está montado.
+- Quem chega em `/cofre` já passou pelo login do GuardList (administrador liberado pelo master). Dentro
+  do GuardList o cofre abre num quadro da mesma origem (`FRAMED`, em `src/lib/embed.ts`): só as
+  páginas aceitam `frame-ancestors 'self'`; a API segue com `'none'`.
 
 ## Não quebrar
 

@@ -13,6 +13,7 @@ import {
   Download,
 } from 'lucide-react';
 import { AmbientBackground } from './AmbientBackground';
+import { FRAMED } from '../lib/embed';
 import { BrandMark } from './BrandMark';
 import { CartoonVaultDoor } from './CartoonIllustrations';
 import {
@@ -251,8 +252,10 @@ export function WelcomeScreen({
 
   return (
     <div className="min-h-screen text-foreground flex flex-col justify-between">
-      <AmbientBackground />
+      {/* Dentro do GuardList: só o painel do cofre, sem fundo, cabeçalho, apresentação e rodapé próprios. */}
+      {!FRAMED && <AmbientBackground />}
       {/* Top Bar Neobrutalista (3 zonas limpas) */}
+      {!FRAMED && (
       <header className="w-full border-b border-glass-line">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 sm:gap-8 px-4 sm:px-6 py-4">
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -292,11 +295,13 @@ export function WelcomeScreen({
           </div>
         </div>
       </header>
+      )}
 
       {/* Hero Principal Neobrutal-UI + StreamUI Comic */}
       <main className="w-full max-w-7xl mx-auto px-6 py-6 lg:py-8 flex-1 flex flex-col justify-center">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
           {/* Coluna Esquerda: palco da marca, título e 3 ações principais */}
+          {!FRAMED && (
           <div className="lg:col-span-7 space-y-5">
             {/* Palco da marca, como o login é no GuardList */}
             <div className="relative w-fit">
@@ -411,9 +416,10 @@ export function WelcomeScreen({
               <span>Sincronização opcional</span>
             </div>
           </div>
+          )}
 
           {/* Coluna Direita: painel de vidro com os formulários */}
-          <div className="lg:col-span-5">
+          <div className={FRAMED ? 'lg:col-span-12 w-full max-w-lg mx-auto' : 'lg:col-span-5'}>
             <Card className="border">
               <CardHeader className="border-b border-line pb-5 bg-surface-raised rounded-t-[10px] -mt-6 pt-6">
                 <div className="flex items-center justify-between gap-4">
@@ -861,6 +867,7 @@ export function WelcomeScreen({
         </div>
 
         {/* Como o cofre protege, em linguagem comum */}
+        {!FRAMED && (
         <section
           id="criptografia"
           className="mt-8 pt-6 border-t border-line grid grid-cols-1 md:grid-cols-4 gap-5"
@@ -905,9 +912,11 @@ export function WelcomeScreen({
             </CardContent>
           </Card>
         </section>
+        )}
       </main>
 
       {/* Rodapé com a versão e uma nota honesta sobre auditoria */}
+      {!FRAMED && (
       <footer className="w-full border-t border-glass-line">
         <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-bold text-muted ">
           <span>
@@ -917,6 +926,7 @@ export function WelcomeScreen({
           <span>Projeto independente, ainda sem auditoria de segurança externa.</span>
         </div>
       </footer>
+      )}
     </div>
   );
 }
